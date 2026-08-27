@@ -1,0 +1,151 @@
+{
+ "schema_version": 1,
+ "episode_index": 3,
+ "saved_at": "2026-08-27T01:21:18.458Z",
+ "atoms": [
+  {
+   "role": "assistant",
+   "content": "approach",
+   "style": "subtask",
+   "timestamp": 0,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "grasp",
+   "style": "subtask",
+   "timestamp": 4.203052288,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] contact_onset f0",
+   "style": "interjection",
+   "timestamp": 4.642928896,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] contact_onset f1",
+   "style": "interjection",
+   "timestamp": 4.665445376,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "transport",
+   "style": "subtask",
+   "timestamp": 5.017031168,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] grasp_stable f0",
+   "style": "interjection",
+   "timestamp": 5.017031168,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] grasp_stable f1",
+   "style": "interjection",
+   "timestamp": 5.017031168,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f0 0.11s",
+   "style": "interjection",
+   "timestamp": 5.072448512,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f1 0.11s",
+   "style": "interjection",
+   "timestamp": 5.303414016,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f0 0.11s",
+   "style": "interjection",
+   "timestamp": 5.40183808,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f0 0.18s",
+   "style": "interjection",
+   "timestamp": 6.800384512,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] slip f0 0.34s",
+   "style": "interjection",
+   "timestamp": 7.14064128,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "place_release",
+   "style": "subtask",
+   "timestamp": 9.440649216,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f1 0.27s",
+   "style": "interjection",
+   "timestamp": 9.497696512,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] place f0 0.08s",
+   "style": "interjection",
+   "timestamp": 9.598261504,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] slip f0 0.19s",
+   "style": "interjection",
+   "timestamp": 9.605261568,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] release f1",
+   "style": "interjection",
+   "timestamp": 9.664314624,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] release f0",
+   "style": "interjection",
+   "timestamp": 9.682317056,
+   "camera": null,
+   "tool_calls": null
+  }
+ ]
+}

@@ -1,0 +1,79 @@
+# Data and upstream-source management
+
+Working model: this repo is our own workspace. Nothing here is a git clone of
+Jingyi's repos — code is vendored as plain snapshots, data is direct-downloaded
+as pinned snapshots. We never push to her repos or datasets from here. Merging
+back happens at the end, as a reviewed diff against the recorded base revisions
+below.
+
+## Vendored code
+
+| Path | Upstream | Base revision | Taken |
+|---|---|---|---|
+| `visualizer/` | HF Space `Jingyi-Z/lerobotac-dataset-visualizer` | `47d63aae3a0fec1a09b3763b13e941bbd23807ac` (2026-08-26 22:06, "Manual per-episode review marks...") | 2026-08-27 |
+
+`visualizer/` is committed in this repo and is where our labeling changes go.
+To merge back later: clone her Space fresh, check out the base revision, apply
+our diff (`git diff` of base snapshot vs our tree), review, and hand it over —
+or open the diff with her directly. Do not add her Space as a git remote here.
+
+## Local data mirrors (`data/`, gitignored)
+
+| Path | Upstream dataset | Pinned revision | Upstream last-modified at pin time |
+|---|---|---|---|
+| `data/sotac/` | `Jingyi-Z/sotac` (63 curated episodes) | `e0fcfeb3171d48a88a4aa0d4fd8eaf5731f7cd58` | 2026-08-27T20:39Z |
+| `data/sotac_raw/` | `Jingyi-Z/sotac_raw` (append-only raw archive) | `18e0dfed13e4a6f18b1a0be224d9a458b95f6bd6` | 2026-08-26T14:38Z |
+
+Downloaded via `huggingface_hub.snapshot_download` with an explicit `revision`
+(HTTP, no git). Sizes: sotac ≈ 1.0 GB (867 MB video), sotac_raw ≈ 1.3 GB.
+
+Contents per dataset: `data/` (30 Hz parquet main tables), `sensors/` (raw
+~91 Hz CSV sidecars + alignment.json per episode), `annotations/` (per-episode
+JSON), `videos/` (chunked mp4), `meta/`, and in sotac a `curation_map.json`.
+
+### Re-sync policy
+
+- She pushes actively (annotations for episodes 0–59 landed 2026-08-27; the
+  recorder's firmware-dropout guard changed what `sotac_raw` contains as of
+  2026-08-26). **Never re-download implicitly.** To sync: query the current
+  revision, record it here with a date, and download to a fresh pinned dir if
+  the old snapshot is still needed for comparison.
+- All scoring/threshold work must state which pinned revision it ran against.
+- Episode vintage matters: episodes recorded before 2026-08-26 contain the
+  zeroed-taxel firmware artifact in raw form; later ones are repaired at the
+  recorder. Track per-episode recording dates when scoring.
+
+### `data/annotation-history/` — preserved annotation revisions
+
+Every save in the visualizer is one Hub commit ("annotations: episode N (X
+atoms)"). Episodes 0–5 were annotated in an overnight session (2026-08-26
+23:49 → 08-27 01:28 UTC) with re-saves whose atom counts changed — the human
+corrections live in the diff between consecutive saves, since edited atoms
+keep their `[auto:]` prefix. Preserved locally as
+`episode_NNNNNN_<rev>.json`:
+
+| Episode | Saves (rev @ atoms) |
+|---|---|
+| 0 | `f99ffe5a` @ 24 → `5e0d63c2` @ 29 |
+| 1 | `ab67afdc` @ 21 → `60638d51` @ 19 |
+| 2 | `d38cb40f` @ 20 → `64794f91` @ 15 |
+| 3 | `76352152` @ 18 (single save) |
+| 4 | `646ccb29` @ 16 (single save) |
+| 5 | `3a3be966` @ 17 (single save) |
+| 45 | `1332842b` / `f6a3b89a` @ 10 (double-save 19 s apart, today) |
+
+Episodes 6–61 were saved in one sweep on 2026-08-27 (14:56–20:46 UTC,
+~2 min/episode, zero non-auto atoms) — treat them as pure detector output,
+not ground truth, regardless of the `reviewed: true` flags in
+`episode_annotations.json` (those flags track episode-level metadata review:
+task, result, attempts).
+
+### Known upstream facts to keep in mind
+
+- Annotations at the pinned sotac revision: episodes 0–49 and 51–59 (no 50),
+  plus `annotations/episode_annotations.json`. Only episodes 0–5 are known
+  human-corrected (per SOTAC-_1.MD); the status of 6–59 (auto vs corrected) is
+  under investigation.
+- The Space writes annotations back to the Hub (`hubCommit.ts`). Our local
+  visualizer copy must not be pointed at her datasets with write credentials;
+  test the write path only against a dataset under our own namespace.

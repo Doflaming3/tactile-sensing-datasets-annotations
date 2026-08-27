@@ -1,0 +1,87 @@
+{
+ "schema_version": 1,
+ "episode_index": 45,
+ "saved_at": "2026-08-27T17:49:27.722Z",
+ "atoms": [
+  {
+   "role": "assistant",
+   "content": "approach",
+   "style": "subtask",
+   "timestamp": 0,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "grasp",
+   "style": "subtask",
+   "timestamp": 3.368667904,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] contact_onset f1",
+   "style": "interjection",
+   "timestamp": 6.471457792,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] contact_onset f0",
+   "style": "interjection",
+   "timestamp": 6.5151168,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] grasp_stable f0",
+   "style": "interjection",
+   "timestamp": 6.81285248,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] grasp_stable f1",
+   "style": "interjection",
+   "timestamp": 6.856384512,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] slip f1 0.16s",
+   "style": "interjection",
+   "timestamp": 7.308315648,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:low] drop f0",
+   "style": "interjection",
+   "timestamp": 7.318781952,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] place f1 0.30s",
+   "style": "interjection",
+   "timestamp": 7.373604864,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:low] drop f1",
+   "style": "interjection",
+   "timestamp": 7.565880576,
+   "camera": null,
+   "tool_calls": null
+  }
+ ]
+}

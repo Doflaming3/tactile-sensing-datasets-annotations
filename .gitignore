@@ -1,0 +1,16 @@
+# Local data mirrors (pinned snapshots, direct-downloaded; see DATA.md).
+# annotation-history is exempt: tiny, irreplaceable ground-truth evidence.
+data/*
+!data/annotation-history/
+
+# HF download cache artifacts
+.cache/
+**/.huggingface/
+
+# Visualizer build/dev output
+visualizer/node_modules/
+visualizer/.next/
+
+# Editor / OS noise
+.vscode/
+Thumbs.db

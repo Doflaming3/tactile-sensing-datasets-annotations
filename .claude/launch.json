@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "visualizer",
+      "runtimeExecutable": "C:\\Users\\Ryan Xu\\.bun\\bin\\bun.exe",
+      "runtimeArgs": ["--bun", "run", "--cwd", "E:\\tactile-sensing-datasets-annotations\\visualizer", "dev"],
+      "port": 3000
+    }
+  ]
+}

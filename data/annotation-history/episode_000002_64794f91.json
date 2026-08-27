@@ -1,0 +1,127 @@
+{
+ "schema_version": 1,
+ "episode_index": 2,
+ "saved_at": "2026-08-27T01:21:45.391Z",
+ "atoms": [
+  {
+   "role": "assistant",
+   "content": "approach",
+   "style": "subtask",
+   "timestamp": 0,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "grasp",
+   "style": "subtask",
+   "timestamp": 6.138051584,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "transport",
+   "style": "subtask",
+   "timestamp": 6.753876224,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "assistant",
+   "content": "place_release",
+   "style": "subtask",
+   "timestamp": 8.935026944,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] contact_onset f0",
+   "style": "interjection",
+   "timestamp": 6.412864,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] contact_onset f1",
+   "style": "interjection",
+   "timestamp": 6.445424896,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] grasp_stable f1",
+   "style": "interjection",
+   "timestamp": 6.753876224,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] grasp_stable f0",
+   "style": "interjection",
+   "timestamp": 8.459480832,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f0 0.11s",
+   "style": "interjection",
+   "timestamp": 8.491636736,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:medium] slip f0 0.24s",
+   "style": "interjection",
+   "timestamp": 8.943504384,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] place f0 0.17s",
+   "style": "interjection",
+   "timestamp": 9.03524224,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] slip f1 0.19s",
+   "style": "interjection",
+   "timestamp": 9.074871808,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] place f1 0.05s",
+   "style": "interjection",
+   "timestamp": 9.101593088,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] release f1",
+   "style": "interjection",
+   "timestamp": 9.152626688,
+   "camera": null,
+   "tool_calls": null
+  },
+  {
+   "role": "user",
+   "content": "[auto:high] release f0",
+   "style": "interjection",
+   "timestamp": 9.207847168,
+   "camera": null,
+   "tool_calls": null
+  }
+ ]
+}
