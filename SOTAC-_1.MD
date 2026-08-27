@@ -336,7 +336,55 @@ Pulled the `sotac` Hub history. Every visualizer save is one commit
   independently trustworthy files. And episodes 0–5 were labeled by the
   pre-debounce detector, so a fresh run diffs against them in both directions.
 
-### 8.7 Section 7 status after this pass
+### 8.7 Delta audit (2026-08-27, later): episodes 0–5 are NOT human-corrected
+
+Supersedes the ground-truth reading in 8.6. Mechanical classification of the
+save-pair deltas (`scripts/extract_deltas.py`, full writeup in
+`analysis/ground-truth-deltas.md`): zero atoms moved, zero text-edited,
+every added/deleted atom is auto-formatted, and each delta matches a
+detector commit landing between the saves (`52b4b11` place backfill 00:09,
+`8c3be6c` raw dropout hold 01:11, `da167ee` contact debounce 01:17 — all
+UTC). The ep45 double-save control is bit-identical, so saves are
+deterministic.
+
+Consequences:
+
+- **The dataset has no annotation ground truth.** Episodes 0–5 are
+  regression snapshots of an evolving detector. T1.1 changes from "score
+  against 0–5" to "create a hand-labeled scoring set" (stratify across the
+  10 multi-attempt and 6 failure/partial episodes).
+- **The §3.1 info-drop is deliberate.** Commit `bd55a13` ("compact event
+  labels, drop wordy info suffix", 00:16 UTC) removed it on purpose. T1.2
+  is not a revert; the detail should come back as a structured field on the
+  atom (precedent: the unused `camera` / `tool_calls` slots), not as longer
+  content strings.
+- Section 6 question 5 is answered (0–5 track detector versions); replace
+  it with: "which episodes have you verified by hand, and may we hand-label
+  N episodes as the scoring set?"
+
+### 8.8 Offline runner + full-corpus diff: her corrections recovered (2026-08-27, latest)
+
+`scripts/run-detector.ts` replays the app's auto-label pipeline offline on the
+local mirrors; 24/59 published episodes reproduce **bit-exactly**, validating
+the harness. Diffing the rest against fresh default runs recovers the manual
+corrections that 8.7 could not see (they live inside every save, not between
+saves). Full writeup: `analysis/detector-vs-published.md`. Summary:
+
+- **30 subtask-boundary drags on 24 episodes** — `grasp` start dragged later
+  by ≈3.2 s median (29/30 later). The segmenter's "first sustained closing"
+  anchor fires during approach; threshold explanations tested and excluded.
+  Her most frequent manual fix, and a directly implementable detector repair:
+  anchor grasp to the closing bout that leads to contact.
+- **73 event deletions** — labeled false positives, by class: place 26,
+  contact_onset 17, slip 13, drop 6, release 4, grasp_stable 4. By deleted
+  confidence: medium 59, low 6, high 5.
+- So T1.1 has a **precision** signal after all (73 labeled FPs + 30 correct
+  grasp boundaries); **recall** still requires fresh hand labels.
+- Amends 8.7: "no human edits" holds for the event timeline *between saves*;
+  subtask boundaries in 0–5 were in fact hand-dragged before the first save
+  and preserved by events-only re-runs.
+
+### 8.9 Section 7 status after this pass
 
 | Item | Status |
 |---|---|
