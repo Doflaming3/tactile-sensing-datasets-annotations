@@ -128,6 +128,7 @@ const TUNABLE: Array<
 export default function AutoLabelPanel({
   sensorFrames,
   gripper,
+  arm,
   repoId,
   root,
   episodeId,
@@ -135,6 +136,8 @@ export default function AutoLabelPanel({
   sensorFrames: SensorFramesMap | undefined;
   /** Episode-relative gripper trajectory (from the flat chart data). */
   gripper: { t: number[]; pos: number[] } | null;
+  /** Summed |arm-joint speed| (gripper excluded) — transport anchor. */
+  arm: { t: number[]; speed: number[] } | null;
   repoId: string;
   root?: string | null;
   episodeId: number;
@@ -237,7 +240,7 @@ export default function AutoLabelPanel({
           return;
         }
         const t0 = performance.now();
-        const result = detectEvents(series, gripper, th);
+        const result = detectEvents(series, gripper, th, arm);
         // Diagnostics: everything needed to compare a browser run against the
         // offline reference. Read via DevTools: window.__autolabelDebug
         if (typeof window !== "undefined") {
@@ -290,7 +293,7 @@ export default function AutoLabelPanel({
         setRunning(false);
       }
     },
-    [series30, useRaw, loadRaw, gripper, atoms, deleteAtom, addAtoms],
+    [series30, useRaw, loadRaw, gripper, arm, atoms, deleteAtom, addAtoms],
   );
 
   // Re-detect only tactile events, leaving subtask segments (including

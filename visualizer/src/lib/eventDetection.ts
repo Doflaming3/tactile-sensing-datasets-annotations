@@ -80,6 +80,16 @@ export interface GripperSeries {
   pos: number[]; // arbitrary units; only derivative sign is used
 }
 
+/** Summed |joint speed| of the ARM joints (everything except the jaw),
+ * arbitrary units/s. Carries the one fact fingertip force cannot: whether
+ * the arm is moving. Transport anchors to it — a light object's weight
+ * transfer is invisible in grip force (the lift detector never fires on
+ * sotac), but lift-off is unmissable in shoulder/elbow motion. */
+export interface ArmMotionSeries {
+  t: number[]; // seconds
+  speed: number[]; // summed |d(joint)/dt| over non-gripper joints
+}
+
 // ---------------------------------------------------------------- thresholds
 
 export interface DetectionThresholds {
@@ -664,6 +674,7 @@ export function detectEvents(
   series: TactileSeries,
   gripper: GripperSeries | null,
   thresholds?: Partial<DetectionThresholds>,
+  arm?: ArmMotionSeries | null,
 ): AutoLabelResult {
   const th: DetectionThresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
   const { t, rateHz, fingers } = series;
@@ -1191,32 +1202,39 @@ export function detectEvents(
     let tClose = closeStart >= 0 ? t[closeStart] : dur * 0.25;
     // a failed trial belongs to approach, not grasp
     if (tClose < prevBoutEndS) tClose = prevBoutEndS;
-    // transport starts when the grasp is READY — every finger's grip has
-    // stabilized — not at the first finger's stability: her hand-corrected
-    // transport boundaries sit 0.5–1.9 s after first-stability, 12 of 12
-    // later. A second finger stabilizing more than SETTLE_CAP_S after the
-    // first is a re-grip, not settling, and must not delay transport
-    // (sotac ep24). The ideal anchor would be the lift event, but the lift
-    // detector never fires on sotac — the foam ball's weight transfer
-    // stays under liftRateNps — a defect of its own.
-    const SETTLE_CAP_S = 1.5;
-    const firstStableByFinger = new Map<number, number>();
-    for (const e of cleaned) {
-      if (
-        e.label === "grasp_stable" &&
-        e.startS >= tClose &&
-        !firstStableByFinger.has(e.finger)
-      ) {
-        firstStableByFinger.set(e.finger, e.startS);
+    // transport starts when the ARM starts carrying: first sustained arm
+    // motion at/after the grasp's first stability. Grip-force statistics
+    // cannot mark this boundary — first-stability is 0.5–1.9 s early on
+    // her 12 hand-corrected episodes (settling), but waiting for the
+    // second finger overshoots when the operator lifts with one grip
+    // still fluctuating (sotac ep2, video-verified: ball airborne at
+    // 6.9 s, second finger's flat-force test only passes at 8.5 s). A
+    // light object's weight transfer is equally invisible in force, so
+    // the moving arm is the only reliable lift-off signal. Falls back to
+    // first-stability when no arm data is supplied.
+    const stableAfterClose = cleaned.find(
+      (e) => e.label === "grasp_stable" && e.startS >= tClose,
+    );
+    const firstStableS = stableAfterClose ? stableAfterClose.startS : null;
+    let tStableRaw = firstStableS ?? tClose + 1;
+    if (arm && arm.t.length > 2 && firstStableS !== null) {
+      const ARM_MOVE_EPS = 12; // summed units/s; jitter ~1-2, slow drift ~5-10
+      const moveSustainS = 0.15;
+      let j = 1;
+      let moveStart = -1;
+      for (let i = 0; i < n; i++) {
+        if (t[i] < firstStableS - 0.05) continue;
+        while (j < arm.t.length - 1 && arm.t[j] < t[i]) j++;
+        if (arm.speed[j] > ARM_MOVE_EPS) {
+          if (moveStart < 0) moveStart = i;
+          if (t[i] - t[moveStart] >= moveSustainS) {
+            tStableRaw = Math.max(t[moveStart], firstStableS);
+            break;
+          }
+        } else {
+          moveStart = -1;
+        }
       }
-    }
-    let tStableRaw = tClose + 1;
-    if (firstStableByFinger.size > 0) {
-      const firsts = [...firstStableByFinger.values()];
-      tStableRaw = Math.min(
-        Math.max(...firsts),
-        Math.min(...firsts) + SETTLE_CAP_S,
-      );
     }
     const tStable = Math.min(Math.max(tStableRaw, tClose), dur);
     const tOpen = Math.max(openStart >= 0 ? t[openStart] : dur * 0.9, tStable);

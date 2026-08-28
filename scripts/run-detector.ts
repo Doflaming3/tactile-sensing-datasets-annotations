@@ -129,6 +129,7 @@ interface Info {
 interface EpisodeInputs {
   timestamps: number[];
   gripper: { t: number[]; pos: number[] } | null;
+  arm: { t: number[]; speed: number[] } | null;
   frames: unknown[];
   sensorName: string;
   nTaxels: number;
@@ -173,17 +174,40 @@ async function loadEpisodeInputs(
   const timestamps = rows.map((r) => toNum(r["timestamp"]));
   const frames = rows.map((r) => r[sensorKey]);
   let gripper: { t: number[]; pos: number[] } | null = null;
+  let arm: { t: number[]; speed: number[] } | null = null;
   if (gripperIdx >= 0) {
     gripper = { t: [], pos: [] };
+    arm = { t: [], speed: [] };
+    let prev: number[] | null = null;
+    let prevT = 0;
     for (const r of rows) {
       const st = r["observation.state"] as ArrayLike<number> | undefined;
       if (!st) continue;
-      gripper.t.push(toNum(r["timestamp"]));
+      const ts = toNum(r["timestamp"]);
+      gripper.t.push(ts);
       gripper.pos.push(Number(st[gripperIdx]));
+      // arm speed: summed |joint velocity| over all non-gripper joints
+      const joints: number[] = [];
+      for (let k = 0; k < st.length; k++) {
+        if (k !== gripperIdx) joints.push(Number(st[k]));
+      }
+      let spd = 0;
+      if (prev && ts - prevT > 1e-9) {
+        for (let k = 0; k < joints.length; k++) {
+          spd += Math.abs(joints[k] - prev[k]) / (ts - prevT);
+        }
+      }
+      arm.t.push(ts);
+      arm.speed.push(spd);
+      prev = joints;
+      prevT = ts;
     }
-    if (gripper.t.length <= 2) gripper = null;
+    if (gripper.t.length <= 2) {
+      gripper = null;
+      arm = null;
+    }
   }
-  return { timestamps, gripper, frames, sensorName, nTaxels };
+  return { timestamps, gripper, arm, frames, sensorName, nTaxels };
 }
 
 function loadRawCsvTexts(root: string, ep: number, sensorName: string): string[] | null {
@@ -278,7 +302,7 @@ async function runEpisode(
   }
   if (!series) throw new Error(`episode ${ep}: no tactile series`);
 
-  const result = detectEvents(series, gripper, args.thresholds);
+  const result = detectEvents(series, gripper, args.thresholds, inputs.arm);
   const atoms = resultToAtoms(result) as unknown as Atom[];
 
   if (!args.all) {

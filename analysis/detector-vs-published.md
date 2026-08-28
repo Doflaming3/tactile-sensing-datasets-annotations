@@ -210,9 +210,24 @@ later — the same direction as every one of her corrections.
 Two consequences recorded: (1) **the `lift` detector never fires on
 sotac** — zero lift events across the corpus; the foam ball's weight
 transfer stays under `liftRateNps` = 1.5 N/s while the jaw-static gate
-also blocks it during tightening. Fixing it would give the semantically
-ideal transport anchor (transport = lift-off). (2) The exact-bit-match
-metric vs published files is retired (4/59 after this change): it
-validated the offline harness, but published boundaries reflect the old
-detector; the video-verified and hand-dragged sets are the scores that
-matter now.
+also blocks it during tightening. (2) The exact-bit-match metric vs
+published files is retired: it validated the offline harness, but
+published boundaries reflect the old detector; the video-verified and
+hand-dragged sets are the scores that matter now.
+
+**Superseded same day — grip statistics cannot mark this boundary at
+all.** Zheng video-verified ep2: the ball lifts at 6.9 s with the second
+finger's grip still fluctuating (its flat-force stability only passes at
+8.5 s), so the capped both-ready rule was 1.5 s late there, while
+first-stability is 0.5–1.9 s early elsewhere — and no stability statistic
+separates the two situations. Final anchor: **transport = first sustained
+ARM motion (summed non-gripper |joint speed| > 12 units/s for 0.15 s) at
+or after the grasp's first stability** — the arm starting to carry is the
+one signal grip force cannot fake, and it is loud even for objects whose
+weight transfer is invisible to the fingertips. New `ArmMotionSeries`
+input, wired in both the runner (from observation.state) and the app
+(from chart rows). Result: transport disagreements 13 → **8**, median
+0.69 s, direction-balanced; ep2 exact (6.754 vs her 6.75); ep24/27/30/
+32/34/47/49 agree; remaining residuals are sub-0.9 s ambiguity plus ep56
+(-1.5 s, true lift-off later than first arm motion after a two-trial
+grasp).

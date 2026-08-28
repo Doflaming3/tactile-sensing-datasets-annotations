@@ -216,10 +216,9 @@ export default function EpisodeViewer({
 
   const router = useRouter();
   const [folderList, setFolderList] = useState<string[] | null>(null);
-  const [companyTask, setCompanyTask] = useState<Record<
-    string,
-    string
-  > | null>(null);
+  const [companyTask, setCompanyTask] = useState<Record<string, string> | null>(
+    null,
+  );
   const [epAnnotation, setEpAnnotation] = useState<EpisodeAnnotation | null>(
     null,
   );
@@ -375,7 +374,14 @@ export default function EpisodeViewer({
       <FlaggedEpisodesProvider>
         <AnnotationsProvider>
           <EpisodeBootstrap data={data!} />
-          <EpisodeViewerInner data={data!} org={org} dataset={dataset} folderList={folderList} companyTask={companyTask} epAnnotation={epAnnotation} />
+          <EpisodeViewerInner
+            data={data!}
+            org={org}
+            dataset={dataset}
+            folderList={folderList}
+            companyTask={companyTask}
+            epAnnotation={epAnnotation}
+          />
         </AnnotationsProvider>
       </FlaggedEpisodesProvider>
     </TimeProvider>
@@ -449,9 +455,7 @@ function AnnotationBadges({ a }: { a: EpisodeAnnotation }) {
         </span>
       )}
       {a.events && a.events.length > 0 && (
-        <span className="w-full text-slate-400">
-          {a.events.join(" · ")}
-        </span>
+        <span className="w-full text-slate-400">{a.events.join(" · ")}</span>
       )}
     </div>
   );
@@ -461,7 +465,10 @@ function EpisodeViewerInner({
   data,
   org,
   dataset,
- folderList,  companyTask, epAnnotation, }: {
+  folderList,
+  companyTask,
+  epAnnotation,
+}: {
   data: EpisodeData;
   org?: string;
   dataset?: string;
@@ -487,9 +494,7 @@ function EpisodeViewerInner({
   const folderIdx = folderMode
     ? Math.max(0, folderList!.indexOf(innerRootParam!))
     : -1;
-  const effEpisodes = folderMode
-    ? folderList!.map((_, i) => i)
-    : episodes;
+  const effEpisodes = folderMode ? folderList!.map((_, i) => i) : episodes;
   const effEpisodeId = folderMode ? folderIdx : episodeId;
   const folderLabels = folderMode ? folderList! : undefined;
 
@@ -517,6 +522,41 @@ function EpisodeViewerInner({
       }
     }
     return t.length > 2 ? { t, pos } : null;
+  }, [data.flatChartData]);
+
+  // Arm motion (summed |joint speed|, gripper excluded) for the tactile
+  // auto-labeler — the transport boundary anchors to the arm starting to
+  // carry, which grip force cannot see (light objects).
+  const armSeries = useMemo(() => {
+    const rows = data.flatChartData;
+    if (!rows || rows.length === 0) return null;
+    const keys = Object.keys(rows[0]).filter(
+      (k) => /\.pos$/i.test(k) && !/^action/i.test(k) && !/gripper/i.test(k),
+    );
+    if (keys.length === 0) return null;
+    const t: number[] = [];
+    const speed: number[] = [];
+    let prev: number[] | null = null;
+    let prevT = 0;
+    for (const r of rows) {
+      const ts = r["timestamp"];
+      if (typeof ts !== "number") continue;
+      const joints = keys.map((k) =>
+        typeof r[k] === "number" ? (r[k] as number) : NaN,
+      );
+      if (joints.some((v) => Number.isNaN(v))) continue;
+      let spd = 0;
+      if (prev && ts - prevT > 1e-9) {
+        for (let k = 0; k < joints.length; k++) {
+          spd += Math.abs(joints[k] - prev[k]) / (ts - prevT);
+        }
+      }
+      t.push(ts);
+      speed.push(spd);
+      prev = joints;
+      prevT = ts;
+    }
+    return t.length > 2 ? { t, speed } : null;
   }, [data.flatChartData]);
 
   const loadStartRef = useRef(performance.now());
@@ -966,7 +1006,10 @@ function EpisodeViewerInner({
   );
   const [dashSlots, setDashSlots] = useState<[string, string]>(["v:0", "v:1"]);
   const streamOptions = useMemo(() => {
-    const opts = videosInfo.map((v, i) => ({ id: `v:${i}`, label: v.filename }));
+    const opts = videosInfo.map((v, i) => ({
+      id: `v:${i}`,
+      label: v.filename,
+    }));
     for (const cam of rgbdCams) {
       opts.push({ id: `rgbd:${cam}:color`, label: `${cam} · color` });
       opts.push({ id: `rgbd:${cam}:depth`, label: `${cam} · depth` });
@@ -1146,8 +1189,7 @@ function EpisodeViewerInner({
                 style={{
                   gridTemplateColumns:
                     "minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1.15fr)",
-                  gridTemplateRows:
-                    "minmax(0, 4fr) minmax(0, 6fr)",
+                  gridTemplateRows: "minmax(0, 4fr) minmax(0, 6fr)",
                   gridTemplateAreas: '"img img side" "joint joint side"',
                 }}
               >
@@ -1186,58 +1228,58 @@ function EpisodeViewerInner({
                   className="min-h-0 flex flex-col gap-3"
                 >
                   <div className="flex-1 min-h-0 flex flex-col">
-                  {tacLabels.length > 2 && (
-                    <select
-                      className="shrink-0 mb-1 text-[11px] bg-[var(--surface-1)] border border-white/10 rounded px-1 py-0.5 text-slate-300"
-                      value={dashFingers[0]}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        setDashFingers((prev) => [v, prev[1]]);
-                      }}
-                    >
-                      {tacLabels.map((l, i) => (
-                        <option key={l} value={i}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <div className="flex-1 min-h-0">
-                    <Suspense fallback={null}>
-                      <TactileFingerView
-                        sensorFrames={data.sensorFrames!}
-                        fps={datasetInfo.fps}
-                        fingerIndex={dashFingers[0]}
-                      />
-                    </Suspense>
-                  </div>
+                    {tacLabels.length > 2 && (
+                      <select
+                        className="shrink-0 mb-1 text-[11px] bg-[var(--surface-1)] border border-white/10 rounded px-1 py-0.5 text-slate-300"
+                        value={dashFingers[0]}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setDashFingers((prev) => [v, prev[1]]);
+                        }}
+                      >
+                        {tacLabels.map((l, i) => (
+                          <option key={l} value={i}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="flex-1 min-h-0">
+                      <Suspense fallback={null}>
+                        <TactileFingerView
+                          sensorFrames={data.sensorFrames!}
+                          fps={datasetInfo.fps}
+                          fingerIndex={dashFingers[0]}
+                        />
+                      </Suspense>
+                    </div>
                   </div>
                   <div className="flex-1 min-h-0 flex flex-col">
-                  {tacLabels.length > 2 && (
-                    <select
-                      className="shrink-0 mb-1 text-[11px] bg-[var(--surface-1)] border border-white/10 rounded px-1 py-0.5 text-slate-300"
-                      value={dashFingers[1]}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        setDashFingers((prev) => [prev[0], v]);
-                      }}
-                    >
-                      {tacLabels.map((l, i) => (
-                        <option key={l} value={i}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <div className="flex-1 min-h-0">
-                    <Suspense fallback={null}>
-                      <TactileFingerView
-                        sensorFrames={data.sensorFrames!}
-                        fps={datasetInfo.fps}
-                        fingerIndex={dashFingers[1]}
-                      />
-                    </Suspense>
-                  </div>
+                    {tacLabels.length > 2 && (
+                      <select
+                        className="shrink-0 mb-1 text-[11px] bg-[var(--surface-1)] border border-white/10 rounded px-1 py-0.5 text-slate-300"
+                        value={dashFingers[1]}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setDashFingers((prev) => [prev[0], v]);
+                        }}
+                      >
+                        {tacLabels.map((l, i) => (
+                          <option key={l} value={i}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="flex-1 min-h-0">
+                      <Suspense fallback={null}>
+                        <TactileFingerView
+                          sensorFrames={data.sensorFrames!}
+                          fps={datasetInfo.fps}
+                          fingerIndex={dashFingers[1]}
+                        />
+                      </Suspense>
+                    </div>
                   </div>
                   <div className="flex-[0.8] min-h-0">
                     <Suspense fallback={null}>
@@ -1342,8 +1384,12 @@ function EpisodeViewerInner({
                     </p>
                   )}
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {[companyTask.object, companyTask.contact_part,
-                      companyTask.force_level, companyTask.speed]
+                    {[
+                      companyTask.object,
+                      companyTask.contact_part,
+                      companyTask.force_level,
+                      companyTask.speed,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
@@ -1385,7 +1431,6 @@ function EpisodeViewerInner({
                   />
                 </Suspense>
               )}
-
 
               {/* Tactile sensors (PXSR-style force arrows) */}
               {data.sensorFrames &&
@@ -1484,6 +1529,7 @@ function EpisodeViewerInner({
                 <AutoLabelPanel
                   sensorFrames={data.sensorFrames}
                   gripper={gripperSeries}
+                  arm={armSeries}
                   repoId={datasetInfo.repoId}
                   root={innerRootParam}
                   episodeId={effEpisodeId}
@@ -1543,10 +1589,18 @@ function EpisodeViewerInner({
                         // metadata.json -> 1280x720).
                         cameras: [
                           ...datasetInfo.cameras,
-                          ...["RGB_Camera0", "RGB_Camera1", "RGB_Camera2",
-                              "RGB_Camera3", "RGB_Camera4", "RGB_Camera5"].map(
-                            (name) => ({ name, width: 1920, height: 1080 }),
-                          ),
+                          ...[
+                            "RGB_Camera0",
+                            "RGB_Camera1",
+                            "RGB_Camera2",
+                            "RGB_Camera3",
+                            "RGB_Camera4",
+                            "RGB_Camera5",
+                          ].map((name) => ({
+                            name,
+                            width: 1920,
+                            height: 1080,
+                          })),
                           ...["RGBD_0", "RGBD_1", "RGBD_2"].map((name) => ({
                             name: `${name} (color+depth16)`,
                             width: 1280,
