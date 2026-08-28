@@ -10,6 +10,7 @@ data/*
 # Visualizer build/dev output
 visualizer/node_modules/
 visualizer/.next/
+visualizer/tsconfig.tsbuildinfo
 
 # Editor / OS noise
 .vscode/

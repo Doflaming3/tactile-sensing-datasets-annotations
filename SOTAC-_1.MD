@@ -384,7 +384,25 @@ saves). Full writeup: `analysis/detector-vs-published.md`. Summary:
   subtask boundaries in 0–5 were in fact hand-dragged before the first save
   and preserved by events-only re-runs.
 
-### 8.9 Section 7 status after this pass
+### 8.9 First detector fix + a fourth defect: cross-stream clock skew
+
+- **Grasp-anchor fix shipped** (`eventDetection.ts`, the only file changed):
+  grasp anchors to the closing motion leading to the stable grasp's contact,
+  walking connected closing bouts back as one motion. Against her 30 dragged
+  boundaries: median |error| 3.48 s → 1.88 s, disagreeing episodes 18 → 14.
+  Tests 157/157; her repo's lint fails on a pre-existing error we left alone.
+- **The residual is not an anchoring problem — it is a clock problem.** The
+  raw-sidecar timeline and the main-table/video timeline disagree by a
+  time-VARYING few hundred ms (ep30: jaw-close appears ~0.67 s after the
+  contact it causes; ~0.25 s at release; raw rows are host-receipt-stamped,
+  table rows are ideal 1/30 ticks). Every gripper-gated decision and every
+  event-vs-video timestamp inherits the skew — likely part of why her drags
+  exist. A constant-shift estimator was tried and reverted (wrong model).
+  Proper fix: drift-aware stream alignment, or recorder-side wall-clock
+  frame timestamps (a `lerobotac` change to propose). Also contaminates
+  T1.3. Details: `analysis/detector-vs-published.md` addendum.
+
+### 8.10 Section 7 status after this pass
 
 | Item | Status |
 |---|---|

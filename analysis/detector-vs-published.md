@@ -47,6 +47,42 @@ deletions concentrate in `medium`, so the confidence tags carry real signal.
 run does not produce (slip 4, drop 4, contact 1, release 1) — likely from
 threshold-slider sessions; minor, flagged for the conversation with her.
 
+## Addendum: grasp-anchor fix + the clock-skew discovery (same day, later)
+
+**Fix shipped** in `visualizer/src/lib/eventDetection.ts` (+68/−19, the only
+file changed): the `grasp` subtask now anchors to the closing motion that
+leads to the grasp's contact — contact reference = the contact preceding the
+first `grasp_stable` (approach brushes no longer pull it early), and
+connected closing bouts (pauses ≤ 1 s) are walked back as one motion.
+Result on the 30 dragged boundaries: disagreeing episodes 18 → 14, median
+|error| **3.48 s → 1.88 s**; exact-match episodes 24 → 23 (ep16 regressed,
+see below). Verified: `bun test` 157/157, type-check clean; `bun run lint`
+fails on a pre-existing `react/no-unescaped-entities` error in upstream code
+we did not touch.
+
+**Why the residual errors will not yield to anchor tuning — the streams are
+skewed in time.** Matching ep30's events against its jaw trace shows the
+raw-sidecar clock and the main-table clock disagree by a **time-varying**
+few hundred ms: the jaw-close plunge appears ~0.67 s *after* the contact it
+causes; ~0.25 s at release. Cause is unresolved (raw rows are stamped with
+host receipt time — USB batching jitter — while table timestamps are ideal
+1/30 s ticks). A constant-shift correlation estimator was implemented,
+found the offset non-constant, and was **reverted** — a scalar shift is the
+wrong model. Consequences:
+
+- Every gripper-gated decision (release-vs-drop, lift, place gating, all
+  subtask boundaries) inherits the skew, in the app and offline alike.
+- Auto event timestamps are skewed relative to the video timeline the
+  annotator sees — plausibly part of why her boundary drags exist at all.
+- `alignment.json` was created for exactly this and the visualizer ignores
+  it; but the table side has no absolute anchor, so a proper fix needs a
+  drift-aware alignment (or recorder-side wall-clock timestamps per frame —
+  a `lerobotac` change to propose to Jingyi).
+- This also contaminates T1.3 (30 vs 91 Hz comparison): the raw stream's
+  effective sample spacing is receipt-jittered.
+
+A `KNOWN DEFECT` comment marks the resample site in `eventDetection.ts`.
+
 ## What this gives us
 
 - **A per-class precision signal**: the 73 deletions are labeled false

@@ -270,9 +270,7 @@ export function buildSeriesFromSensorFrames(
         for (let k = 0; k < nTaxels; k++) {
           const fz = taxels[k]?.[2] ?? 0;
           if (fz > 0.05) {
-            dists.push(
-              Math.hypot(layout[k][0] - copX, layout[k][1] - copY),
-            );
+            dists.push(Math.hypot(layout[k][0] - copX, layout[k][1] - copY));
           }
         }
         dists.sort((a, b) => a - b);
@@ -561,21 +559,25 @@ export function detectEvents(
   const events: RawEvent[] = [];
   const dur = n ? t[n - 1] : 0;
 
-  // gripper velocity resampled onto series time base
+  // gripper velocity resampled onto series time base.
+  // KNOWN DEFECT (do not paper over with a constant shift): the raw-sidecar
+  // clock and the main-table clock disagree by a time-VARYING few hundred
+  // ms (sotac ep30: jaw-close appears ~0.67 s after the contact it causes;
+  // ~0.25 s at release). Every gripper-gated decision below inherits the
+  // skew. Fixing it needs a drift-aware alignment of the two streams, not
+  // a scalar offset — see analysis/detector-vs-published.md in the
+  // annotations workspace.
   const gvel = new Float64Array(n);
   if (gripper && gripper.t.length > 2) {
     let j = 1;
     for (let i = 0; i < n; i++) {
       while (j < gripper.t.length - 1 && gripper.t[j] < t[i]) j++;
       const dt = gripper.t[j] - gripper.t[j - 1];
-      gvel[i] =
-        dt > 1e-9 ? (gripper.pos[j] - gripper.pos[j - 1]) / dt : 0;
+      gvel[i] = dt > 1e-9 ? (gripper.pos[j] - gripper.pos[j - 1]) / dt : 0;
     }
   }
 
-  const maxFn = Math.max(
-    ...fingers.map((f) => Math.max(...Array.from(f.fn))),
-  );
+  const maxFn = Math.max(...fingers.map((f) => Math.max(...Array.from(f.fn))));
   if (maxFn < th.contactEnterN) {
     return {
       subtasks: dur > 0 ? [{ label: "approach", startS: 0, endS: dur }] : [],
@@ -631,13 +633,18 @@ export function detectEvents(
           inContact = false;
           const exitIdx = belowSince;
           belowSince = -1;
-          const opening = gvel[exitIdx] > th.gripperVelEps || gvel[i] > th.gripperVelEps;
+          const opening =
+            gvel[exitIdx] > th.gripperVelEps || gvel[i] > th.gripperVelEps;
           events.push({
             label: opening ? "release" : "drop",
             startS: t[exitIdx],
             endS: t[exitIdx],
             finger: fi,
-            confidence: opening ? "medium" : f.hf[i] > th.hfExit ? "medium" : "low",
+            confidence: opening
+              ? "medium"
+              : f.hf[i] > th.hfExit
+                ? "medium"
+                : "low",
             order: events.length,
           });
           slipActive = incActive = rotActive = liftActive = -1;
@@ -870,17 +877,24 @@ export function detectEvents(
   const subtasks: DetectedSubtask[] = [];
   if (gripper && gripper.t.length > 2 && dur > 0) {
     const firstStable = cleaned.find((e) => e.label === "grasp_stable");
-    let closeStart = -1;
     const sustain = Math.max(2, Math.round(0.15 * rateHz));
     let run = 0;
+    // sustained CLOSING runs; the grasp anchor must pick among ALL bouts,
+    // not the first one — approach-phase jaw motion otherwise starts the
+    // grasp segment seconds before the object is touched
+    const closeRuns: number[] = []; // start index of each sustained closing bout
+    const closeRunEnds: number[] = []; // last closing index of the same bout
     // sustained OPENING runs (symmetric with closing: jitter never counts)
     const openRuns: number[] = []; // start index of each sustained opening bout
     let openRun = 0;
     for (let i = 0; i < n; i++) {
       if (gvel[i] < -th.gripperVelEps) {
         run++;
-        if (run >= sustain && closeStart < 0) closeStart = i - run + 1;
-      } else run = 0;
+        if (run === sustain) closeRuns.push(i - run + 1);
+      } else {
+        if (run >= sustain) closeRunEnds.push(i - 1);
+        run = 0;
+      }
       if (gvel[i] > th.gripperVelEps) {
         openRun++;
         if (openRun === sustain) {
@@ -909,6 +923,44 @@ export function detectEvents(
           : openRuns[openRuns.length - 1];
       } else {
         openStart = openRuns[openRuns.length - 1];
+      }
+    }
+    // grasp starts at the closing motion that LEADS TO the grasp's contact
+    // (mirrors how place_release anchors to the final release below). Using
+    // the first closing bout instead fires during approach on ~40% of
+    // episodes — the single most frequent hand-correction in the published
+    // annotations. Two guards: the contact reference is the contact
+    // preceding the first stable grasp (approach brushes also emit
+    // contact_onset), and connected closing bouts are walked back as one
+    // motion (a staged close pauses; an approach twitch is seconds apart).
+    if (run >= sustain) closeRunEnds.push(n - 1);
+    const contacts = cleaned.filter((e) => e.label === "contact_onset");
+    let contactRef = contacts.length ? contacts[0] : null;
+    if (firstStable) {
+      const before = contacts.filter((c) => c.startS <= firstStable.startS);
+      if (before.length) contactRef = before[before.length - 1];
+    }
+    let closeStart = -1;
+    if (closeRuns.length > 0) {
+      if (contactRef) {
+        // latest closing bout starting at/before the contact (small slack:
+        // contact_onset fires only after the debounced force crossing) ...
+        let k = -1;
+        for (let j = 0; j < closeRuns.length; j++) {
+          if (t[closeRuns[j]] <= contactRef.startS + 0.05) k = j;
+        }
+        if (k < 0) k = 0;
+        // ... then back through bouts separated by sub-second pauses
+        const CHAIN_GAP_S = 1.0;
+        while (
+          k > 0 &&
+          t[closeRuns[k]] - t[closeRunEnds[k - 1]] <= CHAIN_GAP_S
+        ) {
+          k--;
+        }
+        closeStart = closeRuns[k];
+      } else {
+        closeStart = closeRuns[0];
       }
     }
     const tClose = closeStart >= 0 ? t[closeStart] : dur * 0.25;
@@ -947,14 +999,11 @@ export function resultToAtoms(result: AutoLabelResult): LanguageAtom[] {
     });
   }
   for (const e of result.events) {
-    const span =
-      e.endS > e.startS ? ` ${(e.endS - e.startS).toFixed(2)}s` : "";
+    const span = e.endS > e.startS ? ` ${(e.endS - e.startS).toFixed(2)}s` : "";
     const finger = e.finger >= 0 ? ` f${e.finger}` : "";
     atoms.push({
       role: "user",
-      content: `[auto:${e.confidence}] ${e.label}${finger}${span}${
-        ""
-      }`,
+      content: `[auto:${e.confidence}] ${e.label}${finger}${span}${""}`,
       style: "interjection",
       timestamp: e.startS,
       camera: null,
