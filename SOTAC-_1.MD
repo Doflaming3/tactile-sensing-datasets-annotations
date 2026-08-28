@@ -361,6 +361,12 @@ Consequences:
 - Section 6 question 5 is answered (0–5 track detector versions); replace
   it with: "which episodes have you verified by hand, and may we hand-label
   N episodes as the scoring set?"
+- New questions (from the boundary work, 2026-08-28): **"What is the
+  DEFINITION of the transport boundary — grip established, or the object
+  leaving its resting plane?"** (Zheng adopted lift-off and video-judged
+  our boundaries correct where they differ from hers by 0.5–0.75 s), and
+  **"Which sign of shoulder_lift is 'up' on the SO-101?"** (unlocks exact
+  lift-off detection, the ep56 residual, and carry-during-squeeze).
 
 ### 8.8 Offline runner + full-corpus diff: her corrections recovered (2026-08-27, latest)
 

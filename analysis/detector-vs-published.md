@@ -226,8 +226,47 @@ or after the grasp's first stability** — the arm starting to carry is the
 one signal grip force cannot fake, and it is loud even for objects whose
 weight transfer is invisible to the fingertips. New `ArmMotionSeries`
 input, wired in both the runner (from observation.state) and the app
-(from chart rows). Result: transport disagreements 13 → **8**, median
-0.69 s, direction-balanced; ep2 exact (6.754 vs her 6.75); ep24/27/30/
-32/34/47/49 agree; remaining residuals are sub-0.9 s ambiguity plus ep56
-(-1.5 s, true lift-off later than first arm motion after a two-trial
-grasp).
+(from chart rows).
+
+**Refinement (ep31, video-verified):** arm motion during an active
+squeeze is repositioning, not carrying — ep31's arm moves at 9.1 s while
+a 40-unit jaw squeeze runs 9.1–9.8 s; her boundary is 9.9 s. The
+candidate is therefore postponed while **substantial jaw closing (≥ 8
+units of travel) lies within 1 s ahead of it**; ongoing squeeze tails and
+mid-carry micro-tightens (≤ ~5 units) do not postpone (ep2, ep24 — a
+bout-start-time test was tried first and failed both directions).
+
+**Tried and rejected — net joint displacement as the carry test.** To
+cover the hypothetical "carrying while still squeezing hard" (which the
+squeeze-postpone would wrongly delay), summed |net joint rotation| was
+tested as a direction-aware discriminator: carrying goes somewhere,
+adjustment jiggles. Measured result: ep31's grasp-phase repositioning is
+itself directional (≥16 units net during the squeeze), so net motion
+cannot separate the two cases and ep31 regressed to 9.11 s. Reverted.
+The true separator is SIGNED lift-direction motion of the shoulder-lift
+joint, which needs a per-robot sign convention — parked; the
+`ArmMotionSeries` interface now carries per-joint positions so that
+refinement is plumbing-ready. Until then, carry-during-fresh-squeeze is
+a documented limit (boundary lands at squeeze end, typically < 1 s late).
+
+**Definition adopted (Zheng, video-arbitrated): transport starts when the
+object leaves the plane it rests on (lift-off).** Zheng judged OUR
+boundaries correct on the "ours later" family (eps 15, 17, 21, 52, 59)
+where hers sit 0.5–0.75 s earlier — those five are hereby definition
+deltas, not errors, and her dragged values stop being the transport gold
+standard. Her own definition is undocumented (annotation_pipeline_
+technical.md / Table VIII, both unseen); from placement it reads as "grip
+established" rather than lift-off. Definition alignment is now a
+top-of-list question for Jingyi. What the code implements is a
+direction-blind approximation of lift-off: sustained summed |rotation
+rate| of the five non-gripper joints (> 12 units/s for 0.15 s) after
+first grip stability, squeeze-postponed; the exact lift-off definition
+needs signed shoulder-lift motion, blocked only on the SO-101 sign
+convention (one question).
+
+Final state: transport disagreements 13 → **8**, median 0.65 s;
+video-verified ep2 ≈ exact, ep31 −0.19, ep24 = 6.271 vs her 6.27 exact;
+ep27/30/32/33/34/35/47/49/53/58 agree. Remaining: six residuals ≤ 0.75 s
+(0, 15, 17, 21, 52, 59) and ep56 at −1.5 s (arm repositions with the jaw
+done before the true lift — would need direction-aware, e.g.
+shoulder-lift-specific, motion to resolve).
