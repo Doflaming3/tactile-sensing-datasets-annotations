@@ -322,7 +322,7 @@
   "episode": 21,
   "flags": [
    "unlabeled_transition@9.8s",
-   "failed_attempt@4.5s"
+   "failed_attempt@3.8-4.5s"
   ],
   "ours": 20,
   "theirs": 19,
@@ -421,7 +421,7 @@
  {
   "episode": 25,
   "flags": [
-   "failed_attempt@4.6s"
+   "failed_attempt@1.3-4.6s"
   ],
   "ours": 29,
   "theirs": 24,
@@ -714,7 +714,7 @@
   "episode": 36,
   "flags": [
    "unlabeled_transition@7.0s",
-   "failed_attempt@3.1s"
+   "failed_attempt@1.2-3.1s"
   ],
   "ours": 13,
   "theirs": 10,
@@ -746,7 +746,7 @@
  {
   "episode": 37,
   "flags": [
-   "failed_attempt@4.2s"
+   "failed_attempt@3.4-4.2s"
   ],
   "ours": 27,
   "theirs": 18,
@@ -895,7 +895,7 @@
  {
   "episode": 40,
   "flags": [
-   "failed_attempt@1.0s"
+   "failed_attempt@0.5-1.0s"
   ],
   "ours": 22,
   "theirs": 19,
@@ -937,8 +937,8 @@
  {
   "episode": 42,
   "flags": [
-   "failed_attempt@1.8s",
-   "failed_attempt@3.4s"
+   "failed_attempt@0.2-1.8s",
+   "failed_attempt@3.1-3.4s"
   ],
   "ours": 17,
   "theirs": 13,
@@ -1147,7 +1147,7 @@
  {
   "episode": 49,
   "flags": [
-   "failed_attempt@4.6s"
+   "failed_attempt@4.4-4.6s"
   ],
   "ours": 23,
   "theirs": 22,

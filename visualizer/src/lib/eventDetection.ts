@@ -1078,14 +1078,31 @@ export function detectEvents(
   // owner. Episode metadata's attempt count is the validation target.
   const graspStartS = subtasks.find((s) => s.label === "grasp")?.startS;
   if (graspStartS !== undefined) {
-    let lastAttemptS = -Infinity;
-    for (const e of cleaned) {
-      if (e.label !== "drop" || e.startS >= graspStartS) continue;
-      // per-finger drops of the same physical loss arrive within ~0.5 s
-      if (e.startS - lastAttemptS > 0.5) {
-        flags.push(`failed_attempt@${e.startS.toFixed(1)}s`);
+    const preDrops = cleaned.filter(
+      (e) => e.label === "drop" && e.startS < graspStartS,
+    );
+    // per-finger drops of the same physical loss arrive within ~0.5 s
+    const clusters: { firstDropS: number; lastDropS: number }[] = [];
+    for (const d of preDrops) {
+      const cur = clusters[clusters.length - 1];
+      if (cur && d.startS - cur.lastDropS <= 0.5) cur.lastDropS = d.startS;
+      else clusters.push({ firstDropS: d.startS, lastDropS: d.startS });
+    }
+    // span each attempt from the contact that opened the grip to its loss
+    let prevEndS = -Infinity;
+    for (const c of clusters) {
+      let startS = c.firstDropS;
+      for (const e of cleaned) {
+        if (e.startS >= c.firstDropS) break;
+        if (e.label === "contact_onset" && e.startS > prevEndS) {
+          startS = e.startS;
+          break;
+        }
       }
-      lastAttemptS = e.startS;
+      flags.push(
+        `failed_attempt@${startS.toFixed(1)}-${c.lastDropS.toFixed(1)}s`,
+      );
+      prevEndS = c.lastDropS;
     }
   }
 
