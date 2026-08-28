@@ -264,6 +264,20 @@ first grip stability, squeeze-postponed; the exact lift-off definition
 needs signed shoulder-lift motion, blocked only on the SO-101 sign
 convention (one question).
 
+**Threshold provenance (asked and answered honestly):** ARM_MOVE_EPS = 12
+was originally a two-point manual sweep (5, then 12) scored against her
+dragged boundaries — metric-fitting, not derivation. Post-hoc derivation
+from all 63 episodes (~40k samples of summed non-gripper joint speed):
+bimodal — 16% of time parked at 0–1 units/s, 57% in full motion at 30+
+(per-episode median speed 42), with a broad flat valley 1–30 holding the
+acceleration ramps. Any threshold in ~3–25 separates the modes; the
+within-valley choice slides the boundary ~0.1–0.3 s along the ramp — a
+placement convention inside the lift-off definition, calibrated by
+Zheng's video verdicts (ep2/24/31 + the 15/17/21/52/59 family). The
+check that could have genuinely failed passes: the static floor and
+moving mode are uniform across episodes, so a GLOBAL threshold is valid
+here — unlike the force thresholds (12× per-episode grip-force range).
+
 Final state: transport disagreements 13 → **8**, median 0.65 s;
 video-verified ep2 ≈ exact, ep31 −0.19, ep24 = 6.271 vs her 6.27 exact;
 ep27/30/32/33/34/35/47/49/53/58 agree. Remaining: six residuals ≤ 0.75 s
