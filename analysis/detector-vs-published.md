@@ -86,6 +86,31 @@ plus genuinely ambiguous cases where contact comes from arm motion with the
 jaw already positioned — not a timestamp defect. Further anchor tuning
 would be fitting hand jitter; stopped at median 1.88 s.
 
+## Addendum 2: failed-attempt detection (flags-only, validated vs her metadata)
+
+Motivated by ep49 (gripped → ball slid out → re-gripped, confirmed on
+video): the detector now emits a `failed_attempt@Xs` **flag** for each
+pre-grasp drop cluster (drops within 0.5 s = one physical loss). Flags
+only — the Table VIII taxonomy has no retry class, so nothing enters the
+event stream until that question is settled with Jingyi.
+
+Validation against `episode_annotations.json`'s hand-recorded `attempts`
+field: **45/59 episodes agree** (detected = 1 + failed-attempt flags).
+The 14 disagreements split into exactly the two expected failure modes:
+
+- **7 over-counts** (eps 21, 25, 36, 37, 40, 42): our flag rests on a drop
+  event *she deleted as a false positive* — the attempt detector inherits
+  the drop detector's precision problem, nothing new.
+- **8 under-counts** (eps 16, 31, 32, 39, 45, 47, 54, 56): failed attempts
+  with no tactile drop signature — most plausibly the jaw closed on air
+  (no contact ⇒ no tactile event possible) or the object slipped without
+  force fully exiting. Detecting these needs the gripper trajectory
+  (pre-grasp closing bouts with no contact), a natural v2.
+
+Note ep16 appears both here (attempts=2) and as the grasp-anchor
+regression: with two genuine attempts, "where grasp starts" is ambiguous
+even for a human — her boundary sits on attempt 1, ours on attempt 2.
+
 ## What this gives us
 
 - **A per-class precision signal**: the 73 deletions are labeled false

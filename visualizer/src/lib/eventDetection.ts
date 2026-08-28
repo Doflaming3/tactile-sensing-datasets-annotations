@@ -1071,6 +1071,24 @@ export function detectEvents(
     subtasks.push({ label: "place_release", startS: tOpen, endS: dur });
   }
 
+  // failed grasp attempts: contact was made and lost (drop) before the
+  // grasp that sticks — "gripped, object slid out, gripped again". Surfaced
+  // as flags only: the Table VIII taxonomy has no retry class, so nothing
+  // is added to the event stream until that question is settled with its
+  // owner. Episode metadata's attempt count is the validation target.
+  const graspStartS = subtasks.find((s) => s.label === "grasp")?.startS;
+  if (graspStartS !== undefined) {
+    let lastAttemptS = -Infinity;
+    for (const e of cleaned) {
+      if (e.label !== "drop" || e.startS >= graspStartS) continue;
+      // per-finger drops of the same physical loss arrive within ~0.5 s
+      if (e.startS - lastAttemptS > 0.5) {
+        flags.push(`failed_attempt@${e.startS.toFixed(1)}s`);
+      }
+      lastAttemptS = e.startS;
+    }
+  }
+
   return { subtasks, events: cleaned, flags };
 }
 

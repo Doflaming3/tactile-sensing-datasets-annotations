@@ -319,6 +319,7 @@ async function runEpisode(
     c.moved.length === 0 && c.modified.length === 0;
   reportRows.push({
     episode: ep,
+    flags: result.flags,
     ours: atoms.length,
     theirs: theirs.length,
     unchanged: c.unchanged.length,
