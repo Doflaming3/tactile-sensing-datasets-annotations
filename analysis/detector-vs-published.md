@@ -147,7 +147,43 @@ close) and jaw-close-with-no-contact (user rejected non-tactile judgment).
 Still invisible: ep31/32/39/45/47/56 — below 2 N or under 3 raw frames;
 those need her metadata or video.
 
-## What this gives us
+## Addendum 3: trial-aware segmentation (ep56, video-verified failure)
+
+Ep56 exposed the structural gap behind every remaining anchor patch: the
+pipeline had no concept of a *trial*. Its trial 1 (5.1–6.8 s) reaches a
+brief false stability (object squeezed against the surface), the FIRST
+`grasp_stable` captured the grasp anchor, and transport started
+mid-failure — the real grasp only begins at 9.0 s.
+
+Reworked: per-finger contact spans (contact_onset → release/drop) merge
+across fingers into hand-level **bouts** (= trials); the bout holding the
+**last** `grasp_stable` is the grasp; the anchor chain never crosses into
+a previous trial and the grasp start clamps to the previous trial's end.
+Every earlier bout becomes `failed_attempt@start-end` — subsuming the
+drop-cluster logic and catching losses classified as `release` ("lost,
+not dropped").
+
+Result: ep56 → `approach 0–6.8 (containing failed_attempt@5.1-6.8s) →
+grasp 6.8–9.4 → transport 9.4–12.9` (her hand-dragged transport: 11.3;
+previous auto: 5.5). Metadata agreement 45/59 with ep31, ep39, ep56 newly
+agreeing; ep49/16/54 unchanged.
+
+**Scope limit (by design): single-cycle episodes only.** "Grasp = bout
+with the last stable" is correct for sotac because every episode is one
+pick-and-place. A multi-cycle episode (place into bowl, pick up again,
+drop) would shove the first — successful — cycle into approach and flag
+it failed. The general fix is bout-CONTENT classification (bout ends in a
+real place+release ⇒ completed cycle, gets its own subtask segments;
+otherwise ⇒ failed attempt), which strictly generalizes the current rule
+— but it is gated on place-detector precision: ep56's failed trial itself
+contains two FALSE place events, so today the predicate would misfire.
+Order of work: place precision → bout-content classification →
+cycle-aware segmentation (repeated subtask segments = output-convention
+change, Table VIII conversation). Still open: ep45-class losses *inside*
+the final grasp bout (secured-then-lost with no re-grasp — a definition
+question), ep32 (zero trace), ep47 (sub-2 N touches), and a ~10-episode
+judgment queue (0, 9, 21, 22, 23, 25, 36, 37, 40, 42) where flagged bouts
+await video verdicts against the known-undercounting `attempts` metadata.
 
 - **A per-class precision signal**: the 73 deletions are labeled false
   positives. No recall signal exists (nothing tells us what the detector

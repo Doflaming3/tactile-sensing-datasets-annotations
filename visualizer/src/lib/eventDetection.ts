@@ -1041,6 +1041,61 @@ export function detectEvents(
   }
   cleaned.sort((a, b) => a.startS - b.startS);
 
+  // ---- contact bouts = grasp trials
+  // Per finger, a contact_onset opens a span and the next release/drop on
+  // that finger closes it; overlapping or near spans across fingers merge
+  // into one hand-level bout = one physical trial. The bout holding the
+  // LAST grasp_stable is the grasp that counts; every bout before it is a
+  // failed trial. Keying on the FIRST stability instead mistakes a failed
+  // trial's brief false stability (squeezing the object against the
+  // surface) for the grasp and starts transport mid-failure — sotac ep56,
+  // video-verified: trial 1 holds 5.1-6.8 s and is lost, the real grasp
+  // only begins at 9.0 s.
+  const fingerSpans: { startS: number; endS: number }[] = [];
+  {
+    const byFinger = new Map<number, DetectedEvent[]>();
+    for (const e of cleaned) {
+      if (!byFinger.has(e.finger)) byFinger.set(e.finger, []);
+      byFinger.get(e.finger)!.push(e);
+    }
+    for (const list of byFinger.values()) {
+      let open = -1;
+      for (const e of list) {
+        if (e.label === "contact_onset") {
+          if (open < 0) open = e.startS;
+        } else if (e.label === "release" || e.label === "drop") {
+          if (open >= 0) {
+            fingerSpans.push({ startS: open, endS: e.startS });
+            open = -1;
+          }
+        }
+      }
+      if (open >= 0) fingerSpans.push({ startS: open, endS: dur });
+    }
+  }
+  fingerSpans.sort((a, b) => a.startS - b.startS);
+  const bouts: { startS: number; endS: number }[] = [];
+  for (const s of fingerSpans) {
+    const cur = bouts[bouts.length - 1];
+    if (cur && s.startS <= cur.endS + 0.5) {
+      cur.endS = Math.max(cur.endS, s.endS);
+    } else {
+      bouts.push({ ...s });
+    }
+  }
+  const lastStable = [...cleaned]
+    .reverse()
+    .find((e) => e.label === "grasp_stable");
+  let graspBout = bouts.length ? bouts[bouts.length - 1] : null;
+  if (lastStable) {
+    const holding = bouts.find(
+      (b) =>
+        lastStable.startS >= b.startS - 1e-6 &&
+        lastStable.startS <= b.endS + 1e-6,
+    );
+    if (holding) graspBout = holding;
+  }
+
   // ---- subtasks from gripper trajectory
   const subtasks: DetectedSubtask[] = [];
   if (gripper && gripper.t.length > 2 && dur > 0) {
@@ -1102,27 +1157,29 @@ export function detectEvents(
     // contact_onset), and connected closing bouts are walked back as one
     // motion (a staged close pauses; an approach twitch is seconds apart).
     if (run >= sustain) closeRunEnds.push(n - 1);
-    const contacts = cleaned.filter((e) => e.label === "contact_onset");
-    let contactRef = contacts.length ? contacts[0] : null;
-    if (firstStable) {
-      const before = contacts.filter((c) => c.startS <= firstStable.startS);
-      if (before.length) contactRef = before[before.length - 1];
-    }
+    // the grasp anchors to the closing motion leading to the GRASP BOUT's
+    // first contact (never a failed trial's)
+    const contactRefS = graspBout ? graspBout.startS : null;
+    const prevBoutEndS = graspBout
+      ? (bouts[bouts.indexOf(graspBout) - 1]?.endS ?? -Infinity)
+      : -Infinity;
     let closeStart = -1;
     if (closeRuns.length > 0) {
-      if (contactRef) {
+      if (contactRefS !== null) {
         // latest closing bout starting at/before the contact (small slack:
         // contact_onset fires only after the debounced force crossing) ...
         let k = -1;
         for (let j = 0; j < closeRuns.length; j++) {
-          if (t[closeRuns[j]] <= contactRef.startS + 0.05) k = j;
+          if (t[closeRuns[j]] <= contactRefS + 0.05) k = j;
         }
         if (k < 0) k = 0;
-        // ... then back through bouts separated by sub-second pauses
+        // ... then back through bouts separated by sub-second pauses, never
+        // crossing into the previous failed trial
         const CHAIN_GAP_S = 1.0;
         while (
           k > 0 &&
-          t[closeRuns[k]] - t[closeRunEnds[k - 1]] <= CHAIN_GAP_S
+          t[closeRuns[k]] - t[closeRunEnds[k - 1]] <= CHAIN_GAP_S &&
+          t[closeRuns[k - 1]] > prevBoutEndS
         ) {
           k--;
         }
@@ -1131,7 +1188,9 @@ export function detectEvents(
         closeStart = closeRuns[0];
       }
     }
-    const tClose = closeStart >= 0 ? t[closeStart] : dur * 0.25;
+    let tClose = closeStart >= 0 ? t[closeStart] : dur * 0.25;
+    // a failed trial belongs to approach, not grasp
+    if (tClose < prevBoutEndS) tClose = prevBoutEndS;
     // first grasp_stable AFTER the jaw started closing (episodes that begin
     // already in contact otherwise produce an inverted grasp segment)
     const stableAfterClose = cleaned.find(
@@ -1148,38 +1207,16 @@ export function detectEvents(
     subtasks.push({ label: "place_release", startS: tOpen, endS: dur });
   }
 
-  // failed grasp attempts: contact was made and lost (drop) before the
-  // grasp that sticks — "gripped, object slid out, gripped again". Surfaced
-  // as flags only: the Table VIII taxonomy has no retry class, so nothing
-  // is added to the event stream until that question is settled with its
-  // owner. Episode metadata's attempt count is the validation target.
-  const graspStartS = subtasks.find((s) => s.label === "grasp")?.startS;
-  if (graspStartS !== undefined) {
-    const preDrops = cleaned.filter(
-      (e) => e.label === "drop" && e.startS < graspStartS,
-    );
-    // per-finger drops of the same physical loss arrive within ~0.5 s
-    const clusters: { firstDropS: number; lastDropS: number }[] = [];
-    for (const d of preDrops) {
-      const cur = clusters[clusters.length - 1];
-      if (cur && d.startS - cur.lastDropS <= 0.5) cur.lastDropS = d.startS;
-      else clusters.push({ firstDropS: d.startS, lastDropS: d.startS });
-    }
-    // span each attempt from the contact that opened the grip to its loss
-    let prevEndS = -Infinity;
-    for (const c of clusters) {
-      let startS = c.firstDropS;
-      for (const e of cleaned) {
-        if (e.startS >= c.firstDropS) break;
-        if (e.label === "contact_onset" && e.startS > prevEndS) {
-          startS = e.startS;
-          break;
-        }
-      }
-      flags.push(
-        `failed_attempt@${startS.toFixed(1)}-${c.lastDropS.toFixed(1)}s`,
-      );
-      prevEndS = c.lastDropS;
+  // failed grasp trials: every contact bout before the grasp bout —
+  // "gripped, lost it (dropped or slid out), tried again". Surfaced as
+  // flags only: the Table VIII taxonomy has no retry class, so nothing is
+  // added to the event stream until that question is settled with its
+  // owner. Validated against episode metadata's hand-recorded attempt
+  // count (which itself undercounts — sotac ep54, video-verified).
+  if (graspBout) {
+    for (const b of bouts) {
+      if (b === graspBout) break;
+      flags.push(`failed_attempt@${b.startS.toFixed(1)}-${b.endS.toFixed(1)}s`);
     }
   }
 
