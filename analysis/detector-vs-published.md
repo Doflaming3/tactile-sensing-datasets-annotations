@@ -60,28 +60,31 @@ see below). Verified: `bun test` 157/157, type-check clean; `bun run lint`
 fails on a pre-existing `react/no-unescaped-entities` error in upstream code
 we did not touch.
 
-**Why the residual errors will not yield to anchor tuning — the streams are
-skewed in time.** Matching ep30's events against its jaw trace shows the
-raw-sidecar clock and the main-table clock disagree by a **time-varying**
-few hundred ms: the jaw-close plunge appears ~0.67 s *after* the contact it
-causes; ~0.25 s at release. Cause is unresolved (raw rows are stamped with
-host receipt time — USB batching jitter — while table timestamps are ideal
-1/30 s ticks). A constant-shift correlation estimator was implemented,
-found the offset non-constant, and was **reverted** — a scalar shift is the
-wrong model. Consequences:
+**RETRACTION (verified same day, later): there is NO clock skew on sotac.**
+The skew hypothesis came from misreading ep30 causality — the first contact
+there is caused by the *arm descending* onto the foam ball while the jaw is
+stationary; the jaw squeeze at 6.6 s happens after first touch, which is
+physically fine. The decisive instrument: every 30 Hz table frame's tactile
+field is a sample-and-hold snapshot of the latest 91 Hz raw row, so matching
+frames to rows **by content** recovers (tableT, rawT) anchor pairs with no
+clock model. On sotac the recovered map is **identity to ~2 ms across the
+whole episode**. Event timestamps are therefore trustworthy relative to the
+video timeline; a constant-shift estimator tried earlier was correctly
+reverted, but for the wrong reason.
 
-- Every gripper-gated decision (release-vs-drop, lift, place gating, all
-  subtask boundaries) inherits the skew, in the app and offline alike.
-- Auto event timestamps are skewed relative to the video timeline the
-  annotator sees — plausibly part of why her boundary drags exist at all.
-- `alignment.json` was created for exactly this and the visualizer ignores
-  it; but the table side has no absolute anchor, so a proper fix needs a
-  drift-aware alignment (or recorder-side wall-clock timestamps per frame —
-  a `lerobotac` change to propose to Jingyi).
-- This also contaminates T1.3 (30 vs 91 Hz comparison): the raw stream's
-  effective sample spacing is receipt-jittered.
+The instrument survives as `buildTableToRawClockMap` in `eventDetection.ts`:
+a per-episode alignment *check* on sotac, and the missing-alignment supplier
+for per-episode-folder company-format data (only first-sample-alignable,
+~1 s error). **Do not use it as a gripper-time transform on sotac**: anchor
+pairs exist only during contact, and interpolation between sparse anchors
+can go non-monotone, corrupting the velocity resampler (measured: corpus
+match rate collapsed 23 → 2 with remapping enabled; removed).
 
-A `KNOWN DEFECT` comment marks the resample site in `eventDetection.ts`.
+Residual grasp-boundary errors after the anchor fix are therefore her
+placement tolerance (drags land 0.2–1.5 s before the kept first contact)
+plus genuinely ambiguous cases where contact comes from arm motion with the
+jaw already positioned — not a timestamp defect. Further anchor tuning
+would be fitting hand jitter; stopped at median 1.88 s.
 
 ## What this gives us
 

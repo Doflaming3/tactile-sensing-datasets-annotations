@@ -391,16 +391,18 @@ saves). Full writeup: `analysis/detector-vs-published.md`. Summary:
   walking connected closing bouts back as one motion. Against her 30 dragged
   boundaries: median |error| 3.48 s → 1.88 s, disagreeing episodes 18 → 14.
   Tests 157/157; her repo's lint fails on a pre-existing error we left alone.
-- **The residual is not an anchoring problem — it is a clock problem.** The
-  raw-sidecar timeline and the main-table/video timeline disagree by a
-  time-VARYING few hundred ms (ep30: jaw-close appears ~0.67 s after the
-  contact it causes; ~0.25 s at release; raw rows are host-receipt-stamped,
-  table rows are ideal 1/30 ticks). Every gripper-gated decision and every
-  event-vs-video timestamp inherits the skew — likely part of why her drags
-  exist. A constant-shift estimator was tried and reverted (wrong model).
-  Proper fix: drift-aware stream alignment, or recorder-side wall-clock
-  frame timestamps (a `lerobotac` change to propose). Also contaminates
-  T1.3. Details: `analysis/detector-vs-published.md` addendum.
+- **Clock-skew claim RETRACTED (verified same day).** Content-matching the
+  table's sample-and-hold tactile frames against raw rows recovers the
+  table→raw clock map with no model; on sotac it is identity to ~2 ms. The
+  "skew" was a misread of ep30 causality (arm-descent causes first contact
+  while the jaw is stationary; the squeeze comes after). Event timestamps
+  ARE trustworthy vs video, and T1.3 is not contaminated. The instrument
+  survives as `buildTableToRawClockMap` — per-episode alignment check on
+  sotac, and the missing-alignment supplier for company-format data. Not
+  safe as a gripper-time transform (sparse anchors → non-monotone map;
+  corpus 23 → 2 when tried; removed). Residual grasp-boundary error is her
+  placement tolerance plus arm-caused-contact ambiguity — anchor tuning
+  stopped at median 1.88 s. Details: `analysis/detector-vs-published.md`.
 
 ### 8.10 Section 7 status after this pass
 

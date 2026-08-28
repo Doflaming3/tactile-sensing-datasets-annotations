@@ -13,10 +13,7 @@ export default function Home() {
   );
 }
 
-const EXAMPLE_DATASETS = [
-  "Jingyi-Z/sotac",
-  "Jingyi-Z/sotac_raw",
-];
+const EXAMPLE_DATASETS = ["Jingyi-Z/sotac", "Jingyi-Z/sotac_raw"];
 
 const FEATURES = [
   "Per-taxel force arrows",
@@ -286,13 +283,16 @@ function HomeInner() {
           <HfAuthButton variant="ghost" />
         </div>
 
-        {/* Recently visited (falls back to examples on first visit) */}
+        {/* Pinned tactile datasets, then any other recently-visited ones */}
         <div className="mt-8">
           <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-medium">
-            {recent.length > 0 ? "Recently Visited" : "Tactile Datasets"}
+            Tactile Datasets
           </p>
           <div className="flex flex-row flex-wrap gap-2 justify-center max-w-xl">
-            {(recent.length > 0 ? recent : EXAMPLE_DATASETS).map((ds) => (
+            {[
+              ...EXAMPLE_DATASETS,
+              ...recent.filter((ds) => !EXAMPLE_DATASETS.includes(ds)),
+            ].map((ds) => (
               <button
                 key={ds}
                 type="button"

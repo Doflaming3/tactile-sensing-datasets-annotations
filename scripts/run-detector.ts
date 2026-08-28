@@ -186,18 +186,12 @@ async function loadEpisodeInputs(
   return { timestamps, gripper, frames, sensorName, nTaxels };
 }
 
-function loadRawSeries(
-  root: string,
-  ep: number,
-  sensorName: string,
-  layout: [number, number, number][] | null,
-): TactileSeries | null {
+function loadRawCsvTexts(root: string, ep: number, sensorName: string): string[] | null {
   const dir = join(root, "sensors", sensorName, `episode_${pad6(ep)}`);
   if (!existsSync(dir)) return null;
   const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
   if (files.length === 0) return null;
-  const texts = files.map((f) => readFileSync(join(dir, f), "utf-8"));
-  return buildSeriesFromRawCsvs(texts, layout);
+  return files.map((f) => readFileSync(join(dir, f), "utf-8"));
 }
 
 // ---------------------------------------------------------------- compare
@@ -256,14 +250,25 @@ async function runEpisode(
   const layout = resolveTaxelLayout(inputs.nTaxels)?.points ?? null;
 
   let series: TactileSeries | null = null;
+  let gripper = inputs.gripper;
   let source = args.source;
   if (args.source === "raw") {
-    const raw = loadRawSeries(root, ep, inputs.sensorName, layout);
-    if (raw) {
+    const texts = loadRawCsvTexts(root, ep, inputs.sensorName);
+    const raw = texts ? buildSeriesFromRawCsvs(texts, layout) : null;
+    if (raw && texts) {
       const tEnd = inputs.timestamps.length
         ? inputs.timestamps[inputs.timestamps.length - 1] + 0.1
         : raw.t[raw.t.length - 1];
       series = clipSeries(raw, tEnd);
+      // NOTE: the gripper (table clock) is used as-is on the raw time base.
+      // Content-matching via buildTableToRawClockMap verified the two sotac
+      // clocks agree to ~2 ms, so no re-clocking is needed here. Do NOT
+      // remap by default: anchor pairs exist only during contact, and the
+      // interpolated map can go non-monotone between sparse anchors, which
+      // corrupts the gripper-velocity resampler (measured: corpus match
+      // rate collapsed 23 -> 2 with remapping on). Company-format data,
+      // where the clocks genuinely differ, needs a monotone-constrained
+      // fit before this becomes safe as a transform.
     } else {
       source = "table";
     }
@@ -273,7 +278,7 @@ async function runEpisode(
   }
   if (!series) throw new Error(`episode ${ep}: no tactile series`);
 
-  const result = detectEvents(series, inputs.gripper, args.thresholds);
+  const result = detectEvents(series, gripper, args.thresholds);
   const atoms = resultToAtoms(result) as unknown as Atom[];
 
   if (!args.all) {

@@ -43,7 +43,8 @@ function isAutoEventAtom(a: LanguageAtom): boolean {
 }
 
 function isAutoAtom(a: LanguageAtom): boolean {
-  if (a.style === "interjection" && a.content?.startsWith("[auto:")) return true;
+  if (a.style === "interjection" && a.content?.startsWith("[auto:"))
+    return true;
   if (
     a.style === "subtask" &&
     a.role === "assistant" &&
@@ -59,35 +60,67 @@ const TUNABLE: Array<
   [keyof DetectionThresholds, string, number, number, number, string]
 > = [
   [
-    "contactEnterN", "contact enter (N)", 0.05, 2, 0.05,
+    "contactEnterN",
+    "contact enter (N)",
+    0.05,
+    2,
+    0.05,
     "Total fingertip force above which the pad counts as touching the object. Raise it if sensor noise or light brushes create false 'contact' events; lower it to catch very gentle first touches earlier.",
   ],
   [
-    "stableMinN", "stable min force (N)", 0.1, 5, 0.1,
+    "stableMinN",
+    "stable min force (N)",
+    0.1,
+    5,
+    0.1,
     "Minimum sustained grip force for the grasp to count as 'stable hold'. Raise it and weak pinches stay labeled unstable; lower it and even light grips qualify as holding.",
   ],
   [
-    "hfEnter", "slip HF enter", 2, 60, 1,
+    "hfEnter",
+    "slip HF enter",
+    2,
+    60,
+    1,
     "High-frequency vibration energy in the tactile signal that triggers a slip event (micro-vibrations from the object sliding). Lower = more sensitive slip detection but more false positives from arm motion.",
   ],
   [
-    "slipShearRateNps", "slip shear rate (N/s)", 1, 30, 1,
+    "slipShearRateNps",
+    "slip shear rate (N/s)",
+    1,
+    30,
+    1,
     "How fast the tangential (shear) force must change to count as gross slip. Lower values flag slower slides; higher values only catch abrupt slips.",
   ],
   [
-    "slipDivEnter", "incipient divergence", 0.1, 0.9, 0.05,
+    "slipDivEnter",
+    "incipient divergence",
+    0.1,
+    0.9,
+    0.05,
     "Fraction of taxels whose force vectors start pointing apart, the early signature of a slip that has not fully started. Lower = earlier (but noisier) incipient-slip warnings. These events are marked low-confidence for review.",
   ],
   [
-    "rotationTauNmm", "rotation torque (N·mm)", 5, 120, 5,
+    "rotationTauNmm",
+    "rotation torque (N·mm)",
+    5,
+    120,
+    5,
     "Net torque on the pad above which the object counts as rotating in the gripper (e.g. a cup pivoting). Raise it if normal regrasps trigger false rotation events.",
   ],
   [
-    "placeDropFrac", "place drop fraction", 0.05, 0.6, 0.05,
+    "placeDropFrac",
+    "place drop fraction",
+    0.05,
+    0.6,
+    0.05,
     "Fraction of the held force that must vanish for a 'release/placed' event. Lower = release detected at the slightest unloading; higher = only when the object is almost fully let go.",
   ],
   [
-    "gripperVelEps", "gripper vel eps", 0.1, 3, 0.1,
+    "gripperVelEps",
+    "gripper vel eps",
+    0.1,
+    3,
+    0.1,
     "Gripper joint speed below which the gripper counts as 'not moving', used to separate intentional open/close from holding still. Raise it if servo jitter keeps the gripper from ever reading as stationary.",
   ],
 ];
@@ -108,9 +141,14 @@ export default function AutoLabelPanel({
 }) {
   const { atoms, addAtoms, deleteAtom, resetAtoms } = useAnnotations();
   const [open, setOpen] = useState(false);
-  const [thresholds, setThresholds] = useState<Partial<DetectionThresholds>>({});
+  const [thresholds, setThresholds] = useState<Partial<DetectionThresholds>>(
+    {},
+  );
   const [useRaw, setUseRaw] = useState(true);
-  const [rawState, setRawState] = useState<"none" | "loading" | "ready" | "missing">("none");
+  const [running, setRunning] = useState(false);
+  const [rawState, setRawState] = useState<
+    "none" | "loading" | "ready" | "missing"
+  >("none");
   const rawSeriesRef = useRef<TactileSeries | null>(null);
   const [lastResult, setLastResult] = useState<AutoLabelResult | null>(null);
   const [status, setStatus] = useState("");
@@ -174,70 +212,83 @@ export default function AutoLabelPanel({
 
   const run = useCallback(
     async (th: Partial<DetectionThresholds>) => {
-      let series: TactileSeries | null = series30;
-      let usedFallback = false;
-      if (useRaw) {
-        const raw = await loadRaw();
-        // Sidecar CSVs record through the inter-episode reset period, so the
-        // raw stream can far outlast the episode, clip to the main table's
-        // time window before detecting.
-        if (raw) {
-          const tEnd = series30
-            ? series30.t[series30.t.length - 1] + 0.1
-            : raw.t[raw.t.length - 1];
-          series = clipSeries(raw, tEnd);
-        } else {
-          // Silent fallback previously made 30 Hz artifacts (zero-frame
-          // dropouts) look like raw-stream detections. Be explicit.
-          usedFallback = true;
+      setRunning(true);
+      try {
+        let series: TactileSeries | null = series30;
+        let usedFallback = false;
+        if (useRaw) {
+          const raw = await loadRaw();
+          // Sidecar CSVs record through the inter-episode reset period, so the
+          // raw stream can far outlast the episode, clip to the main table's
+          // time window before detecting.
+          if (raw) {
+            const tEnd = series30
+              ? series30.t[series30.t.length - 1] + 0.1
+              : raw.t[raw.t.length - 1];
+            series = clipSeries(raw, tEnd);
+          } else {
+            // Silent fallback previously made 30 Hz artifacts (zero-frame
+            // dropouts) look like raw-stream detections. Be explicit.
+            usedFallback = true;
+          }
         }
+        if (!series) {
+          setStatus("no tactile data in this episode");
+          return;
+        }
+        const t0 = performance.now();
+        const result = detectEvents(series, gripper, th);
+        // Diagnostics: everything needed to compare a browser run against the
+        // offline reference. Read via DevTools: window.__autolabelDebug
+        if (typeof window !== "undefined") {
+          (window as unknown as Record<string, unknown>).__autolabelDebug = {
+            rateHz: series.rateHz,
+            nSamples: series.t.length,
+            tRange: [series.t[0], series.t[series.t.length - 1]],
+            gripper: gripper
+              ? {
+                  n: gripper.t.length,
+                  tRange: [gripper.t[0], gripper.t[gripper.t.length - 1]],
+                  posRange: [
+                    Math.min(...gripper.pos),
+                    Math.max(...gripper.pos),
+                  ],
+                }
+              : null,
+            thresholds: th,
+            subtasks: result.subtasks,
+            events: result.events.slice(0, 40),
+            flags: result.flags,
+          };
+        }
+        // replace previous auto atoms, keep human ones. In events-only mode,
+        // only auto EVENT atoms are replaced; subtask segments stay untouched.
+        const replaceFilter = eventsOnlyRef.current
+          ? isAutoEventAtom
+          : isAutoAtom;
+        for (const a of atoms.filter(replaceFilter)) deleteAtom(a);
+        const newAtoms = resultToAtoms(result);
+        addAtoms(
+          eventsOnlyRef.current
+            ? newAtoms.filter((a) => a.style === "interjection")
+            : newAtoms,
+        );
+        setLastResult(result);
+        const subStr = result.subtasks
+          .map(
+            (s) =>
+              `${s.label.slice(0, 5)} ${s.startS.toFixed(1)}-${s.endS.toFixed(1)}`,
+          )
+          .join(" | ");
+        setStatus(
+          `${usedFallback ? "RAW UNAVAILABLE, used 30 Hz table! " : ""}` +
+            `${result.events.length} events (${(performance.now() - t0).toFixed(0)} ms ` +
+            `@ ${series.rateHz.toFixed(0)} Hz) ${subStr}` +
+            `${result.flags.length ? ` flags: ${result.flags.join(", ")}` : ""}`,
+        );
+      } finally {
+        setRunning(false);
       }
-      if (!series) {
-        setStatus("no tactile data in this episode");
-        return;
-      }
-      const t0 = performance.now();
-      const result = detectEvents(series, gripper, th);
-      // Diagnostics: everything needed to compare a browser run against the
-      // offline reference. Read via DevTools: window.__autolabelDebug
-      if (typeof window !== "undefined") {
-        (window as unknown as Record<string, unknown>).__autolabelDebug = {
-          rateHz: series.rateHz,
-          nSamples: series.t.length,
-          tRange: [series.t[0], series.t[series.t.length - 1]],
-          gripper: gripper
-            ? {
-                n: gripper.t.length,
-                tRange: [gripper.t[0], gripper.t[gripper.t.length - 1]],
-                posRange: [Math.min(...gripper.pos), Math.max(...gripper.pos)],
-              }
-            : null,
-          thresholds: th,
-          subtasks: result.subtasks,
-          events: result.events.slice(0, 40),
-          flags: result.flags,
-        };
-      }
-      // replace previous auto atoms, keep human ones. In events-only mode,
-      // only auto EVENT atoms are replaced; subtask segments stay untouched.
-      const replaceFilter = eventsOnlyRef.current ? isAutoEventAtom : isAutoAtom;
-      for (const a of atoms.filter(replaceFilter)) deleteAtom(a);
-      const newAtoms = resultToAtoms(result);
-      addAtoms(
-        eventsOnlyRef.current
-          ? newAtoms.filter((a) => a.style === "interjection")
-          : newAtoms,
-      );
-      setLastResult(result);
-      const subStr = result.subtasks
-        .map((s) => `${s.label.slice(0, 5)} ${s.startS.toFixed(1)}-${s.endS.toFixed(1)}`)
-        .join(" | ");
-      setStatus(
-        `${usedFallback ? "RAW UNAVAILABLE, used 30 Hz table! " : ""}` +
-          `${result.events.length} events (${(performance.now() - t0).toFixed(0)} ms ` +
-          `@ ${series.rateHz.toFixed(0)} Hz) ${subStr}` +
-          `${result.flags.length ? ` flags: ${result.flags.join(", ")}` : ""}`,
-      );
     },
     [series30, useRaw, loadRaw, gripper, atoms, deleteAtom, addAtoms],
   );
@@ -292,10 +343,11 @@ export default function AutoLabelPanel({
         </label>
         <button
           type="button"
+          disabled={running}
           onClick={() => void run(thresholds)}
-          className="px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium"
+          className="px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sky-600"
         >
-          Auto-label episode
+          {running ? "Auto-labeling…" : "Auto-label episode"}
         </button>
         <label className="flex items-center gap-1 text-xs text-slate-400">
           <input
@@ -331,7 +383,9 @@ export default function AutoLabelPanel({
               /* storage unavailable */
             }
             resetAtoms();
-            setStatus(`cleared ${n} cached episode annotation(s), click Auto-label to regenerate`);
+            setStatus(
+              `cleared ${n} cached episode annotation(s), click Auto-label to regenerate`,
+            );
           }}
           className="text-xs text-red-400/80 hover:text-red-300 underline"
         >

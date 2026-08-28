@@ -480,6 +480,100 @@ function parseRawCsv(text: string): {
   return { t, taxels, nTaxels };
 }
 
+/**
+ * Build a piecewise-linear map from main-table time to raw-stream time.
+ *
+ * Every table frame's tactile field is a sample-and-hold snapshot of the
+ * latest raw row at capture, so matching frames to rows BY CONTENT recovers
+ * (tableT, rawT) anchor pairs directly — no clock model needed. On sotac
+ * the two clocks agree to ~2 ms (verified with this map), so there this is
+ * a per-episode alignment CHECK. It matters for real on per-episode-folder
+ * company-format data, whose raw stream is only first-sample-alignable
+ * (~1 s error) — there the map supplies the missing alignment.
+ *
+ * Returns null when too few frames match (e.g. no raw sidecar, or an
+ * episode with almost no contact). Matching uses finger 0 only and skips
+ * near-zero frames (every all-zero row matches every other one).
+ */
+export function buildTableToRawClockMap(
+  frames: unknown[],
+  tableTs: number[],
+  csvTexts: string[],
+): ((t: number) => number) | null {
+  if (!csvTexts.length) return null;
+  const parsed = parseRawCsv(csvTexts[0]);
+  if (!parsed) return null;
+  const { t: rawT, taxels, nTaxels } = parsed;
+  const nRaw = rawT.length;
+  const n = Math.min(frames.length, tableTs.length);
+  const tt: number[] = [];
+  const rt: number[] = [];
+  let r = 0;
+  for (let i = 0; i < n; i++) {
+    const fr = (frames[i] as number[][][])?.[0];
+    if (!fr || fr.length !== nTaxels) continue;
+    let l1 = 0;
+    for (let k = 0; k < nTaxels; k++) {
+      l1 +=
+        Math.abs(fr[k]?.[0] ?? 0) +
+        Math.abs(fr[k]?.[1] ?? 0) +
+        Math.abs(fr[k]?.[2] ?? 0);
+    }
+    if (l1 < 1.0) continue; // ambiguous: near-zero frames match everywhere
+    let found = -1;
+    for (let rr = r; rr < nRaw; rr++) {
+      let ok = true;
+      const base = rr * nTaxels * 3;
+      for (let k = 0; k < nTaxels && ok; k++) {
+        // 0.051 tolerance: values are 0.1 N-quantized; float32 (parquet)
+        // vs %.1f text (CSV) round-trips differ only far below that
+        if (
+          Math.abs(taxels[base + k * 3] - (fr[k]?.[0] ?? 0)) > 0.051 ||
+          Math.abs(taxels[base + k * 3 + 1] - (fr[k]?.[1] ?? 0)) > 0.051 ||
+          Math.abs(taxels[base + k * 3 + 2] - (fr[k]?.[2] ?? 0)) > 0.051
+        ) {
+          ok = false;
+        }
+      }
+      if (ok) {
+        found = rr;
+        break;
+      }
+    }
+    if (found < 0) continue;
+    r = found; // next frame may hold the same row — do not skip past it
+    // monotone guard: receipt jitter can briefly reorder matches
+    if (rt.length && rawT[found] <= rt[rt.length - 1]) continue;
+    tt.push(tableTs[i]);
+    rt.push(rawT[found]);
+  }
+  if (tt.length < 5) return null;
+  return (t: number): number => {
+    if (t <= tt[0]) return rt[0] + (t - tt[0]);
+    if (t >= tt[tt.length - 1])
+      return rt[rt.length - 1] + (t - tt[tt.length - 1]);
+    let lo = 0;
+    let hi = tt.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (tt[mid] <= t) lo = mid;
+      else hi = mid;
+    }
+    const f = (t - tt[lo]) / Math.max(tt[hi] - tt[lo], 1e-9);
+    return rt[lo] + f * (rt[hi] - rt[lo]);
+  };
+}
+
+/** Re-clock a gripper trajectory (main-table time) onto the raw-stream time
+ * base using a map from buildTableToRawClockMap. Identity when map is null. */
+export function remapGripperClock(
+  gripper: GripperSeries | null,
+  map: ((t: number) => number) | null,
+): GripperSeries | null {
+  if (!gripper || !map) return gripper;
+  return { t: gripper.t.map(map), pos: gripper.pos };
+}
+
 // ---------------------------------------------------------------- changepoints
 
 /**
@@ -559,14 +653,11 @@ export function detectEvents(
   const events: RawEvent[] = [];
   const dur = n ? t[n - 1] : 0;
 
-  // gripper velocity resampled onto series time base.
-  // KNOWN DEFECT (do not paper over with a constant shift): the raw-sidecar
-  // clock and the main-table clock disagree by a time-VARYING few hundred
-  // ms (sotac ep30: jaw-close appears ~0.67 s after the contact it causes;
-  // ~0.25 s at release). Every gripper-gated decision below inherits the
-  // skew. Fixing it needs a drift-aware alignment of the two streams, not
-  // a scalar offset — see analysis/detector-vs-published.md in the
-  // annotations workspace.
+  // gripper velocity resampled onto series time base. The gripper's
+  // timestamps must be ON that base — when the series comes from raw CSVs
+  // whose clock may differ from the main table's (company-format data),
+  // callers re-clock it first via buildTableToRawClockMap +
+  // remapGripperClock. On sotac the clocks agree to ~2 ms.
   const gvel = new Float64Array(n);
   if (gripper && gripper.t.length > 2) {
     let j = 1;
