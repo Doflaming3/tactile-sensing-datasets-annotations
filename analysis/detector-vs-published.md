@@ -111,6 +111,24 @@ Note ep16 appears both here (attempts=2) and as the grasp-anchor
 regression: with two genuine attempts, "where grasp starts" is ambiguous
 even for a human — her boundary sits on attempt 1, ours on attempt 2.
 
+**Ep16 deep-dive (video + raw trace): the "invisible" attempt is neither
+air nor sub-threshold.** The failed grab used the *edge* of the sensor pad
+and left a real burst — 1.4→3.8 N across up to 19 taxels for ~0.17 s at
+2.64 s — which the 0.2 s contact-entry debounce (`ENTER_MIN_S`) erased.
+Sub-duration, not sub-threshold. (Side observation: during the burst the
+firmware's own resultant channel read ~0.1 N while the taxel sum hit
+3.8 N — edge contact appears to break the resultant computation.)
+
+Corpus scan of that "strong brief burst" signature (sum fz > 0.15 N for
+0.03–0.20 s, peak ≥ 1 N): **recall is there — 7 of the 8 under-counted
+multi-attempt episodes contain one** (all but ep32). But **precision is
+hopeless ungated: 47 of 63 episodes** have such bursts (grasp settling,
+slip transients, place impacts, episode-start artifacts). A useful
+human-review flag needs at least two more gates before it exists: burst
+must precede the grasp-subtask start, and must coincide with a jaw-closing
+bout (attempt = closing + brief force; brush = force with an idle jaw).
+Not shipped — measured and parked as the concrete v2 design.
+
 ## What this gives us
 
 - **A per-class precision signal**: the 73 deletions are labeled false
