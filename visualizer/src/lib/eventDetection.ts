@@ -1191,15 +1191,34 @@ export function detectEvents(
     let tClose = closeStart >= 0 ? t[closeStart] : dur * 0.25;
     // a failed trial belongs to approach, not grasp
     if (tClose < prevBoutEndS) tClose = prevBoutEndS;
-    // first grasp_stable AFTER the jaw started closing (episodes that begin
-    // already in contact otherwise produce an inverted grasp segment)
-    const stableAfterClose = cleaned.find(
-      (e) => e.label === "grasp_stable" && e.startS >= tClose,
-    );
-    const tStable = Math.min(
-      Math.max(stableAfterClose ? stableAfterClose.startS : tClose + 1, tClose),
-      dur,
-    );
+    // transport starts when the grasp is READY — every finger's grip has
+    // stabilized — not at the first finger's stability: her hand-corrected
+    // transport boundaries sit 0.5–1.9 s after first-stability, 12 of 12
+    // later. A second finger stabilizing more than SETTLE_CAP_S after the
+    // first is a re-grip, not settling, and must not delay transport
+    // (sotac ep24). The ideal anchor would be the lift event, but the lift
+    // detector never fires on sotac — the foam ball's weight transfer
+    // stays under liftRateNps — a defect of its own.
+    const SETTLE_CAP_S = 1.5;
+    const firstStableByFinger = new Map<number, number>();
+    for (const e of cleaned) {
+      if (
+        e.label === "grasp_stable" &&
+        e.startS >= tClose &&
+        !firstStableByFinger.has(e.finger)
+      ) {
+        firstStableByFinger.set(e.finger, e.startS);
+      }
+    }
+    let tStableRaw = tClose + 1;
+    if (firstStableByFinger.size > 0) {
+      const firsts = [...firstStableByFinger.values()];
+      tStableRaw = Math.min(
+        Math.max(...firsts),
+        Math.min(...firsts) + SETTLE_CAP_S,
+      );
+    }
+    const tStable = Math.min(Math.max(tStableRaw, tClose), dur);
     const tOpen = Math.max(openStart >= 0 ? t[openStart] : dur * 0.9, tStable);
     subtasks.push({ label: "approach", startS: 0, endS: tClose });
     subtasks.push({ label: "grasp", startS: tClose, endS: tStable });

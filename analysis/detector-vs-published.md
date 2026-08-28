@@ -194,3 +194,25 @@ await video verdicts against the known-undercounting `attempts` metadata.
   That directly eliminates her most frequent manual correction.
 - **Ranked precision work**: `place` first (26), contact debounce second
   (17), late-episode slip bursts third (13).
+
+## Addendum 4: transport anchor — grasp-READY, not first-stability
+
+Audit of her 12 hand-dragged transport boundaries: the old anchor (first
+`grasp_stable`) was earlier than her value on **12 of 12**, median 0.91 s
+— she consistently places transport after the grip has finished settling.
+New anchor: **the latest of each finger's first `grasp_stable`** in the
+grasp bout, capped at first-stability + 1.5 s (a second finger stabilizing
+later than that is a re-grip, not settling — ep24). Dragged-set error
+0.91 → 0.54 median with 5 of 12 (24, 30, 31, 32, 47) now agreeing
+outright; ~20 previously accepted (unreviewed) boundaries shift 0.2–1.5 s
+later — the same direction as every one of her corrections.
+
+Two consequences recorded: (1) **the `lift` detector never fires on
+sotac** — zero lift events across the corpus; the foam ball's weight
+transfer stays under `liftRateNps` = 1.5 N/s while the jaw-static gate
+also blocks it during tightening. Fixing it would give the semantically
+ideal transport anchor (transport = lift-off). (2) The exact-bit-match
+metric vs published files is retired (4/59 after this change): it
+validated the offline harness, but published boundaries reflect the old
+detector; the video-verified and hand-dragged sets are the scores that
+matter now.

@@ -19,7 +19,7 @@
     "content": "grasp"
    },
    {
-    "t": 5.37147776,
+    "t": 5.999983104,
     "content": "transport"
    }
   ],
@@ -63,8 +63,14 @@
   "flags": [],
   "ours": 20,
   "theirs": 19,
-  "unchanged": 19,
-  "moved": [],
+  "unchanged": 18,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 6.545121536,
+    "theirs": 6.502653184
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -79,11 +85,21 @@
   "flags": [],
   "ours": 15,
   "theirs": 15,
-  "unchanged": 15,
+  "unchanged": 14,
   "moved": [],
   "modified": [],
-  "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyOurs": [
+   {
+    "t": 8.253876223999999,
+    "content": "transport"
+   }
+  ],
+  "onlyTheirs": [
+   {
+    "t": 6.753876224,
+    "content": "transport"
+   }
+  ]
  },
  {
   "episode": 3,
@@ -101,8 +117,14 @@
   "flags": [],
   "ours": 16,
   "theirs": 16,
-  "unchanged": 16,
-  "moved": [],
+  "unchanged": 15,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.172463872,
+    "theirs": 5.09580928
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -133,8 +155,14 @@
   "flags": [],
   "ours": 12,
   "theirs": 12,
-  "unchanged": 12,
-  "moved": [],
+  "unchanged": 11,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.182768384,
+    "theirs": 4.940549632
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -144,8 +172,14 @@
   "flags": [],
   "ours": 12,
   "theirs": 12,
-  "unchanged": 12,
-  "moved": [],
+  "unchanged": 11,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.401306112,
+    "theirs": 4.926338304
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -159,7 +193,7 @@
   "moved": [
    {
     "content": "transport",
-    "ours": 4.095550976,
+    "ours": 4.399862272,
     "theirs": 4.400000095367432
    }
   ],
@@ -174,8 +208,14 @@
   ],
   "ours": 13,
   "theirs": 11,
-  "unchanged": 11,
-  "moved": [],
+  "unchanged": 10,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.32524416,
+    "theirs": 4.225680128
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -194,8 +234,14 @@
   "flags": [],
   "ours": 15,
   "theirs": 15,
-  "unchanged": 15,
-  "moved": [],
+  "unchanged": 14,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.171403008,
+    "theirs": 5.149741824
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -205,8 +251,14 @@
   "flags": [],
   "ours": 12,
   "theirs": 12,
-  "unchanged": 12,
-  "moved": [],
+  "unchanged": 11,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.53362176,
+    "theirs": 4.302080512
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -216,12 +268,17 @@
   "flags": [],
   "ours": 11,
   "theirs": 11,
-  "unchanged": 10,
+  "unchanged": 9,
   "moved": [
    {
     "content": "grasp",
     "ours": 5.401597952,
     "theirs": 5.366666793823242
+   },
+   {
+    "content": "transport",
+    "ours": 6.150174464,
+    "theirs": 6.095099392
    }
   ],
   "modified": [],
@@ -233,19 +290,35 @@
   "flags": [],
   "ours": 17,
   "theirs": 17,
-  "unchanged": 17,
+  "unchanged": 16,
   "moved": [],
   "modified": [],
-  "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyOurs": [
+   {
+    "t": 5.467962112,
+    "content": "transport"
+   }
+  ],
+  "onlyTheirs": [
+   {
+    "t": 4.95113216,
+    "content": "transport"
+   }
+  ]
  },
  {
   "episode": 14,
   "flags": [],
   "ours": 13,
   "theirs": 13,
-  "unchanged": 13,
-  "moved": [],
+  "unchanged": 12,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.90356352,
+    "theirs": 4.540360192
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -255,8 +328,14 @@
   "flags": [],
   "ours": 19,
   "theirs": 19,
-  "unchanged": 19,
-  "moved": [],
+  "unchanged": 18,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.587423488,
+    "theirs": 4.378367232
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -268,7 +347,7 @@
   ],
   "ours": 17,
   "theirs": 15,
-  "unchanged": 14,
+  "unchanged": 13,
   "moved": [],
   "modified": [],
   "onlyOurs": [
@@ -283,12 +362,20 @@
    {
     "t": 5.667342336,
     "content": "grasp"
+   },
+   {
+    "t": 7.035298048,
+    "content": "transport"
    }
   ],
   "onlyTheirs": [
    {
     "t": 3.036258304,
     "content": "grasp"
+   },
+   {
+    "t": 6.370647808,
+    "content": "transport"
    }
   ]
  },
@@ -297,19 +384,35 @@
   "flags": [],
   "ours": 20,
   "theirs": 20,
-  "unchanged": 20,
+  "unchanged": 19,
   "moved": [],
   "modified": [],
-  "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyOurs": [
+   {
+    "t": 5.304955904,
+    "content": "transport"
+   }
+  ],
+  "onlyTheirs": [
+   {
+    "t": 4.577993472,
+    "content": "transport"
+   }
+  ]
  },
  {
   "episode": 18,
   "flags": [],
   "ours": 14,
   "theirs": 14,
-  "unchanged": 14,
-  "moved": [],
+  "unchanged": 13,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.105108224,
+    "theirs": 3.818125056
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -319,19 +422,35 @@
   "flags": [],
   "ours": 16,
   "theirs": 16,
-  "unchanged": 16,
+  "unchanged": 15,
   "moved": [],
   "modified": [],
-  "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyOurs": [
+   {
+    "t": 4.60115584,
+    "content": "transport"
+   }
+  ],
+  "onlyTheirs": [
+   {
+    "t": 4.037799936,
+    "content": "transport"
+   }
+  ]
  },
  {
   "episode": 20,
   "flags": [],
   "ours": 19,
   "theirs": 18,
-  "unchanged": 18,
-  "moved": [],
+  "unchanged": 17,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.377690112,
+    "theirs": 4.146629376
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -349,16 +468,25 @@
   ],
   "ours": 20,
   "theirs": 19,
-  "unchanged": 19,
+  "unchanged": 18,
   "moved": [],
   "modified": [],
   "onlyOurs": [
    {
     "t": 4.147682048,
     "content": "[auto:medium] place f1 0.30s"
+   },
+   {
+    "t": 8.791058176,
+    "content": "transport"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 7.668626688,
+    "content": "transport"
+   }
+  ]
  },
  {
   "episode": 22,
@@ -367,7 +495,7 @@
   ],
   "ours": 23,
   "theirs": 21,
-  "unchanged": 19,
+  "unchanged": 18,
   "moved": [
    {
     "content": "grasp",
@@ -386,11 +514,19 @@
     "content": "[auto:low] drop f1"
    },
    {
+    "t": 7.50351616,
+    "content": "transport"
+   },
+   {
     "t": 9.8581888,
     "content": "[auto:medium] slip f1 0.16s"
    }
   ],
   "onlyTheirs": [
+   {
+    "t": 6.952553728,
+    "content": "transport"
+   },
    {
     "t": 9.8581888,
     "content": "[auto:high] release f1"
@@ -404,8 +540,14 @@
   ],
   "ours": 23,
   "theirs": 21,
-  "unchanged": 20,
-  "moved": [],
+  "unchanged": 19,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 8.57093248,
+    "theirs": 8.240842496
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -434,16 +576,18 @@
   "ours": 17,
   "theirs": 16,
   "unchanged": 14,
-  "moved": [],
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 6.499571712,
+    "theirs": 6.266665935516357
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
     "t": 1.474763264,
     "content": "grasp"
-   },
-   {
-    "t": 4.999571712,
-    "content": "transport"
    },
    {
     "t": 15.403234304,
@@ -454,10 +598,6 @@
    {
     "t": 5.133333206176758,
     "content": "grasp"
-   },
-   {
-    "t": 6.266665935516357,
-    "content": "transport"
    }
   ]
  },
@@ -469,8 +609,14 @@
   ],
   "ours": 29,
   "theirs": 24,
-  "unchanged": 24,
-  "moved": [],
+  "unchanged": 23,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 9.557983744,
+    "theirs": 9.227492352
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -501,12 +647,17 @@
   "flags": [],
   "ours": 14,
   "theirs": 13,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [
    {
     "content": "grasp",
     "ours": 4.202875648,
     "theirs": 4.033332824707031
+   },
+   {
+    "content": "transport",
+    "ours": 4.951549952,
+    "theirs": 4.863584768
    }
   ],
   "modified": [],
@@ -528,7 +679,7 @@
   "modified": [],
   "onlyOurs": [
    {
-    "t": 6.778479104,
+    "t": 8.16374784,
     "content": "transport"
    }
   ],
@@ -544,8 +695,14 @@
   "flags": [],
   "ours": 18,
   "theirs": 15,
-  "unchanged": 14,
-  "moved": [],
+  "unchanged": 13,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 7.104553216,
+    "theirs": 6.88447872
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -577,8 +734,14 @@
   "flags": [],
   "ours": 15,
   "theirs": 15,
-  "unchanged": 15,
-  "moved": [],
+  "unchanged": 14,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 6.01785344,
+    "theirs": 5.897380352
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -589,26 +752,24 @@
   "ours": 23,
   "theirs": 23,
   "unchanged": 21,
-  "moved": [],
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 7.535212544,
+    "theirs": 7.400000095367432
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
     "t": 0.537928192,
     "content": "grasp"
-   },
-   {
-    "t": 6.511808256,
-    "content": "transport"
    }
   ],
   "onlyTheirs": [
    {
     "t": 5.933333873748779,
     "content": "grasp"
-   },
-   {
-    "t": 7.400000095367432,
-    "content": "transport"
    }
   ]
  },
@@ -621,7 +782,13 @@
   "ours": 28,
   "theirs": 25,
   "unchanged": 23,
-  "moved": [],
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 10.14334464,
+    "theirs": 9.933333396911621
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -639,20 +806,12 @@
    {
     "t": 7.139332864,
     "content": "grasp"
-   },
-   {
-    "t": 8.976912384,
-    "content": "transport"
    }
   ],
   "onlyTheirs": [
    {
     "t": 8.366665840148926,
     "content": "grasp"
-   },
-   {
-    "t": 9.933333396911621,
-    "content": "transport"
    }
   ]
  },
@@ -662,7 +821,13 @@
   "ours": 22,
   "theirs": 21,
   "unchanged": 19,
-  "moved": [],
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 8.16325632,
+    "theirs": 7.966666221618652
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -672,20 +837,12 @@
    {
     "t": 6.325606656,
     "content": "[auto:medium] place f1 0.18s"
-   },
-   {
-    "t": 7.437228288,
-    "content": "transport"
    }
   ],
   "onlyTheirs": [
    {
     "t": 4.466667175292969,
     "content": "grasp"
-   },
-   {
-    "t": 7.966666221618652,
-    "content": "transport"
    }
   ]
  },
@@ -694,8 +851,14 @@
   "flags": [],
   "ours": 19,
   "theirs": 16,
-  "unchanged": 16,
-  "moved": [],
+  "unchanged": 15,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.952011776,
+    "theirs": 4.867689216
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -723,12 +886,12 @@
   "modified": [],
   "onlyOurs": [
    {
-    "t": 4.204025088,
-    "content": "transport"
-   },
-   {
     "t": 4.876102144,
     "content": "[auto:high] place f0 0.30s"
+   },
+   {
+    "t": 5.381924096,
+    "content": "transport"
    }
   ],
   "onlyTheirs": [
@@ -773,12 +936,17 @@
   ],
   "ours": 13,
   "theirs": 10,
-  "unchanged": 9,
+  "unchanged": 8,
   "moved": [
    {
     "content": "grasp",
     "ours": 4.743998976,
     "theirs": 4.866666793823242
+   },
+   {
+    "content": "transport",
+    "ours": 5.480701184,
+    "theirs": 5.437155584
    }
   ],
   "modified": [],
@@ -805,8 +973,14 @@
   ],
   "ours": 27,
   "theirs": 18,
-  "unchanged": 18,
-  "moved": [],
+  "unchanged": 17,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.613326336,
+    "theirs": 5.569915904
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -887,7 +1061,7 @@
   "moved": [
    {
     "content": "transport",
-    "ours": 4.687447296,
+    "ours": 5.097891072,
     "theirs": 5.099999904632568
    }
   ],
@@ -956,8 +1130,14 @@
   ],
   "ours": 22,
   "theirs": 19,
-  "unchanged": 19,
-  "moved": [],
+  "unchanged": 18,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 3.727478016,
+    "theirs": 3.672944384
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -980,8 +1160,14 @@
   "flags": [],
   "ours": 15,
   "theirs": 14,
-  "unchanged": 14,
-  "moved": [],
+  "unchanged": 13,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 3.866685696,
+    "theirs": 3.741976576
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -999,7 +1185,7 @@
   ],
   "ours": 17,
   "theirs": 13,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [
    {
     "content": "grasp",
@@ -1024,9 +1210,18 @@
    {
     "t": 3.355511296,
     "content": "[auto:low] drop f1"
+   },
+   {
+    "t": 5.17135232,
+    "content": "transport"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 4.64300672,
+    "content": "transport"
+   }
+  ]
  },
  {
   "episode": 43,
@@ -1081,7 +1276,7 @@
     "content": "grasp"
    },
    {
-    "t": 6.81285248,
+    "t": 6.856384512,
     "content": "transport"
    },
    {
@@ -1113,7 +1308,13 @@
   "ours": 21,
   "theirs": 16,
   "unchanged": 14,
-  "moved": [],
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 8.82217344,
+    "theirs": 8.699999809265137
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -1138,10 +1339,6 @@
    },
    {
     "t": 7.5897664,
-    "content": "transport"
-   },
-   {
-    "t": 7.5897664,
     "content": "[auto:medium] grasp_stable f0"
    }
   ],
@@ -1149,10 +1346,6 @@
    {
     "t": 7.366666793823242,
     "content": "grasp"
-   },
-   {
-    "t": 8.699999809265137,
-    "content": "transport"
    }
   ]
  },
@@ -1161,8 +1354,14 @@
   "flags": [],
   "ours": 19,
   "theirs": 15,
-  "unchanged": 13,
-  "moved": [],
+  "unchanged": 12,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 7.537905664,
+    "theirs": 7.505216768
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -1223,7 +1422,7 @@
     "content": "[auto:medium] place f0 0.30s"
    },
    {
-    "t": 7.867362048,
+    "t": 8.032566528,
     "content": "transport"
    }
   ],
@@ -1250,8 +1449,14 @@
   "flags": [],
   "ours": 14,
   "theirs": 14,
-  "unchanged": 13,
-  "moved": [],
+  "unchanged": 12,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.577719808,
+    "theirs": 4.523678208
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -1271,8 +1476,14 @@
   "flags": [],
   "ours": 17,
   "theirs": 17,
-  "unchanged": 16,
-  "moved": [],
+  "unchanged": 15,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 6.93549184,
+    "theirs": 6.901978624
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -1295,8 +1506,14 @@
   ],
   "ours": 18,
   "theirs": 14,
-  "unchanged": 14,
-  "moved": [],
+  "unchanged": 13,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.566267392,
+    "theirs": 4.52223744
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -1323,8 +1540,14 @@
   "flags": [],
   "ours": 15,
   "theirs": 15,
-  "unchanged": 15,
-  "moved": [],
+  "unchanged": 14,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.028902144,
+    "theirs": 5.0173952
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -1361,7 +1584,7 @@
     "content": "grasp"
    },
    {
-    "t": 9.408055296,
+    "t": 10.343533312,
     "content": "transport"
    }
   ],
@@ -1383,8 +1606,14 @@
   ],
   "ours": 15,
   "theirs": 15,
-  "unchanged": 15,
-  "moved": [],
+  "unchanged": 14,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 5.292125184,
+    "theirs": 5.270117888
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -1396,8 +1625,14 @@
   ],
   "ours": 13,
   "theirs": 13,
-  "unchanged": 13,
-  "moved": [],
+  "unchanged": 12,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 4.342773504,
+    "theirs": 4.334775552
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
@@ -1407,8 +1642,14 @@
   "flags": [],
   "ours": 15,
   "theirs": 15,
-  "unchanged": 15,
-  "moved": [],
+  "unchanged": 14,
+  "moved": [
+   {
+    "content": "transport",
+    "ours": 6.360396544,
+    "theirs": 6.3270784
+   }
+  ],
   "modified": [],
   "onlyOurs": [],
   "onlyTheirs": []
