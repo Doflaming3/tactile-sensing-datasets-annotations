@@ -26,7 +26,11 @@ for ep_str, m in sorted(meta.items(), key=lambda x: int(x[0])):
     if ep not in rows:
         continue
     flags = rows[ep]["flags"]
-    detected = 1 + sum(1 for f in flags if f.startswith("failed_attempt"))
+    detected = 1 + sum(
+        1
+        for f in flags
+        if f.startswith("failed_attempt") or f.startswith("possible_attempt")
+    )
     hers = m.get("attempts", 1)
     total += 1
     if detected == hers:

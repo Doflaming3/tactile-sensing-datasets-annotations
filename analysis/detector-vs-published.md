@@ -123,11 +123,29 @@ Corpus scan of that "strong brief burst" signature (sum fz > 0.15 N for
 0.03–0.20 s, peak ≥ 1 N): **recall is there — 7 of the 8 under-counted
 multi-attempt episodes contain one** (all but ep32). But **precision is
 hopeless ungated: 47 of 63 episodes** have such bursts (grasp settling,
-slip transients, place impacts, episode-start artifacts). A useful
-human-review flag needs at least two more gates before it exists: burst
-must precede the grasp-subtask start, and must coincide with a jaw-closing
-bout (attempt = closing + brief force; brush = force with an idle jaw).
-Not shipped — measured and parked as the concrete v2 design.
+slip transients, place impacts, episode-start artifacts).
+
+**What shipped (after two rejected designs):** the entry debounce now has
+a strength exception, evaluated on the **unfiltered** force (`fnRaw` — the
+median-5 smoothing that protects sustained detection flattens 3–4-sample
+grazes below every threshold). A sub-0.2 s run yields a low-confidence
+`contact_onset` + `drop` pair when it lasts ≥ 0.03 s, peaks ≥ 2 N, starts
+after the 0.5 s episode-start settling window (ep58 has a 2.2 N start-up
+spike), and precedes the finger's first held contact. Existing taxonomy
+classes; the drop-based `failed_attempt` flag counts them automatically.
+
+Video-verified wins: ep16 (`brief 3.8N` @ 2.64) and **ep54 with BOTH
+failed attempts** (`@2.4s` f1 5.2 N, `@3.4s` f0 2.4 N — Zheng confirmed
+two failed grabs on video; her metadata records only 2 total attempts, so
+the `attempts` field itself undercounts and is label-noisy as a validation
+target). Corpus: metadata agreement 43/59, exact bit-matches 23 → 21 —
+both drops are recovered-attempt pairs the published files lack, i.e.
+correct differences. Awaiting video verdicts (real attempt vs approach
+nudge): ep9 @2.8, ep22 @2.9, ep23 @5.0. Two rejected designs for the
+record: burst-must-overlap-jaw-closing (zero yield — grazes precede the
+close) and jaw-close-with-no-contact (user rejected non-tactile judgment).
+Still invisible: ep31/32/39/45/47/56 — below 2 N or under 3 raw frames;
+those need her metadata or video.
 
 ## What this gives us
 

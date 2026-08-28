@@ -59,7 +59,9 @@ export interface AutoLabelResult {
 
 /** Per-finger derived signals, one value per sample. */
 export interface FingerSeries {
-  fn: Float64Array; // sum of taxel fz (N)
+  fn: Float64Array; // sum of taxel fz (N), median-5 smoothed
+  fnRaw: Float64Array; // same, UNsmoothed — brief-contact recovery only
+  // (median-5 flattens 3-4-sample grazes below every threshold)
   fs: Float64Array; // |sum of taxel (fx, fy)| (N)
   tauZ: Float64Array; // spin torque proxy about CoP normal (N*mm)
   slipDiv: Float64Array; // edge/center shear-direction divergence, 0..1
@@ -119,6 +121,21 @@ const EXIT_MIN_S = 0.3;
 /** Contact entry must persist this long before contact_onset fires —
  * momentary brushes during approach otherwise spam contact/drop pairs. */
 const ENTER_MIN_S = 0.2;
+
+/** ...unless the contact is STRONG: the entry debounce exists for weak
+ * near-threshold brushes, but a failed-grab graze on the pad's edge can
+ * put >3 N on the taxels for under 0.2 s (sotac ep16 at 2.64 s) and must
+ * not vanish. A sub-debounce run still yields a (low-confidence)
+ * contact+drop pair when it lasts BRIEF_CONTACT_MIN_S and peaks above
+ * BRIEF_CONTACT_STRONG_N — judged by the tactile data itself. The floor is
+ * 3 raw frames: sotac ep54's second failed grab is 2.4 N over 12 taxels
+ * for 0.044 s (video-verified), and start-up artifacts stay excluded by
+ * the strength bar, not the duration. */
+const BRIEF_CONTACT_MIN_S = 0.03;
+const BRIEF_CONTACT_STRONG_N = 2.0;
+/** Ignore brief contacts this close to t=0 — the sensor settles and the
+ * arm is still parked; sotac ep58 has a 2.2 N start-up spike at 0.25 s. */
+const BRIEF_CONTACT_SKIP_START_S = 0.5;
 
 export const DEFAULT_THRESHOLDS: DetectionThresholds = {
   contactEnterN: 0.15,
@@ -344,6 +361,7 @@ export function buildSeriesFromSensorFrames(
     const hf = movingRms(dFs, Math.max(3, Math.round(rateHz * 0.11)));
     fingers.push({
       fn: fnS,
+      fnRaw: fn,
       fs: fsS,
       tauZ: median5(tauZ),
       slipDiv,
@@ -404,6 +422,7 @@ export function clipSeries(s: TactileSeries, tMax: number): TactileSeries {
     rateHz: s.rateHz,
     fingers: s.fingers.map((f) => ({
       fn: f.fn.slice(0, n),
+      fnRaw: f.fnRaw.slice(0, n),
       fs: f.fs.slice(0, n),
       tauZ: f.tauZ.slice(0, n),
       slipDiv: f.slipDiv.slice(0, n),
@@ -913,6 +932,64 @@ export function detectEvents(
         info: "inferred",
         order: events.length,
       });
+    }
+  });
+
+  // ---- brief strong contacts the entry debounce erased (failed grabs on
+  // the pad's edge — see BRIEF_CONTACT_*). Evaluated on the UNFILTERED
+  // force: median-5 flattens a 3-4-sample graze (ep54's 2.4 N / 0.044 s
+  // second attempt) below every threshold. Only before the finger's first
+  // held contact — later sub-debounce spikes are settling/impact
+  // transients, not attempts.
+  fingers.forEach((f, fi) => {
+    let firstRealS = Infinity;
+    for (const e of events) {
+      if (
+        e.finger === fi &&
+        e.label === "contact_onset" &&
+        e.startS < firstRealS
+      ) {
+        firstRealS = e.startS;
+      }
+    }
+    let start = -1;
+    let peak = 0;
+    for (let i = 0; i < n; i++) {
+      if (f.fnRaw[i] > th.contactEnterN) {
+        if (start < 0) {
+          start = i;
+          peak = 0;
+        }
+        if (f.fnRaw[i] > peak) peak = f.fnRaw[i];
+      } else if (start >= 0) {
+        const durS = t[i - 1] - t[start];
+        if (
+          t[start] >= BRIEF_CONTACT_SKIP_START_S &&
+          t[start] < firstRealS &&
+          durS >= BRIEF_CONTACT_MIN_S &&
+          durS < ENTER_MIN_S &&
+          peak >= BRIEF_CONTACT_STRONG_N
+        ) {
+          events.push({
+            label: "contact_onset",
+            startS: t[start],
+            endS: t[start],
+            finger: fi,
+            confidence: "low",
+            info: `brief ${peak.toFixed(1)}N`,
+            order: events.length,
+          });
+          events.push({
+            label: "drop",
+            startS: t[i - 1],
+            endS: t[i - 1],
+            finger: fi,
+            confidence: "low",
+            order: events.length,
+          });
+        }
+        start = -1;
+      }
     }
   });
 
