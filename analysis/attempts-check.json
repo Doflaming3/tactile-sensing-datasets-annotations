@@ -202,7 +202,7 @@
  {
   "episode": 9,
   "flags": [
-   "failed_attempt@2.8-3.0s"
+   "weak_contact@2.8-3.0s"
   ],
   "ours": 13,
   "theirs": 11,
@@ -316,8 +316,14 @@
   "flags": [],
   "ours": 19,
   "theirs": 19,
-  "unchanged": 18,
-  "moved": [],
+  "unchanged": 17,
+  "moved": [
+   {
+    "content": "[auto:medium] grasp_stable f1",
+    "ours": 4.5987648,
+    "theirs": 4.587423488
+   }
+  ],
   "modified": [],
   "onlyOurs": [
    {
@@ -452,11 +458,22 @@
    "unlabeled_transition@9.8s",
    "failed_attempt@3.8-4.5s"
   ],
-  "ours": 20,
+  "ours": 21,
   "theirs": 19,
-  "unchanged": 18,
+  "unchanged": 16,
   "moved": [],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:medium] slip f1 0.18s",
+    "theirs": "[auto:medium] slip f1 0.16s",
+    "t": 9.099340544
+   },
+   {
+    "ours": "[auto:medium] slip f1 0.20s",
+    "theirs": "[auto:medium] slip f1 0.25s",
+    "t": 12.08146944
+   }
+  ],
   "onlyOurs": [
    {
     "t": 4.147682048,
@@ -465,6 +482,10 @@
    {
     "t": 8.405716736,
     "content": "transport"
+   },
+   {
+    "t": 12.6534656,
+    "content": "[auto:high] slip f1 0.33s"
    }
   ],
   "onlyTheirs": [
@@ -479,9 +500,9 @@
   "flags": [
    "failed_attempt@2.9-3.1s"
   ],
-  "ours": 23,
+  "ours": 24,
   "theirs": 21,
-  "unchanged": 19,
+  "unchanged": 15,
   "moved": [
    {
     "content": "grasp",
@@ -489,7 +510,18 @@
     "theirs": 5.800000190734863
    }
   ],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:high] slip f0 0.31s",
+    "theirs": "[auto:high] slip f0 0.39s",
+    "t": 7.646364672
+   },
+   {
+    "ours": "[auto:medium] place f0 0.13s",
+    "theirs": "[auto:high] place f0 0.69s",
+    "t": 8.790782208
+   }
+  ],
   "onlyOurs": [
    {
     "t": 2.9374912,
@@ -500,11 +532,31 @@
     "content": "[auto:low] drop f1"
    },
    {
-    "t": 9.8581888,
-    "content": "[auto:medium] slip f1 0.16s"
+    "t": 8.140879616,
+    "content": "[auto:medium] grasp_stable f0"
+   },
+   {
+    "t": 8.922188032,
+    "content": "[auto:high] release f0"
+   },
+   {
+    "t": 9.890948096,
+    "content": "[auto:medium] slip f1 0.13s"
+   },
+   {
+    "t": 10.764146176,
+    "content": "[auto:low] drop f1"
    }
   ],
   "onlyTheirs": [
+   {
+    "t": 7.50351616,
+    "content": "[auto:high] grasp_stable f0"
+   },
+   {
+    "t": 9.571307008,
+    "content": "[auto:high] release f0"
+   },
    {
     "t": 9.8581888,
     "content": "[auto:high] release f1"
@@ -514,13 +566,19 @@
  {
   "episode": 23,
   "flags": [
-   "failed_attempt@5.0-5.1s"
+   "weak_contact@5.0-5.1s"
   ],
   "ours": 23,
   "theirs": 21,
-  "unchanged": 20,
+  "unchanged": 19,
   "moved": [],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:high] contact_onset f1",
+    "theirs": "[auto:medium] contact_onset f1",
+    "t": 7.822579456
+   }
+  ],
   "onlyOurs": [
    {
     "t": 4.950304,
@@ -544,46 +602,91 @@
  },
  {
   "episode": 24,
-  "flags": [],
-  "ours": 17,
+  "flags": [
+   "weak_contact@4.7-5.2s"
+  ],
+  "ours": 18,
   "theirs": 16,
-  "unchanged": 14,
+  "unchanged": 10,
   "moved": [
    {
+    "content": "grasp",
+    "ours": 5.302777344,
+    "theirs": 5.133333206176758
+   },
+   {
     "content": "transport",
-    "ours": 6.271367424,
+    "ours": 6.612033792,
     "theirs": 6.266665935516357
    }
   ],
-  "modified": [],
-  "onlyOurs": [
+  "modified": [
    {
-    "t": 1.474763264,
-    "content": "grasp"
+    "ours": "[auto:high] place f1 0.13s",
+    "theirs": "[auto:high] place f1 0.49s",
+    "t": 11.435651328
    },
    {
-    "t": 15.403234304,
+    "ours": "[auto:high] release f1",
+    "theirs": "[auto:medium] release f1",
+    "t": 11.56783232
+   }
+  ],
+  "onlyOurs": [
+   {
+    "t": 4.700238848,
     "content": "[auto:medium] contact_onset f1"
+   },
+   {
+    "t": 5.225532928,
+    "content": "[auto:low] drop f1"
+   },
+   {
+    "t": 6.28237824,
+    "content": "[auto:high] contact_onset f1"
+   },
+   {
+    "t": 6.612033792,
+    "content": "[auto:medium] grasp_stable f1"
    }
   ],
   "onlyTheirs": [
    {
-    "t": 5.133333206176758,
-    "content": "grasp"
+    "t": 1.532199424,
+    "content": "[auto:medium] contact_onset f1"
+   },
+   {
+    "t": 6.28237824,
+    "content": "[auto:high] slip f1 0.13s"
    }
   ]
  },
  {
   "episode": 25,
   "flags": [
-   "failed_attempt@1.3-1.8s",
-   "failed_attempt@4.4-4.6s"
+   "weak_contact@1.3-1.8s"
   ],
-  "ours": 29,
+  "ours": 27,
   "theirs": 24,
-  "unchanged": 24,
+  "unchanged": 19,
   "moved": [],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:high] contact_onset f1",
+    "theirs": "[auto:medium] contact_onset f1",
+    "t": 8.710812416
+   },
+   {
+    "ours": "[auto:medium] slip f1 0.27s",
+    "theirs": "[auto:medium] slip f1 0.45s",
+    "t": 10.569750016
+   },
+   {
+    "ours": "[auto:high] contact_onset f1",
+    "theirs": "[auto:medium] contact_onset f1",
+    "t": 14.112524544
+   }
+  ],
   "onlyOurs": [
    {
     "t": 1.31766016,
@@ -594,19 +697,28 @@
     "content": "[auto:medium] release f1"
    },
    {
-    "t": 4.3868096,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
-    "t": 4.617609984,
-    "content": "[auto:low] drop f1"
-   },
-   {
-    "t": 14.453613824,
+    "t": 15.53738496,
     "content": "[auto:medium] grasp_stable f1"
+   },
+   {
+    "t": 16.303966464,
+    "content": "place_release"
+   },
+   {
+    "t": 16.576724736,
+    "content": "[auto:low] drop f1"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 8.809527552,
+    "content": "[auto:high] slip f1 0.39s"
+   },
+   {
+    "t": 13.80483968,
+    "content": "place_release"
+   }
+  ]
  },
  {
   "episode": 26,
@@ -655,11 +767,23 @@
  {
   "episode": 28,
   "flags": [],
-  "ours": 18,
+  "ours": 17,
   "theirs": 15,
-  "unchanged": 14,
-  "moved": [],
-  "modified": [],
+  "unchanged": 12,
+  "moved": [
+   {
+    "content": "[auto:high] grasp_stable f1",
+    "ours": 7.15926272,
+    "theirs": 7.104553216
+   }
+  ],
+  "modified": [
+   {
+    "ours": "[auto:medium] slip f1 0.38s",
+    "theirs": "[auto:medium] slip f1 0.48s",
+    "t": 12.012353536
+   }
+  ],
   "onlyOurs": [
    {
     "t": 4.334728704,
@@ -670,11 +794,7 @@
     "content": "[auto:medium] slip f1 0.11s"
    },
    {
-    "t": 14.136964096,
-    "content": "[auto:medium] slip f1 0.12s"
-   },
-   {
-    "t": 15.291405824,
+    "t": 15.015701248,
     "content": "[auto:medium] place f1 0.30s"
    }
   ],
@@ -729,9 +849,9 @@
    "failed_attempt@4.3-5.0s",
    "failed_attempt@6.6-7.1s"
   ],
-  "ours": 28,
+  "ours": 29,
   "theirs": 25,
-  "unchanged": 23,
+  "unchanged": 20,
   "moved": [
    {
     "content": "transport",
@@ -739,7 +859,23 @@
     "theirs": 9.933333396911621
    }
   ],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:medium] slip f1 0.14s",
+    "theirs": "[auto:medium] slip f1 0.12s",
+    "t": 6.776749312
+   },
+   {
+    "ours": "[auto:medium] slip f1 0.30s",
+    "theirs": "[auto:high] slip f1 0.30s",
+    "t": 9.780250624
+   },
+   {
+    "ours": "[auto:medium] slip f0 0.34s",
+    "theirs": "[auto:high] slip f0 0.34s",
+    "t": 9.791248128
+   }
+  ],
   "onlyOurs": [
    {
     "t": 4.872705536,
@@ -752,6 +888,10 @@
    {
     "t": 7.040611584,
     "content": "[auto:medium] place f1 0.30s"
+   },
+   {
+    "t": 7.106648064,
+    "content": "[auto:medium] slip f1 0.14s"
    },
    {
     "t": 7.139332864,
@@ -799,7 +939,7 @@
  {
   "episode": 33,
   "flags": [],
-  "ours": 19,
+  "ours": 20,
   "theirs": 16,
   "unchanged": 15,
   "moved": [
@@ -822,6 +962,10 @@
    {
     "t": 8.968711168,
     "content": "[auto:medium] contact_onset f1"
+   },
+   {
+    "t": 10.23584896,
+    "content": "[auto:low] drop f1"
    }
   ],
   "onlyTheirs": []
@@ -851,9 +995,9 @@
  {
   "episode": 35,
   "flags": [],
-  "ours": 26,
+  "ours": 23,
   "theirs": 26,
-  "unchanged": 24,
+  "unchanged": 16,
   "moved": [
    {
     "content": "grasp",
@@ -866,24 +1010,72 @@
     "theirs": 5.1666669845581055
    }
   ],
-  "modified": [],
-  "onlyOurs": [],
-  "onlyTheirs": []
+  "modified": [
+   {
+    "ours": "[auto:high] contact_onset f1",
+    "theirs": "[auto:medium] contact_onset f1",
+    "t": 4.905651968
+   },
+   {
+    "ours": "[auto:high] contact_onset f0",
+    "theirs": "[auto:medium] contact_onset f0",
+    "t": 4.937726464
+   },
+   {
+    "ours": "[auto:high] slip f1 0.18s",
+    "theirs": "[auto:medium] slip f1 0.18s",
+    "t": 6.203352064
+   },
+   {
+    "ours": "[auto:high] slip f1 0.18s",
+    "theirs": "[auto:high] slip f1 0.15s",
+    "t": 9.002846976
+   }
+  ],
+  "onlyOurs": [
+   {
+    "t": 6.379724032,
+    "content": "[auto:low] drop f0"
+   }
+  ],
+  "onlyTheirs": [
+   {
+    "t": 7.205075968,
+    "content": "[auto:medium] slip f0 0.15s"
+   },
+   {
+    "t": 8.789158656,
+    "content": "[auto:medium] slip f0 0.25s"
+   },
+   {
+    "t": 8.921757184,
+    "content": "[auto:high] place f0 0.10s"
+   },
+   {
+    "t": 9.020988928,
+    "content": "[auto:high] release f0"
+   }
+  ]
  },
  {
   "episode": 36,
   "flags": [
    "unlabeled_transition@7.0s",
-   "failed_attempt@1.2-3.1s"
+   "weak_contact@1.2-3.1s"
   ],
-  "ours": 13,
+  "ours": 14,
   "theirs": 10,
-  "unchanged": 8,
+  "unchanged": 7,
   "moved": [
    {
     "content": "grasp",
     "ours": 4.743998976,
     "theirs": 4.866666793823242
+   },
+   {
+    "content": "[auto:high] contact_onset f1",
+    "ours": 5.139744256,
+    "theirs": 5.129337344
    },
    {
     "content": "transport",
@@ -904,18 +1096,20 @@
    {
     "t": 5.405393152,
     "content": "[auto:medium] place f0 0.30s"
+   },
+   {
+    "t": 9.609099264,
+    "content": "[auto:low] drop f1"
    }
   ],
   "onlyTheirs": []
  },
  {
   "episode": 37,
-  "flags": [
-   "failed_attempt@3.4-4.2s"
-  ],
-  "ours": 27,
+  "flags": [],
+  "ours": 21,
   "theirs": 18,
-  "unchanged": 17,
+  "unchanged": 16,
   "moved": [
    {
     "content": "transport",
@@ -926,50 +1120,37 @@
   "modified": [],
   "onlyOurs": [
    {
-    "t": 3.444597504,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
-    "t": 4.196294144,
-    "content": "[auto:low] drop f1"
-   },
-   {
-    "t": 5.051294976,
-    "content": "[auto:medium] contact_onset f1"
+    "t": 5.31605248,
+    "content": "[auto:high] contact_onset f1"
    },
    {
     "t": 5.645926656,
     "content": "[auto:medium] place f0 0.30s"
    },
    {
-    "t": 11.337775104,
-    "content": "[auto:medium] slip f1 0.15s"
+    "t": 10.53282432,
+    "content": "[auto:medium] place f1 0.30s"
    },
    {
-    "t": 12.348284416,
-    "content": "[auto:medium] slip f1 0.14s"
-   },
-   {
-    "t": 12.54701312,
-    "content": "[auto:medium] slip f1 0.18s"
-   },
-   {
-    "t": 13.2404416,
-    "content": "[auto:medium] slip f1 0.15s"
-   },
-   {
-    "t": 13.448493056,
-    "content": "[auto:medium] slip f1 0.11s"
+    "t": 10.831754496,
+    "content": "[auto:high] release f1"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 5.31605248,
+    "content": "[auto:high] slip f1 0.11s"
+   }
+  ]
  },
  {
   "episode": 38,
-  "flags": [],
-  "ours": 16,
+  "flags": [
+   "weak_contact@0.3-2.4s"
+  ],
+  "ours": 18,
   "theirs": 12,
-  "unchanged": 12,
+  "unchanged": 10,
   "moved": [],
   "modified": [],
   "onlyOurs": [
@@ -986,20 +1167,43 @@
     "content": "[auto:medium] place f1 0.30s"
    },
    {
-    "t": 8.9971776,
-    "content": "[auto:medium] contact_onset f1"
+    "t": 2.43883648,
+    "content": "[auto:medium] release f1"
+   },
+   {
+    "t": 4.210784768,
+    "content": "[auto:high] contact_onset f1"
+   },
+   {
+    "t": 4.528988672,
+    "content": "[auto:medium] grasp_stable f1"
+   },
+   {
+    "t": 6.389684992,
+    "content": "[auto:high] place f1 0.05s"
+   },
+   {
+    "t": 6.444643328,
+    "content": "[auto:high] release f1"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 4.210784768,
+    "content": "[auto:high] slip f1 0.20s"
+   },
+   {
+    "t": 7.743356928,
+    "content": "[auto:low] drop f1"
+   }
+  ]
  },
  {
   "episode": 39,
-  "flags": [
-   "failed_attempt@0.1-1.7s"
-  ],
-  "ours": 20,
+  "flags": [],
+  "ours": 16,
   "theirs": 13,
-  "unchanged": 9,
+  "unchanged": 8,
   "moved": [
    {
     "content": "transport",
@@ -1010,24 +1214,12 @@
   "modified": [],
   "onlyOurs": [
    {
-    "t": 0.109667328,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
-    "t": 1.035275264,
-    "content": "[auto:medium] place f1 0.63s"
-   },
-   {
-    "t": 1.66327296,
-    "content": "[auto:medium] release f1"
-   },
-   {
-    "t": 2.464861952,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
     "t": 2.475868672,
     "content": "grasp"
+   },
+   {
+    "t": 4.390555904,
+    "content": "[auto:high] contact_onset f1"
    },
    {
     "t": 4.731546624,
@@ -1042,18 +1234,22 @@
     "content": "[auto:high] place f1 0.30s"
    },
    {
-    "t": 7.790695936,
-    "content": "[auto:medium] place f1 0.30s"
+    "t": 5.743730944,
+    "content": "[auto:high] place f1 0.04s"
    },
    {
-    "t": 10.090054912,
-    "content": "[auto:medium] place f1 0.30s"
+    "t": 5.78839552,
+    "content": "[auto:high] release f1"
    }
   ],
   "onlyTheirs": [
    {
     "t": 3.933332920074463,
     "content": "grasp"
+   },
+   {
+    "t": 4.390555904,
+    "content": "[auto:high] slip f1 0.13s"
    },
    {
     "t": 5.633815296,
@@ -1068,11 +1264,11 @@
  {
   "episode": 40,
   "flags": [
-   "failed_attempt@0.5-1.0s"
+   "unlabeled_transition@6.9s"
   ],
-  "ours": 22,
+  "ours": 18,
   "theirs": 19,
-  "unchanged": 18,
+  "unchanged": 15,
   "moved": [
    {
     "content": "transport",
@@ -1083,24 +1279,33 @@
   "modified": [],
   "onlyOurs": [
    {
-    "t": 0.481520384,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
-    "t": 0.967424512,
-    "content": "[auto:low] drop f1"
-   },
-   {
     "t": 3.52864768,
     "content": "[auto:medium] place f0 0.30s"
+   },
+   {
+    "t": 5.70815872,
+    "content": "[auto:low] drop f0"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 6.202279168,
+    "content": "[auto:medium] slip f0 0.18s"
+   },
+   {
+    "t": 6.202279168,
+    "content": "[auto:medium] place f0 0.30s"
+   },
+   {
+    "t": 6.819091968,
+    "content": "[auto:high] release f0"
+   }
+  ]
  },
  {
   "episode": 41,
   "flags": [],
-  "ours": 15,
+  "ours": 14,
   "theirs": 14,
   "unchanged": 13,
   "moved": [
@@ -1111,23 +1316,15 @@
    }
   ],
   "modified": [],
-  "onlyOurs": [
-   {
-    "t": 9.211524096,
-    "content": "[auto:medium] contact_onset f1"
-   }
-  ],
+  "onlyOurs": [],
   "onlyTheirs": []
  },
  {
   "episode": 42,
-  "flags": [
-   "failed_attempt@0.2-1.8s",
-   "failed_attempt@3.1-3.4s"
-  ],
-  "ours": 17,
+  "flags": [],
+  "ours": 14,
   "theirs": 13,
-  "unchanged": 11,
+  "unchanged": 7,
   "moved": [
    {
     "content": "grasp",
@@ -1135,38 +1332,51 @@
     "theirs": 3.700000047683716
    },
    {
+    "content": "[auto:high] contact_onset f1",
+    "ours": 4.400795392,
+    "theirs": 4.32353792
+   },
+   {
     "content": "transport",
     "ours": 4.77523328,
     "theirs": 4.64300672
+   },
+   {
+    "content": "[auto:medium] grasp_stable f1",
+    "ours": 5.18249344,
+    "theirs": 5.17135232
    }
   ],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:medium] slip f1 0.14s",
+    "theirs": "[auto:medium] slip f1 0.11s",
+    "t": 7.332440064
+   }
+  ],
   "onlyOurs": [
    {
-    "t": 0.153674496,
-    "content": "[auto:medium] contact_onset f1"
+    "t": 8.088012032,
+    "content": "[auto:high] place f1 0.08s"
    },
    {
-    "t": 1.815635456,
-    "content": "[auto:low] drop f1"
-   },
-   {
-    "t": 3.0712128,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
-    "t": 3.355511296,
-    "content": "[auto:low] drop f1"
+    "t": 8.1657984,
+    "content": "[auto:high] release f1"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 9.705483008,
+    "content": "[auto:low] drop f1"
+   }
+  ]
  },
  {
   "episode": 43,
   "flags": [],
-  "ours": 20,
+  "ours": 18,
   "theirs": 16,
-  "unchanged": 15,
+  "unchanged": 14,
   "moved": [
    {
     "content": "transport",
@@ -1174,23 +1384,21 @@
     "theirs": 4.654779392
    }
   ],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:high] slip f0 0.21s",
+    "theirs": "[auto:high] slip f0 0.19s",
+    "t": 4.34684544
+   }
+  ],
   "onlyOurs": [
    {
-    "t": 0,
+    "t": 2.068884736,
     "content": "[auto:medium] contact_onset f0"
    },
    {
-    "t": 0.252713472,
-    "content": "[auto:medium] slip f0 0.11s"
-   },
-   {
-    "t": 0.703283712,
+    "t": 4.64376832,
     "content": "[auto:medium] grasp_stable f0"
-   },
-   {
-    "t": 1.045118976,
-    "content": "[auto:medium] slip f0 0.22s"
    }
   ],
   "onlyTheirs": []
@@ -1261,40 +1469,34 @@
  {
   "episode": 47,
   "flags": [],
-  "ours": 21,
+  "ours": 18,
   "theirs": 16,
-  "unchanged": 14,
+  "unchanged": 13,
   "moved": [
    {
     "content": "transport",
-    "ours": 8.271696128,
+    "ours": 9.075170304,
     "theirs": 8.699999809265137
    }
   ],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:high] slip f0 0.11s",
+    "theirs": "[auto:high] slip f0 0.13s",
+    "t": 8.39257344
+   }
+  ],
   "onlyOurs": [
    {
-    "t": 0.261694464,
+    "t": 1.405719296,
     "content": "[auto:medium] contact_onset f0"
-   },
-   {
-    "t": 0.470773504,
-    "content": "[auto:medium] slip f0 0.26s"
-   },
-   {
-    "t": 1.306910208,
-    "content": "[auto:medium] slip f0 0.11s"
-   },
-   {
-    "t": 3.507664128,
-    "content": "[auto:medium] slip f0 0.19s"
    },
    {
     "t": 3.7066944,
     "content": "grasp"
    },
    {
-    "t": 7.5897664,
+    "t": 8.777553664,
     "content": "[auto:medium] grasp_stable f0"
    }
   ],
@@ -1363,7 +1565,7 @@
   ],
   "ours": 23,
   "theirs": 22,
-  "unchanged": 20,
+  "unchanged": 19,
   "moved": [
    {
     "content": "grasp",
@@ -1376,7 +1578,13 @@
     "theirs": 8.533332824707031
    }
   ],
-  "modified": [],
+  "modified": [
+   {
+    "ours": "[auto:medium] slip f0 0.11s",
+    "theirs": "[auto:medium] slip f0 0.22s",
+    "t": 10.034780416
+   }
+  ],
   "onlyOurs": [
    {
     "t": 7.73683072,

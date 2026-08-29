@@ -195,6 +195,63 @@ await video verdicts against the known-undercounting `attempts` metadata.
 - **Ranked precision work**: `place` first (26), contact debounce second
   (17), late-episode slip bursts third (13).
 
+## Addendum 5: phantom readings — two no-contact mechanisms, one fixed
+
+Zheng video-verified that the flagged "attempts" on eps 25/42/9 involved
+NO contact at all — fingertip pads in the air (jaw open at 26–82 units)
+while the sensor read light force. Start-of-episode rest-force scan
+across all 63 episodes splits the phenomenon:
+
+1. **Baseline drift / LSB flicker** — firmware zeroes once per SESSION,
+   at connect. Zheng's ep43 verdict ("air" at the 2.07 s contact) forced
+   a closer look at the shape: NOT slow drift but **flicker** — 5–13
+   taxels toggling at 1–2 LSB (0.1–0.2 N each), the finger sum swinging
+   0 ↔ 2.6 N for seconds, with occasional full-zero frames, sometimes
+   settling into a quasi-steady ~1.8 N phantom (ep43, ep47 f0). Partial
+   fix shipped: per-episode per-taxel baseline (median of first 0.4 s)
+   plus an ADAPTIVE tracker (tau 1.5 s) that follows the wandering zero
+   while the finger is idle (< 1 N) and freezes under load. This absorbs
+   the standing-offset family (0.2 N eps, ep25's 4.4 s phantom) but NOT
+   the settled flicker (ep43 @2.07, ep47 @1.41 keep one phantom medium
+   contact each). **Deliberately not chased further**: the next patch (a
+   ~0.25 N per-taxel deadband) would erase the video-verified ep16 graze
+   (real contact at the same ~0.2 N/taxel amplitude); flicker and real
+   edge-grazes differ only in temporal persistence, and the damage is one
+   phantom atom on two episodes — flags, counts, and boundaries all
+   unaffected. The real fix is recorder-side per-episode re-zeroing
+   (firmware calibrate per episode, or `software_baseline_frames`) —
+   recommendation to Jingyi, now with the flicker evidence attached.
+   **Blind-zone check passed (Zheng, video):** the two candidate episodes
+   for real sub-1 N attempts (ep39 0–2.5 s, ep47 0–3.7 s — metadata says
+   2 attempts on both; their weak bouts were absorbed by the baseline)
+   show NO touching on video. The absorbed signal was phantom, the 1 N
+   quiet margin stands, and those episodes' extra "attempts" never
+   reached the sensing area — the true sensor floor.
+   **Zero-frame census (last discriminator tested, inverted result):**
+   real light grazes BLINK — 29–64% of frames inside the video-verified
+   ep16/ep54 grazes are all-zero (firmware distributed-block dropouts +
+   genuine 1–2 LSB toggling) — while ep43's phantom is 0% zeros
+   (rock-steady) and ep47's is 24%. No gate exists in either direction.
+   The settled phantom is hereby classified NOT SEPARABLE from real
+   contact at signal level; residual = phantom force visible in panels +
+   one phantom contact atom on eps 43/47. Remaining fixes are outside the
+   signal path: recorder per-episode re-zero (Jingyi — her own ep43 note
+   says "tactile baseline noise on finger 0 at episode start"), and the
+   review workflow's episode-notes field. NEW sensor fact for C6/Paxini:
+   real brief grazes are 30–60% firmware zero-dropouts — also why brief
+   contacts interact badly with the median filter.
+2. **Motion-coincident phantoms** — eps 25/9 rest at exactly 0.0 and the
+   readings appear only while the arm moves, pads in air. Mechanism
+   unknown (fz is UNSIGNED by sensor firmware design, so oscillation
+   signatures are unobservable — a fact for the C6 conversation).
+   Guarded by the 2.3 N weak-bout downgrade (`weak_contact` flags),
+   calibrated on 7 video verdicts: false ≤ 2.2 N, real ≥ 2.4 N.
+
+Attempt agreement after both: **51/59**, remaining disagreements fully
+classified (54 = metadata undercount, we are right; 0/21/22 = strong
+4.2–4.8 N bouts awaiting video verdicts; 32/39/45/47 = below sensor or
+definition floor).
+
 ## Addendum 4: transport anchor — grasp-READY, not first-stability
 
 Audit of her 12 hand-dragged transport boundaries: the old anchor (first
