@@ -70,7 +70,12 @@ function mergeGroups(data: ChartRow[][]): ChartRow[] {
 }
 
 export const DataRecharts = React.memo(
-  ({ data, onChartsReady, defaultCombined = false, fill = false }: DataGraphProps) => {
+  ({
+    data,
+    onChartsReady,
+    defaultCombined = false,
+    fill = false,
+  }: DataGraphProps) => {
     const [hoveredTime, setHoveredTime] = useState<number | null>(null);
     const [expanded, setExpanded] = useState(defaultCombined);
 
@@ -179,6 +184,25 @@ const SingleDataGraph = React.memo(
     legendBelow?: boolean;
   }) => {
     const { currentTime, seek } = useTime();
+
+    // Pin the playhead tooltip (numeric Tooltip defaultIndex) only once the
+    // chart host has real dimensions. recharts' displayDefaultTooltip
+    // dereferences state.tooltipTicks, which never initializes when the
+    // chart mounts at zero size (hidden pane, background iframe — e.g. the
+    // Space before its tab is first shown) and crashes the whole page.
+    const chartHostRef = useRef<HTMLDivElement>(null);
+    const [hostHasSize, setHostHasSize] = useState(false);
+    useEffect(() => {
+      const el = chartHostRef.current;
+      if (!el) return;
+      const check = () =>
+        setHostHasSize(el.offsetWidth > 0 && el.offsetHeight > 0);
+      check();
+      const ro = new ResizeObserver(check);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }, []);
+
     const flattenRow = useCallback(
       (row: Record<string, number | Record<string, number>>, prefix = "") => {
         const result: Record<string, number> = {};
@@ -419,7 +443,9 @@ const SingleDataGraph = React.memo(
     }, [groups, singles]);
 
     return (
-      <div className={`w-full bg-[var(--surface-1)]/40 rounded-lg border border-white/10/50 p-3 ${fill ? (legendBelow ? "h-full min-h-0 flex flex-col" : "h-full min-h-0 flex flex-row items-stretch") : ""}`}>
+      <div
+        className={`w-full bg-[var(--surface-1)]/40 rounded-lg border border-white/10/50 p-3 ${fill ? (legendBelow ? "h-full min-h-0 flex flex-col" : "h-full min-h-0 flex flex-row items-stretch") : ""}`}
+      >
         {chartTitle && !fill && (
           <p
             className="text-xs font-medium text-slate-300 mb-1 px-1 truncate"
@@ -429,6 +455,7 @@ const SingleDataGraph = React.memo(
           </p>
         )}
         <div
+          ref={chartHostRef}
           className={`${
             fill
               ? "flex-1 min-h-0 h-full"
@@ -488,7 +515,9 @@ const SingleDataGraph = React.memo(
                 active={true}
                 isAnimationActive={false}
                 defaultIndex={
-                  !hoveredTime ? findClosestDataIndex(currentTime) : undefined
+                  hostHasSize && !hoveredTime
+                    ? findClosestDataIndex(currentTime)
+                    : undefined
                 }
               />
 

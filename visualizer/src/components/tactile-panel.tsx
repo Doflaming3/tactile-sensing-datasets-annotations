@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import { useTime } from "@/context/time-context";
 import { resolveTaxelLayout } from "@/lib/taxel-layouts";
+import { applyAdaptiveBaseline } from "@/lib/eventDetection";
 import RawStreamPanel from "@/components/raw-stream-panel";
 import {
   computeFolderTactileAggregate,
@@ -122,7 +123,27 @@ function expandChannels(
 function channelsFrom(sensorFrames: SensorFramesMap): Channel[] {
   const out: Channel[] = [];
   for (const [name, sf] of Object.entries(sensorFrames)) {
-    out.push(...expandChannels(name, sf.shape, sf.frames, sf.timestamps));
+    // Show the DRIFT-CORRECTED signal everywhere (3D arrows, timeline,
+    // stats) — the same correction the auto-labeler judges, so the panels
+    // never display force when the pad demonstrably touches nothing
+    // (sotac ep43/47: phantom baseline flicker, video-verified). Buffered
+    // (N,P,3) history shapes are left raw; sotac's (F,P,3) and single
+    // (P,3) shapes are corrected.
+    let frames = sf.frames;
+    try {
+      if (sf.shape.length === 3 && sf.shape[0] <= 4) {
+        frames =
+          (applyAdaptiveBaseline(sf.frames, sf.timestamps) as unknown[]) ??
+          sf.frames;
+      } else if (sf.shape.length === 2) {
+        const wrapped = sf.frames.map((fr) => [fr]);
+        const corr = applyAdaptiveBaseline(wrapped, sf.timestamps);
+        if (corr) frames = corr.map((fr) => fr[0]);
+      }
+    } catch {
+      frames = sf.frames; // raw beats a crashed panel
+    }
+    out.push(...expandChannels(name, sf.shape, frames, sf.timestamps));
   }
   return out.filter((c) => resolveTaxelLayout(c.nPoints));
 }
@@ -163,7 +184,11 @@ function FitCamera({ points }: { points: [number, number, number][] }) {
   const ctrls = useThree((s) => s.controls);
   useEffect(() => {
     if (!points.length) return;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
     for (const [x, y, z] of points) {
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
@@ -301,6 +326,7 @@ function buildTimeline(channels: Channel[]): TimelineRow[] {
   if (!channels.length) return [];
   const nFrames = channels[0].timestamps.length;
   const step = Math.max(1, Math.floor(nFrames / 900));
+
   const rows: TimelineRow[] = [];
   for (let fi = 0; fi < nFrames; fi += step) {
     const row: TimelineRow = { t: channels[0].timestamps[fi] ?? 0 };
@@ -450,29 +476,29 @@ export function TactileStats({
         <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">
           Tactile Sensors, current episode
         </p>
-      <table className="w-full text-sm text-slate-300">
-        <thead>
-          <tr className="text-[11px] text-slate-500 text-left">
-            <th className="py-1 pr-3 font-normal">channel</th>
-            <th className="py-1 pr-3 font-normal">peak |F|</th>
-            <th className="py-1 pr-3 font-normal">@ time</th>
-            <th className="py-1 pr-3 font-normal">contact %</th>
-            <th className="py-1 pr-3 font-normal">mean ΣFz (contact)</th>
-            <th className="py-1 pr-3 font-normal">max ΣFz</th>
-          </tr>
-        </thead>
-        <tbody className="tabular">
-          {rows.map((r) => (
-            <tr key={r.label} className="border-t border-slate-800">
-              <td className="py-1.5 pr-3">{r.label}</td>
-              <td className="py-1.5 pr-3">{r.peak.toFixed(2)} N</td>
-              <td className="py-1.5 pr-3">{r.peakT.toFixed(2)} s</td>
-              <td className="py-1.5 pr-3">{r.contactPct.toFixed(1)}%</td>
-              <td className="py-1.5 pr-3">{r.meanSumFz.toFixed(2)} N</td>
-              <td className="py-1.5 pr-3">{r.maxSumFz.toFixed(2)} N</td>
+        <table className="w-full text-sm text-slate-300">
+          <thead>
+            <tr className="text-[11px] text-slate-500 text-left">
+              <th className="py-1 pr-3 font-normal">channel</th>
+              <th className="py-1 pr-3 font-normal">peak |F|</th>
+              <th className="py-1 pr-3 font-normal">@ time</th>
+              <th className="py-1 pr-3 font-normal">contact %</th>
+              <th className="py-1 pr-3 font-normal">mean ΣFz (contact)</th>
+              <th className="py-1 pr-3 font-normal">max ΣFz</th>
             </tr>
-          ))}
-        </tbody>
+          </thead>
+          <tbody className="tabular">
+            {rows.map((r) => (
+              <tr key={r.label} className="border-t border-slate-800">
+                <td className="py-1.5 pr-3">{r.label}</td>
+                <td className="py-1.5 pr-3">{r.peak.toFixed(2)} N</td>
+                <td className="py-1.5 pr-3">{r.peakT.toFixed(2)} s</td>
+                <td className="py-1.5 pr-3">{r.contactPct.toFixed(1)}%</td>
+                <td className="py-1.5 pr-3">{r.meanSumFz.toFixed(2)} N</td>
+                <td className="py-1.5 pr-3">{r.maxSumFz.toFixed(2)} N</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </div>

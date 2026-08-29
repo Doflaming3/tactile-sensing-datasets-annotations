@@ -524,9 +524,9 @@ function EpisodeViewerInner({
     return t.length > 2 ? { t, pos } : null;
   }, [data.flatChartData]);
 
-  // Arm motion (summed |joint speed|, gripper excluded) for the tactile
-  // auto-labeler — the transport boundary anchors to the arm starting to
-  // carry, which grip force cannot see (light objects).
+  // Arm joint positions (gripper excluded) for the tactile auto-labeler —
+  // the transport boundary anchors to the arm starting to CARRY, judged by
+  // speed plus net directional rotation, which grip force cannot see.
   const armSeries = useMemo(() => {
     const rows = data.flatChartData;
     if (!rows || rows.length === 0) return null;
@@ -535,28 +535,18 @@ function EpisodeViewerInner({
     );
     if (keys.length === 0) return null;
     const t: number[] = [];
-    const speed: number[] = [];
-    let prev: number[] | null = null;
-    let prevT = 0;
+    const joints: number[][] = [];
     for (const r of rows) {
       const ts = r["timestamp"];
       if (typeof ts !== "number") continue;
-      const joints = keys.map((k) =>
+      const row = keys.map((k) =>
         typeof r[k] === "number" ? (r[k] as number) : NaN,
       );
-      if (joints.some((v) => Number.isNaN(v))) continue;
-      let spd = 0;
-      if (prev && ts - prevT > 1e-9) {
-        for (let k = 0; k < joints.length; k++) {
-          spd += Math.abs(joints[k] - prev[k]) / (ts - prevT);
-        }
-      }
+      if (row.some((v) => Number.isNaN(v))) continue;
       t.push(ts);
-      speed.push(spd);
-      prev = joints;
-      prevT = ts;
+      joints.push(row);
     }
-    return t.length > 2 ? { t, speed } : null;
+    return t.length > 2 ? { t, joints } : null;
   }, [data.flatChartData]);
 
   const loadStartRef = useRef(performance.now());

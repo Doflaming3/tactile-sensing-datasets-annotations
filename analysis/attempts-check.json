@@ -668,7 +668,7 @@
   ],
   "ours": 27,
   "theirs": 24,
-  "unchanged": 19,
+  "unchanged": 18,
   "moved": [],
   "modified": [
    {
@@ -697,6 +697,10 @@
     "content": "[auto:medium] release f1"
    },
    {
+    "t": 8.410812415999999,
+    "content": "grasp"
+   },
+   {
     "t": 15.53738496,
     "content": "[auto:medium] grasp_stable f1"
    },
@@ -710,6 +714,10 @@
    }
   ],
   "onlyTheirs": [
+   {
+    "t": 5.707067904,
+    "content": "grasp"
+   },
    {
     "t": 8.809527552,
     "content": "[auto:high] slip f1 0.39s"
@@ -824,24 +832,19 @@
   "unchanged": 21,
   "moved": [
    {
+    "content": "grasp",
+    "ours": 5.727974144,
+    "theirs": 5.933333873748779
+   },
+   {
     "content": "transport",
     "ours": 7.172774656,
     "theirs": 7.400000095367432
    }
   ],
   "modified": [],
-  "onlyOurs": [
-   {
-    "t": 0.537928192,
-    "content": "grasp"
-   }
-  ],
-  "onlyTheirs": [
-   {
-    "t": 5.933333873748779,
-    "content": "grasp"
-   }
-  ]
+  "onlyOurs": [],
+  "onlyTheirs": []
  },
  {
   "episode": 31,
@@ -1748,7 +1751,7 @@
     "content": "[auto:medium] place f1 0.30s"
    },
    {
-    "t": 6.811403776,
+    "t": 8.735607296,
     "content": "grasp"
    },
    {

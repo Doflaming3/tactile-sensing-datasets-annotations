@@ -136,8 +136,8 @@ export default function AutoLabelPanel({
   sensorFrames: SensorFramesMap | undefined;
   /** Episode-relative gripper trajectory (from the flat chart data). */
   gripper: { t: number[]; pos: number[] } | null;
-  /** Summed |arm-joint speed| (gripper excluded) — transport anchor. */
-  arm: { t: number[]; speed: number[] } | null;
+  /** Arm joint positions (gripper excluded) — transport anchor. */
+  arm: { t: number[]; joints: number[][] } | null;
   repoId: string;
   root?: string | null;
   episodeId: number;
@@ -428,12 +428,28 @@ export default function AutoLabelPanel({
         </div>
       )}
 
-      {lastResult && lastResult.events.some((e) => e.confidence === "low") && (
-        <p className="text-[11px] text-amber-400/80">
-          Low-confidence events (incipient slip) need review, the per-taxel
-          shear provenance (C6) is unresolved.
-        </p>
-      )}
+      {lastResult &&
+        (() => {
+          const low = lastResult.events.filter((e) => e.confidence === "low");
+          if (low.length === 0) return null;
+          const counts = new Map<string, number>();
+          for (const e of low) {
+            counts.set(e.label, (counts.get(e.label) ?? 0) + 1);
+          }
+          const summary = [...counts.entries()]
+            .map(([label, c]) => (c > 1 ? `${label} ×${c}` : label))
+            .join(", ");
+          return (
+            <p className="text-[11px] text-amber-400/80">
+              {low.length} low-confidence event{low.length > 1 ? "s" : ""} need
+              review: {summary}
+              {counts.has("incipient_slip")
+                ? " — per-taxel shear provenance (C6) is unresolved"
+                : ""}
+              .
+            </p>
+          );
+        })()}
     </div>
   );
 }

@@ -80,14 +80,16 @@ export interface GripperSeries {
   pos: number[]; // arbitrary units; only derivative sign is used
 }
 
-/** Summed |joint speed| of the ARM joints (everything except the jaw),
- * arbitrary units/s. Carries the one fact fingertip force cannot: whether
- * the arm is moving. Transport anchors to it — a light object's weight
- * transfer is invisible in grip force (the lift detector never fires on
- * sotac), but lift-off is unmissable in shoulder/elbow motion. */
+/** ARM joint positions (everything except the jaw), per sample. Carries
+ * the facts fingertip force cannot: whether the arm is moving, and —
+ * via NET displacement — whether that motion goes anywhere. Carrying
+ * accumulates net joint rotation; in-place grasp adjustment jiggles with
+ * little net progress. Transport anchors to this — a light object's
+ * weight transfer is invisible in grip force (the lift detector never
+ * fires on sotac), but a carrying arm is unmissable. */
 export interface ArmMotionSeries {
   t: number[]; // seconds
-  speed: number[]; // summed |d(joint)/dt| over non-gripper joints
+  joints: number[][]; // per sample: non-gripper joint positions (units)
 }
 
 // ---------------------------------------------------------------- thresholds
@@ -231,6 +233,99 @@ function relStd(x: Float64Array, i0: number, i1: number): number {
 // ---------------------------------------------------------------- builders
 
 /**
+ * Remove the wandering per-taxel zero from a `[frame][finger][taxel][3]`
+ * sequence. The firmware zeroes only once per SESSION (at connect); gel
+ * relaxation + thermal drift leave phantom force in later episodes AND
+ * keep wandering within an episode — sotac ep43 starts at 1.8 N standing
+ * and drifts back over the contact threshold by 2.1 s (video-verified:
+ * pad in the air; her episode note says "tactile baseline noise on finger
+ * 0 at episode start"). The baseline initializes from the first 0.4 s and
+ * then TRACKS the signal (tau ~1.5 s) whenever the finger is idle — total
+ * force within QUIET_MARGIN_N — and freezes the moment real contact loads
+ * the pad, so grip force is never absorbed. Cost: contacts that ramp in
+ * slower than the tracker and stay under ~1 N are absorbed as drift; fast
+ * onsets keep the full 0.15 N sensitivity.
+ *
+ * ONE implementation for detection AND display: the series builder feeds
+ * the detector from this, and the tactile panels render it, so the force
+ * arrows a reviewer sees are exactly what the auto-labeler judged.
+ */
+export function applyAdaptiveBaseline(
+  frames: unknown[],
+  timestamps: number[],
+): number[][][][] | null {
+  if (!frames.length || !timestamps.length) return null;
+  const first = frames[0] as number[][][];
+  if (!Array.isArray(first) || !Array.isArray(first[0])) return null;
+  const nFingers = first.length;
+  const nTaxels = first[0].length;
+  const n = Math.min(frames.length, timestamps.length);
+  const t = timestamps;
+  const dur = t[n - 1] - t[0];
+  const rateHz = dur > 0 ? (n - 1) / dur : 30;
+  const QUIET_MARGIN_N = 1.0;
+  const BASELINE_TAU_S = 1.5;
+  const baseWin = Math.min(n, Math.max(3, Math.round(rateHz * 0.4)));
+
+  const out: number[][][][] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = new Array(nFingers);
+  }
+  for (let f = 0; f < nFingers; f++) {
+    const base = new Float64Array(nTaxels * 3);
+    {
+      const buf: number[] = new Array(baseWin);
+      for (let k = 0; k < nTaxels; k++) {
+        for (let ax = 0; ax < 3; ax++) {
+          let m = 0;
+          for (let i = 0; i < baseWin; i++) {
+            const v = (frames[i] as number[][][])?.[f]?.[k]?.[ax];
+            if (typeof v === "number") buf[m++] = v;
+          }
+          if (m > 0) {
+            const s = buf.slice(0, m).sort((a, b) => a - b);
+            base[k * 3 + ax] = s[Math.floor(m / 2)];
+          }
+        }
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const taxels = (frames[i] as number[][][])?.[f];
+      const row: number[][] = new Array(nTaxels);
+      let sfx = 0;
+      let sfy = 0;
+      let sfz = 0;
+      for (let k = 0; k < nTaxels; k++) {
+        const fx = (taxels?.[k]?.[0] ?? 0) - base[k * 3];
+        const fy = (taxels?.[k]?.[1] ?? 0) - base[k * 3 + 1];
+        const fz = (taxels?.[k]?.[2] ?? 0) - base[k * 3 + 2];
+        row[k] = [fx, fy, fz];
+        sfx += fx;
+        sfy += fy;
+        sfz += fz;
+      }
+      out[i][f] = row;
+      // idle → track the wandering zero; loaded → freeze
+      if (
+        taxels &&
+        Math.abs(sfz) < QUIET_MARGIN_N &&
+        Math.hypot(sfx, sfy) < QUIET_MARGIN_N
+      ) {
+        const dt = i > 0 ? t[i] - t[i - 1] : 1 / rateHz;
+        const alpha = Math.min(1, dt / BASELINE_TAU_S);
+        for (let k = 0; k < nTaxels; k++) {
+          for (let ax = 0; ax < 3; ax++) {
+            const raw = taxels[k]?.[ax] ?? 0;
+            base[k * 3 + ax] += alpha * (raw - base[k * 3 + ax]);
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Build a TactileSeries from the 30 Hz main-table sensor frames.
  * `frames[i]` is a nested array of shape [nFingers][nTaxels][3] (fx, fy, fz).
  * `layout` gives per-taxel [x, y, z] mm positions (finger long axis = +Y).
@@ -250,6 +345,10 @@ export function buildSeriesFromSensorFrames(
   const dur = t[n - 1] - t[0];
   const rateHz = dur > 0 ? (n - 1) / dur : 30;
 
+  // one implementation of the drift correction, shared with the display
+  const corrected = applyAdaptiveBaseline(frames, timestamps);
+  const src: unknown[] = corrected ?? frames;
+
   const fingers: FingerSeries[] = [];
   for (let f = 0; f < nFingers; f++) {
     const fn = new Float64Array(n);
@@ -261,7 +360,7 @@ export function buildSeriesFromSensorFrames(
     const curShear = new Float64Array(nTaxels * 2);
 
     for (let i = 0; i < n; i++) {
-      const frame = frames[i] as number[][][];
+      const frame = src[i] as number[][][];
       const taxels = frame?.[f];
       if (!taxels) continue;
       let sfx = 0;
@@ -1199,7 +1298,29 @@ export function detectEvents(
         closeStart = closeRuns[0];
       }
     }
-    let tClose = closeStart >= 0 ? t[closeStart] : dur * 0.25;
+    // Arm-driven contact fallback: when the chosen closing motion sits far
+    // ahead of the contact, the jaw was PRE-POSITIONED and the arm
+    // descended onto the object — the "closing" the selector latched onto
+    // is a micro settle invisible on video (sotac ep30, video-verified:
+    // anchor sat on a 2-unit jaw drift at 0.5 s while grasping begins just
+    // before the 6.0 s contact; a real squeeze can also START only after
+    // the contact and is then ineligible). Anchor a short lead before the
+    // contact instead — her hand-set boundaries lead it by 0.2–1.5 s.
+    const ARM_DRIVEN_MAX_LEAD_S = 2.0;
+    const ARM_DRIVEN_FALLBACK_LEAD_S = 0.3;
+    if (
+      contactRefS !== null &&
+      closeStart >= 0 &&
+      contactRefS - t[closeStart] > ARM_DRIVEN_MAX_LEAD_S
+    ) {
+      closeStart = -1;
+    }
+    let tClose =
+      closeStart >= 0
+        ? t[closeStart]
+        : contactRefS !== null
+          ? Math.max(contactRefS - ARM_DRIVEN_FALLBACK_LEAD_S, 0)
+          : dur * 0.25;
     // a failed trial belongs to approach, not grasp
     if (tClose < prevBoutEndS) tClose = prevBoutEndS;
     // transport starts when the ARM starts carrying: first sustained arm
@@ -1220,20 +1341,67 @@ export function detectEvents(
     if (arm && arm.t.length > 2 && firstStableS !== null) {
       const ARM_MOVE_EPS = 12; // summed units/s; jitter ~1-2, slow drift ~5-10
       const moveSustainS = 0.15;
-      let j = 1;
-      let moveStart = -1;
-      for (let i = 0; i < n; i++) {
-        if (t[i] < firstStableS - 0.05) continue;
-        while (j < arm.t.length - 1 && arm.t[j] < t[i]) j++;
-        if (arm.speed[j] > ARM_MOVE_EPS) {
-          if (moveStart < 0) moveStart = i;
-          if (t[i] - t[moveStart] >= moveSustainS) {
-            tStableRaw = Math.max(t[moveStart], firstStableS);
-            break;
-          }
-        } else {
-          moveStart = -1;
+      const nJoints = arm.joints[0]?.length ?? 0;
+      const speedAt: number[] = new Array(arm.t.length).fill(0);
+      for (let g = 1; g < arm.t.length; g++) {
+        const dt = arm.t[g] - arm.t[g - 1];
+        if (dt <= 1e-9) continue;
+        let s = 0;
+        for (let k = 0; k < nJoints; k++) {
+          s += Math.abs(arm.joints[g][k] - arm.joints[g - 1][k]) / dt;
         }
+        speedAt[g] = s;
+      }
+      // Substantial jaw closing still AHEAD of the candidate postpones it
+      // — the arm was repositioning while the operator worked the
+      // (re)grip, not carrying (ep31, video-verified: 40-unit squeeze at
+      // 9.1-9.8 s, her boundary 9.9 s). Ongoing squeeze tails and
+      // mid-carry micro tightens (≤ ~5 units) do not postpone (ep2,
+      // ep24). KNOWN LIMIT: carrying that overlaps a fresh hard squeeze
+      // is postponed too — net joint displacement cannot separate the two
+      // (ep31's repositioning is itself directional, measured ≥16 units);
+      // separating them needs SIGNED lift-direction motion, which needs a
+      // per-robot sign convention.
+      const SQUEEZE_LOOKAHEAD_S = 1.0;
+      const SQUEEZE_MIN_TRAVEL = 8; // jaw units; real squeezes are 30-50
+      const jawCloseAhead = (fromS: number): number => {
+        if (!gripper) return 0;
+        let start: number | null = null;
+        let minPos = Infinity;
+        for (let g = 0; g < gripper.t.length; g++) {
+          const ts = gripper.t[g];
+          if (ts < fromS) continue;
+          if (ts > fromS + SQUEEZE_LOOKAHEAD_S) break;
+          if (start === null) start = gripper.pos[g];
+          if (gripper.pos[g] < minPos) minPos = gripper.pos[g];
+        }
+        return start === null || minPos === Infinity ? 0 : start - minPos;
+      };
+      let resumeFromS = firstStableS - 0.05;
+      for (;;) {
+        let j = 1;
+        let moveStart = -1;
+        let candidateS = -1;
+        for (let i = 0; i < n; i++) {
+          if (t[i] < resumeFromS) continue;
+          while (j < arm.t.length - 1 && arm.t[j] < t[i]) j++;
+          if (speedAt[j] > ARM_MOVE_EPS) {
+            if (moveStart < 0) moveStart = i;
+            if (t[i] - t[moveStart] >= moveSustainS) {
+              candidateS = t[moveStart];
+              break;
+            }
+          } else {
+            moveStart = -1;
+          }
+        }
+        if (candidateS < 0) break;
+        if (jawCloseAhead(candidateS) >= SQUEEZE_MIN_TRAVEL) {
+          resumeFromS = candidateS + 0.2;
+          continue;
+        }
+        tStableRaw = Math.max(candidateS, firstStableS);
+        break;
       }
     }
     const tStable = Math.min(Math.max(tStableRaw, tClose), dur);
@@ -1251,9 +1419,36 @@ export function detectEvents(
   // owner. Validated against episode metadata's hand-recorded attempt
   // count (which itself undercounts — sotac ep54, video-verified).
   if (graspBout) {
+    // Weak pre-grasp bouts are phantom readings, not grabs: video-verified
+    // (eps 25/42/9) that the pads were in the AIR — jaw open at 26-82
+    // units — while the sensor read light force. Two mechanisms: standing
+    // baseline drift (firmware zeroes once per session; handled by the
+    // per-episode baseline in the series builders) and motion-coincident
+    // phantoms that appear only while the arm moves (mechanism unknown;
+    // fz is unsigned by sensor design, so oscillation cannot be checked).
+    // Calibration from 7 video verdicts: every false bout peaks <= 2.2 N,
+    // every real grab >= 2.4 N. The 2.3 N cut sits in that thin gap —
+    // re-derive as verdicts grow.
+    const WEAK_ATTEMPT_MAX_N = 2.3;
+    const boutPeakN = (b: { startS: number; endS: number }): number => {
+      let pk = 0;
+      for (const f of fingers) {
+        for (let i = 0; i < n; i++) {
+          if (t[i] < b.startS - 0.05) continue;
+          if (t[i] > b.endS + 0.05) break;
+          if (f.fnRaw[i] > pk) pk = f.fnRaw[i];
+        }
+      }
+      return pk;
+    };
     for (const b of bouts) {
       if (b === graspBout) break;
-      flags.push(`failed_attempt@${b.startS.toFixed(1)}-${b.endS.toFixed(1)}s`);
+      const span = `${b.startS.toFixed(1)}-${b.endS.toFixed(1)}s`;
+      if (boutPeakN(b) < WEAK_ATTEMPT_MAX_N) {
+        flags.push(`weak_contact@${span}`);
+      } else {
+        flags.push(`failed_attempt@${span}`);
+      }
     }
   }
 

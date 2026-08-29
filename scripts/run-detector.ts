@@ -129,7 +129,7 @@ interface Info {
 interface EpisodeInputs {
   timestamps: number[];
   gripper: { t: number[]; pos: number[] } | null;
-  arm: { t: number[]; speed: number[] } | null;
+  arm: { t: number[]; joints: number[][] } | null;
   frames: unknown[];
   sensorName: string;
   nTaxels: number;
@@ -174,33 +174,22 @@ async function loadEpisodeInputs(
   const timestamps = rows.map((r) => toNum(r["timestamp"]));
   const frames = rows.map((r) => r[sensorKey]);
   let gripper: { t: number[]; pos: number[] } | null = null;
-  let arm: { t: number[]; speed: number[] } | null = null;
+  let arm: { t: number[]; joints: number[][] } | null = null;
   if (gripperIdx >= 0) {
     gripper = { t: [], pos: [] };
-    arm = { t: [], speed: [] };
-    let prev: number[] | null = null;
-    let prevT = 0;
+    arm = { t: [], joints: [] };
     for (const r of rows) {
       const st = r["observation.state"] as ArrayLike<number> | undefined;
       if (!st) continue;
       const ts = toNum(r["timestamp"]);
       gripper.t.push(ts);
       gripper.pos.push(Number(st[gripperIdx]));
-      // arm speed: summed |joint velocity| over all non-gripper joints
       const joints: number[] = [];
       for (let k = 0; k < st.length; k++) {
         if (k !== gripperIdx) joints.push(Number(st[k]));
       }
-      let spd = 0;
-      if (prev && ts - prevT > 1e-9) {
-        for (let k = 0; k < joints.length; k++) {
-          spd += Math.abs(joints[k] - prev[k]) / (ts - prevT);
-        }
-      }
       arm.t.push(ts);
-      arm.speed.push(spd);
-      prev = joints;
-      prevT = ts;
+      arm.joints.push(joints);
     }
     if (gripper.t.length <= 2) {
       gripper = null;
