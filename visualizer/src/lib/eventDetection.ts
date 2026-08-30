@@ -15,8 +15,6 @@
 // Works at 30 Hz (main-table sensorFrames) or ~91 Hz (raw sidecar CSVs);
 // builders for both input shapes are provided.
 
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-
 import type { LanguageAtom } from "@/types/language.types";
 
 // ---------------------------------------------------------------- types
