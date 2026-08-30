@@ -2050,13 +2050,18 @@ export function detectEvents(
       )
     : undefined;
   if (handRelease) {
+    // pads-meet closes are their own context: "hand still holding" is
+    // false there (the pads held each other, ep0) — no renames inside
+    const airSpans: Array<[number, number]> = [];
+    for (const fl of flags) {
+      const m = /^air_grasp@([\d.]+)-([\d.]+)s$/.exec(fl);
+      if (m) airSpans.push([Number(m[1]) - 0.1, Number(m[2]) + 0.1]);
+    }
+    const inAir = (tq: number): boolean =>
+      airSpans.some(([s, e]) => tq >= s && tq <= e);
+    // the partner holds at tq if its latest engagement-opening precedes
+    // tq with no terminal in between
     const partnerHolding = (fi: number, tq: number): boolean => {
-      for (const c of cleaned) {
-        if (c.finger === fi || c.finger < 0) continue;
-        if (c.startS >= tq) break;
-        // walking in time order: the partner holds if its latest
-        // engagement-opening precedes tq with no terminal in between
-      }
       let lastOn = -1;
       let lastEx = -1;
       for (const c of cleaned) {
@@ -2069,6 +2074,7 @@ export function detectEvents(
       return lastOn >= 0 && lastOn > lastEx;
     };
     for (const e of cleaned) {
+      if (inAir(e.startS)) continue;
       if (e.label === "release" && e.startS < handRelease.startS - 0.3) {
         if (partnerHolding(e.finger, e.startS)) {
           e.info = "hand still holding";
@@ -2094,6 +2100,22 @@ export function detectEvents(
           e.info = "sensor not re-zeroed";
           e.label = "sensor_residual";
         }
+      }
+    }
+    // a PLACE built from that same discharge (the slow decay reads as
+    // weight transfer): place at/after the hand's release on a finger
+    // that has a sensor_residual — ep36 @8.46, ep41 @6.66
+    const residualFingers = new Set(
+      cleaned.filter((e) => e.label === "sensor_residual").map((e) => e.finger),
+    );
+    for (const e of cleaned) {
+      if (
+        e.label === "place" &&
+        residualFingers.has(e.finger) &&
+        e.startS >= handRelease.startS - 0.05
+      ) {
+        e.info = "sensor not re-zeroed";
+        e.label = "sensor_residual";
       }
     }
   }
@@ -2167,12 +2189,14 @@ export function resultToRecordedAtoms(result: AutoLabelResult): LanguageAtom[] {
     (m[1] === "post_task_contact" ? lowSpans : allSpans).push(span);
   }
   const atoms = resultToAtoms(result);
-  if (lowSpans.length === 0 && allSpans.length === 0) return atoms;
   const inside = (a: LanguageAtom, spans: Array<[number, number]>) =>
     spans.some(([s, e]) => a.timestamp >= s && a.timestamp <= e);
   return atoms.filter((a) => {
     if (a.style !== "interjection") return true;
     if (!a.content?.startsWith("[auto:")) return true;
+    // real-name pass: phantom and sensor_residual are not real contact
+    // (finger_unload IS real signal and stays)
+    if (/\] (phantom|sensor_residual)\b/.test(a.content)) return false;
     if (inside(a, allSpans)) return false;
     return !(a.content.startsWith("[auto:low]") && inside(a, lowSpans));
   });

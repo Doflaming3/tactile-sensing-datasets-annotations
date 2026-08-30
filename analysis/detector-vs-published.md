@@ -668,3 +668,45 @@ because its residual drop carries no attempt flag; ep39
 the template correctly. Sweep verdicts recorded: ep16/22/45/0/25/33/37
 all correct, ep7/13 clean. The metadata-driven general case of
 result-aware segmentation remains the open structural item.
+
+### Addendum 6j: real names for the markers (Zheng's marker-honesty pass)
+
+Three new interjection labels, assigned by a rename pass that runs
+LAST (all anchors/bouts/flags/gates compute on the original labels —
+renames are output semantics only):
+- finger_unload ("hand still holding"): a real force exit while the
+  partner still holds, before the hand's release — the hand's release
+  being the first release at/after the place_release anchor (the jaw
+  opening). ep25 @11.68, ep33 @8.11, ep50 @12.18 — exactly Zheng's
+  three "gripper was still holding the ball" verdicts. Real signal:
+  KEPT in recorded annotations.
+- sensor_residual ("sensor not re-zeroed"): a terminal lagging the
+  hand's release by >0.5 s whose contact predates it — the
+  non-re-zeroed sensor discharging. ep36 @9.61, ep41 @7.34, ep22
+  @10.76 — exactly the video-verified residual family. EXCLUDED from
+  recorded annotations (this closes the last known recorded-set
+  contamination; the late-peel rule now feeds an honest label and no
+  longer needs deletion).
+- phantom ("was <label>"): the post-task gate's classified chains.
+  ep25's tail trio, ep33's post-place pair. EXCLUDED from recording.
+Air-grasp spans are exempt from renames (pads held each other, not an
+object — ep0's exits stay plain releases). Corpus census = exactly the
+video-verified set, 11 markers across 6 episodes; anchors, flags,
+attempts (55/59) all bit-identical; 162 tests. NOTE for Jingyi: these
+three labels are outside Table VIII — they name sensor/context
+artifacts, not manipulation events; the recorded set contains only
+Table VIII vocabulary plus finger_unload (real signal, needs her
+naming blessing or a mapping).
+
+Label check (run for Zheng, all 7 affected episodes, full atom lists vs
+recorded set): every rename sits exactly on a video-verdict location;
+nothing else renamed; recorded set keeps all real events (incl.
+finger_unload and ep0's pad-touch contacts) and drops every
+phantom/sensor_residual. The check itself caught one leak: PLACE events
+built from the residual's slow decay (ep36 @8.46, ep41 @6.66 — the
+discharge reads as weight transfer) were still recorded; the rename
+pass now marks place-at/after-hand-release on a residual finger as
+sensor_residual too. Final census: 13 markers across 6 episodes.
+Remaining known recorded-set imperfections, all in the place-FP family
+(next work item): ep0 place @2.70 on pad-pad contact, ep36 place f0
+@5.41 during settling.

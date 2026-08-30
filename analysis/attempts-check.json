@@ -549,7 +549,7 @@
    },
    {
     "t": 10.764146176,
-    "content": "[auto:low] drop f1"
+    "content": "[auto:low] sensor_residual f1"
    }
   ],
   "onlyTheirs": [
@@ -689,11 +689,6 @@
     "ours": "[auto:medium] slip f1 0.27s",
     "theirs": "[auto:medium] slip f1 0.45s",
     "t": 10.569750016
-   },
-   {
-    "ours": "[auto:low] contact_onset f1",
-    "theirs": "[auto:medium] contact_onset f1",
-    "t": 14.112524544
    }
   ],
   "onlyOurs": [
@@ -711,15 +706,19 @@
    },
    {
     "t": 11.681496832,
-    "content": "[auto:high] release f1"
+    "content": "[auto:high] finger_unload f1"
+   },
+   {
+    "t": 14.112524544,
+    "content": "[auto:low] phantom f1"
    },
    {
     "t": 15.53738496,
-    "content": "[auto:low] grasp_stable f1"
+    "content": "[auto:low] phantom f1"
    },
    {
     "t": 16.576724736,
-    "content": "[auto:low] drop f1"
+    "content": "[auto:low] phantom f1"
    }
   ],
   "onlyTheirs": [
@@ -734,6 +733,10 @@
    {
     "t": 11.681496832,
     "content": "[auto:low] drop f1"
+   },
+   {
+    "t": 14.112524544,
+    "content": "[auto:medium] contact_onset f1"
    }
   ]
  },
@@ -993,15 +996,15 @@
    },
    {
     "t": 8.10971136,
-    "content": "[auto:high] release f1"
+    "content": "[auto:high] finger_unload f1"
    },
    {
     "t": 8.968711168,
-    "content": "[auto:low] contact_onset f1"
+    "content": "[auto:low] phantom f1"
    },
    {
     "t": 10.23584896,
-    "content": "[auto:low] drop f1"
+    "content": "[auto:low] phantom f1"
    }
   ],
   "onlyTheirs": [
@@ -1144,7 +1147,7 @@
    },
    {
     "t": 9.609099264,
-    "content": "[auto:medium] release f1"
+    "content": "[auto:medium] sensor_residual f1"
    }
   ],
   "onlyTheirs": []
@@ -1355,7 +1358,7 @@
   "onlyOurs": [
    {
     "t": 7.335036672,
-    "content": "[auto:medium] release f1"
+    "content": "[auto:medium] sensor_residual f1"
    }
   ],
   "onlyTheirs": [
