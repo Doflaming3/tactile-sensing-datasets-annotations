@@ -710,3 +710,56 @@ sensor_residual too. Final census: 13 markers across 6 episodes.
 Remaining known recorded-set imperfections, all in the place-FP family
 (next work item): ep0 place @2.70 on pad-pad contact, ep36 place f0
 @5.41 during settling.
+
+### Addendum 6k: place hygiene — the precision item, census-driven
+
+Census of all 130 corpus place events (features: pre-place plateau, max
+grip recovery before the finger's terminal, distance to the
+place_release anchor, air-span membership, terminal kind). Real
+placements have a signature: at the anchor (dt ~ 0-0.5 s), recovery
+0%, terminal = release/unload. Five artifact classes, all now DELETED
+in a hygiene pass that runs after every anchor/flag/gate (so nothing
+downstream shifts — verified bit-identical):
+- D1 same-finger overlapping duplicates (main path + backfill both
+  firing on one placement): ~14 events (ep10/29/61 family).
+- D2 settling dips — grip recovers >=25% and the carry continues
+  >1.5 s (ep1 @6.7 rec 166%, ep56 @6.7 rec 706%, ep31 x2, ep26, ep34,
+  ep36 @5.41, ep37, ep38, ep48 @9.3, ep49). Margins are thin and
+  measured: real staged placements (ep50 into-the-bowl, ep51, ep46)
+  survive via the <=1.5 s unload gap (max real 1.43 s vs min false
+  1.7 s) — re-derive as verdicts grow.
+- D3 place-then-drop — a dip before LOSING the object (ep21 @4.15,
+  ep24 @4.93, ep40 x2, ep45's loss-overlap).
+- D4 inside air_grasp spans — nothing held (ep0 @2.70).
+- D5 >1.5 s after the place_release anchor — post-task artifacts
+  (ep28 @15.0, ep40 @8.7).
+Result: 130 -> 109 places. Provenance caution recorded: the old "26
+place deletions by her" ground truth is unreliable (eps 0-5 published
+files proved to be detector snapshots), so hygiene is calibrated on
+physics classes + Zheng's video verdicts only. Remaining video items:
+ep20 @4.40 (rec 43%, gap 1.39 s — survives, borderline) and ep56
+@6.62-6.81 (trial-1 place during the failed hold — survives, semantics
+unclear).
+
+### Addendum 6l: calibration toolkit persisted + result-metadata flags
+
+The census scripts that derived every Tier-2 constant now live in
+`scripts/calibration/` with a README documenting the per-constant
+porting protocol (they were session-temporary before — the calibration
+procedure claimed by analysis/portability.md is now an artifact in the
+repo). All smoke-tested from the repo root.
+
+Result metadata integration (first slice of the metadata-driven case):
+detectEvents accepts `context.result`; when the recorded outcome is
+non-success but a full success template is emitted, the episode gets a
+`result_failure` / `result_partial` flag — the tension is flagged for
+human/vision review rather than guessed at (Zheng's ep39 ruling: a
+wrong-location release is tactilely indistinguishable from success).
+The runner feeds it from `annotations/episode_annotations.json`.
+Corpus: ep39 result_failure, **ep48 result_failure (new discovery —
+her metadata calls it a failure while the tactile story is a complete
+task; ep39-class, video/vision review needed)**, ep51/ep55
+result_partial (no attempt flags — what happened?), ep56
+result_partial (consistent with its flagged trial-1). ep45 unflagged
+(the signal-side override already suppressed its template; metadata
+agrees).

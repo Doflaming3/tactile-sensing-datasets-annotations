@@ -861,6 +861,7 @@ export function detectEvents(
   gripper: GripperSeries | null,
   thresholds?: Partial<DetectionThresholds>,
   arm?: ArmMotionSeries | null,
+  context?: { result?: string },
 ): AutoLabelResult {
   const th: DetectionThresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
   const { t, rateHz, fingers } = series;
@@ -2024,6 +2025,96 @@ export function detectEvents(
     }
   }
 
+  // ---- place hygiene (Zheng's precision item; census of all 130
+  // corpus places). A real placement sits at the place_release anchor,
+  // never regains grip, and its finger next releases or unloads. Five
+  // artifact classes are DELETED — places are detector interpretations,
+  // not raw sensor truth, so removing false ones is honest:
+  //  D1 same-finger overlapping duplicates — main path and backfill
+  //     both firing on one placement (~18 corpus events)
+  //  D2 settling dips: grip recovers >=25% of its pre-place level and
+  //     the carry continues >1.5 s more (ep36 @5.41; ep56 @6.7 with
+  //     706% recovery; margins: real staged placements max gap 1.43 s
+  //     (ep50), false min 1.7 s (ep38) — thin, re-derive with verdicts)
+  //  D3 place-then-drop: the finger's next terminal is a drop — a dip
+  //     before LOSING the object is not a placement (ep21 @4.15,
+  //     ep24 @4.93, ep40, ep45's loss-overlap)
+  //  D4 inside an air_grasp span: nothing was held (ep0 @2.70)
+  //  D5 starting >1.5 s after the place_release anchor: post-task
+  //     artifact (ep28 @15.0, ep40 @8.7)
+  const deletedPlaces = new Set<DetectedEvent>();
+  {
+    const placeRelSub = subtasks.find((s) => s.label === "place_release");
+    const airSpans2: Array<[number, number]> = [];
+    for (const fl of flags) {
+      const m = /^air_grasp@([\d.]+)-([\d.]+)s$/.exec(fl);
+      if (m) airSpans2.push([Number(m[1]) - 0.1, Number(m[2]) + 0.1]);
+    }
+    const idxAt = (tq: number): number => {
+      let lo = 0;
+      let hi = n - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (t[mid] < tq) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+    const byF = new Map<number, DetectedEvent[]>();
+    for (const p of cleaned) {
+      if (p.label !== "place") continue;
+      if (!byF.has(p.finger)) byF.set(p.finger, []);
+      byF.get(p.finger)!.push(p);
+    }
+    for (const [fi, list] of byF) {
+      list.sort((a, b) => a.startS - b.startS || a.endS - b.endS);
+      let cur: DetectedEvent | null = null;
+      for (const p of list) {
+        if (cur && p.startS <= cur.endS + 1e-6) deletedPlaces.add(p);
+        else cur = p;
+      }
+      const f = fingers[fi];
+      if (!f) continue;
+      for (const p of list) {
+        if (deletedPlaces.has(p)) continue;
+        if (airSpans2.some(([s, e2]) => p.startS >= s && p.startS <= e2)) {
+          deletedPlaces.add(p);
+          continue;
+        }
+        if (placeRelSub && p.startS > placeRelSub.startS + 1.5) {
+          deletedPlaces.add(p);
+          continue;
+        }
+        const nextTerm = cleaned.find(
+          (x) =>
+            x.finger === fi &&
+            (x.label === "release" || x.label === "drop") &&
+            x.startS >= p.endS - 0.25,
+        );
+        if (nextTerm && nextTerm.label === "drop") {
+          deletedPlaces.add(p);
+          continue;
+        }
+        let plateau = 0;
+        for (
+          let i = idxAt(p.startS - 1.0);
+          i <= idxAt(p.startS) && i < n;
+          i++
+        ) {
+          if (f.fn[i] > plateau) plateau = f.fn[i];
+        }
+        const termS = nextTerm ? nextTerm.startS : t[n - 1];
+        let maxRec = 0;
+        for (let i = idxAt(p.endS + 0.2); i <= idxAt(termS) && i < n; i++) {
+          if (f.fn[i] > maxRec) maxRec = f.fn[i];
+        }
+        if (plateau > 0 && maxRec >= 0.25 * plateau && termS - p.endS > 1.5) {
+          deletedPlaces.add(p);
+        }
+      }
+    }
+  }
+
   // ---- real names for the markers (Zheng's marker-honesty ruling).
   // Runs LAST: every anchor, bout, flag and gate was computed on the
   // original labels, so renames are output semantics only.
@@ -2120,6 +2211,19 @@ export function detectEvents(
     }
   }
 
+  // Recorded outcome (when metadata supplies it) vs our story: a full
+  // success template with a non-success outcome is tactilely
+  // indistinguishable from success (ep39/ep48: the object was released
+  // at the WRONG PLACE — Zheng's ruling: vision-model or human-labeler
+  // territory). Flag the tension for review instead of guessing.
+  if (
+    context?.result &&
+    context.result !== "success" &&
+    subtasks.some((s2) => s2.label === "place_release")
+  ) {
+    flags.push(`result_${context.result}`);
+  }
+
   // flags in chronological order — they are appended in pipeline-pass
   // order, which put ep45's air-miss after its later squeeze-through
   const flagTime = (fl: string): number => {
@@ -2128,7 +2232,11 @@ export function detectEvents(
   };
   flags.sort((a, b) => flagTime(a) - flagTime(b));
 
-  return { subtasks, events: cleaned, flags };
+  return {
+    subtasks,
+    events: cleaned.filter((e) => !deletedPlaces.has(e)),
+    flags,
+  };
 }
 
 // ---------------------------------------------------------------- atoms

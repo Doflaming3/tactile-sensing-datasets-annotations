@@ -4,16 +4,12 @@
   "flags": [
    "air_grasp@2.2-2.7s"
   ],
-  "ours": 24,
+  "ours": 23,
   "theirs": 29,
   "unchanged": 21,
   "moved": [],
   "modified": [],
   "onlyOurs": [
-   {
-    "t": 2.698139648,
-    "content": "[auto:medium] place f1 0.03s"
-   },
    {
     "t": 4.776408064,
     "content": "grasp"
@@ -61,7 +57,7 @@
  {
   "episode": 1,
   "flags": [],
-  "ours": 20,
+  "ours": 19,
   "theirs": 19,
   "unchanged": 18,
   "moved": [
@@ -72,12 +68,7 @@
    }
   ],
   "modified": [],
-  "onlyOurs": [
-   {
-    "t": 6.70927488,
-    "content": "[auto:medium] place f1 0.30s"
-   }
-  ],
+  "onlyOurs": [],
   "onlyTheirs": []
  },
  {
@@ -230,9 +221,9 @@
  {
   "episode": 10,
   "flags": [],
-  "ours": 15,
+  "ours": 13,
   "theirs": 15,
-  "unchanged": 14,
+  "unchanged": 12,
   "moved": [
    {
     "content": "transport",
@@ -242,7 +233,16 @@
   ],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 8.340621568,
+    "content": "[auto:high] place f0 0.30s"
+   },
+   {
+    "t": 8.340621568,
+    "content": "[auto:high] place f1 0.30s"
+   }
+  ]
  },
  {
   "episode": 11,
@@ -343,9 +343,9 @@
   "flags": [
    "failed_attempt@2.6-4.1s"
   ],
-  "ours": 17,
+  "ours": 16,
   "theirs": 15,
-  "unchanged": 13,
+  "unchanged": 12,
   "moved": [
    {
     "content": "transport",
@@ -372,6 +372,10 @@
    {
     "t": 3.036258304,
     "content": "grasp"
+   },
+   {
+    "t": 8.406115072,
+    "content": "[auto:high] place f0 0.30s"
    }
   ]
  },
@@ -458,7 +462,7 @@
    "failed_attempt@3.8-4.5s",
    "unlabeled_transition@9.8s"
   ],
-  "ours": 21,
+  "ours": 20,
   "theirs": 19,
   "unchanged": 16,
   "moved": [],
@@ -475,10 +479,6 @@
    }
   ],
   "onlyOurs": [
-   {
-    "t": 4.147682048,
-    "content": "[auto:medium] place f1 0.30s"
-   },
    {
     "t": 8.405716736,
     "content": "transport"
@@ -613,9 +613,9 @@
   "flags": [
    "weak_contact@4.7-5.2s"
   ],
-  "ours": 18,
+  "ours": 17,
   "theirs": 16,
-  "unchanged": 10,
+  "unchanged": 9,
   "moved": [
    {
     "content": "grasp",
@@ -662,6 +662,10 @@
    {
     "t": 1.532199424,
     "content": "[auto:medium] contact_onset f1"
+   },
+   {
+    "t": 4.932541952,
+    "content": "[auto:medium] place f1 0.29s"
    },
    {
     "t": 6.28237824,
@@ -743,7 +747,7 @@
  {
   "episode": 26,
   "flags": [],
-  "ours": 14,
+  "ours": 13,
   "theirs": 13,
   "unchanged": 11,
   "moved": [
@@ -759,20 +763,15 @@
    }
   ],
   "modified": [],
-  "onlyOurs": [
-   {
-    "t": 4.852073472,
-    "content": "[auto:medium] place f0 0.30s"
-   }
-  ],
+  "onlyOurs": [],
   "onlyTheirs": []
  },
  {
   "episode": 27,
   "flags": [],
-  "ours": 16,
+  "ours": 15,
   "theirs": 16,
-  "unchanged": 15,
+  "unchanged": 14,
   "moved": [
    {
     "content": "transport",
@@ -782,12 +781,17 @@
   ],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 11.0476608,
+    "content": "[auto:high] place f0 0.30s"
+   }
+  ]
  },
  {
   "episode": 28,
   "flags": [],
-  "ours": 17,
+  "ours": 16,
   "theirs": 15,
   "unchanged": 12,
   "moved": [
@@ -812,10 +816,6 @@
    {
     "t": 13.431576576,
     "content": "[auto:medium] slip f1 0.11s"
-   },
-   {
-    "t": 15.015701248,
-    "content": "[auto:medium] place f1 0.30s"
    }
   ],
   "onlyTheirs": [
@@ -828,13 +828,22 @@
  {
   "episode": 29,
   "flags": [],
-  "ours": 15,
+  "ours": 13,
   "theirs": 15,
-  "unchanged": 15,
+  "unchanged": 13,
   "moved": [],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 9.736329472,
+    "content": "[auto:high] place f0 0.30s"
+   },
+   {
+    "t": 9.780985344,
+    "content": "[auto:high] place f1 0.15s"
+   }
+  ]
  },
  {
   "episode": 30,
@@ -864,7 +873,7 @@
    "failed_attempt@4.3-5.0s",
    "failed_attempt@6.6-7.1s"
   ],
-  "ours": 28,
+  "ours": 26,
   "theirs": 25,
   "unchanged": 18,
   "moved": [
@@ -893,16 +902,8 @@
   ],
   "onlyOurs": [
    {
-    "t": 4.872705536,
-    "content": "[auto:medium] place f1 0.30s"
-   },
-   {
     "t": 5.030293504,
     "content": "[auto:low] drop f1"
-   },
-   {
-    "t": 7.040611584,
-    "content": "[auto:medium] place f1 0.30s"
    },
    {
     "t": 7.106648064,
@@ -1017,7 +1018,7 @@
  {
   "episode": 34,
   "flags": [],
-  "ours": 17,
+  "ours": 16,
   "theirs": 16,
   "unchanged": 15,
   "moved": [
@@ -1028,12 +1029,7 @@
    }
   ],
   "modified": [],
-  "onlyOurs": [
-   {
-    "t": 4.876102144,
-    "content": "[auto:high] place f0 0.30s"
-   }
-  ],
+  "onlyOurs": [],
   "onlyTheirs": []
  },
  {
@@ -1107,7 +1103,7 @@
    "weak_contact@1.2-3.1s",
    "unlabeled_transition@7.0s"
   ],
-  "ours": 15,
+  "ours": 14,
   "theirs": 10,
   "unchanged": 7,
   "moved": [
@@ -1138,12 +1134,8 @@
     "content": "[auto:low] drop f1"
    },
    {
-    "t": 5.405393152,
-    "content": "[auto:medium] place f0 0.30s"
-   },
-   {
     "t": 8.46407808,
-    "content": "[auto:high] place f1 1.15s"
+    "content": "[auto:high] sensor_residual f1 1.15s"
    },
    {
     "t": 9.609099264,
@@ -1155,7 +1147,7 @@
  {
   "episode": 37,
   "flags": [],
-  "ours": 21,
+  "ours": 20,
   "theirs": 18,
   "unchanged": 16,
   "moved": [
@@ -1170,10 +1162,6 @@
    {
     "t": 5.31605248,
     "content": "[auto:high] contact_onset f1"
-   },
-   {
-    "t": 5.645926656,
-    "content": "[auto:medium] place f0 0.30s"
    },
    {
     "t": 10.53282432,
@@ -1194,9 +1182,9 @@
  {
   "episode": 38,
   "flags": [],
-  "ours": 14,
+  "ours": 13,
   "theirs": 12,
-  "unchanged": 10,
+  "unchanged": 9,
   "moved": [],
   "modified": [],
   "onlyOurs": [
@@ -1223,6 +1211,10 @@
     "content": "[auto:high] slip f1 0.20s"
    },
    {
+    "t": 4.386486016,
+    "content": "[auto:medium] place f0 0.30s"
+   },
+   {
     "t": 7.743356928,
     "content": "[auto:low] drop f1"
    }
@@ -1231,7 +1223,7 @@
  {
   "episode": 39,
   "flags": [],
-  "ours": 16,
+  "ours": 15,
   "theirs": 13,
   "unchanged": 8,
   "moved": [
@@ -1264,10 +1256,6 @@
     "content": "[auto:high] place f1 0.30s"
    },
    {
-    "t": 5.743730944,
-    "content": "[auto:high] place f1 0.04s"
-   },
-   {
     "t": 5.78839552,
     "content": "[auto:high] release f1"
    }
@@ -1297,9 +1285,9 @@
    "weak_contact@0.5-1.0s",
    "unlabeled_transition@6.9s"
   ],
-  "ours": 20,
+  "ours": 17,
   "theirs": 19,
-  "unchanged": 15,
+  "unchanged": 13,
   "moved": [
    {
     "content": "transport",
@@ -1318,15 +1306,15 @@
     "content": "[auto:low] drop f1"
    },
    {
-    "t": 3.52864768,
-    "content": "[auto:medium] place f0 0.30s"
-   },
-   {
     "t": 5.70815872,
     "content": "[auto:low] drop f0"
    }
   ],
   "onlyTheirs": [
+   {
+    "t": 4.387188224,
+    "content": "[auto:medium] place f0 0.30s"
+   },
    {
     "t": 6.202279168,
     "content": "[auto:medium] slip f0 0.18s"
@@ -1338,6 +1326,10 @@
    {
     "t": 6.819091968,
     "content": "[auto:high] release f0"
+   },
+   {
+    "t": 8.689788672,
+    "content": "[auto:medium] place f1 0.30s"
    }
   ]
  },
@@ -1346,7 +1338,7 @@
   "flags": [],
   "ours": 14,
   "theirs": 14,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [
    {
     "content": "transport",
@@ -1357,11 +1349,19 @@
   "modified": [],
   "onlyOurs": [
    {
+    "t": 6.65856768,
+    "content": "[auto:medium] sensor_residual f1 0.30s"
+   },
+   {
     "t": 7.335036672,
     "content": "[auto:medium] sensor_residual f1"
    }
   ],
   "onlyTheirs": [
+   {
+    "t": 6.65856768,
+    "content": "[auto:medium] place f1 0.30s"
+   },
    {
     "t": 7.335036672,
     "content": "[auto:low] drop f1"
@@ -1480,9 +1480,9 @@
    "failed_attempt@3.4-4.1s",
    "failed_attempt@6.5-7.6s"
   ],
-  "ours": 9,
+  "ours": 8,
   "theirs": 10,
-  "unchanged": 9,
+  "unchanged": 8,
   "moved": [],
   "modified": [],
   "onlyOurs": [],
@@ -1490,15 +1490,19 @@
    {
     "t": 3.368667904,
     "content": "grasp"
+   },
+   {
+    "t": 7.373604864,
+    "content": "[auto:high] place f1 0.30s"
    }
   ]
  },
  {
   "episode": 46,
   "flags": [],
-  "ours": 14,
+  "ours": 13,
   "theirs": 14,
-  "unchanged": 13,
+  "unchanged": 12,
   "moved": [
    {
     "content": "transport",
@@ -1508,7 +1512,12 @@
   ],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 8.60502272,
+    "content": "[auto:high] place f0 0.10s"
+   }
+  ]
  },
  {
   "episode": 47,
@@ -1552,7 +1561,7 @@
  {
   "episode": 48,
   "flags": [],
-  "ours": 19,
+  "ours": 18,
   "theirs": 15,
   "unchanged": 11,
   "moved": [
@@ -1567,10 +1576,6 @@
    {
     "t": 6.835387904,
     "content": "grasp"
-   },
-   {
-    "t": 9.343870208,
-    "content": "[auto:medium] place f1 0.30s"
    },
    {
     "t": 11.874789632,
@@ -1613,7 +1618,7 @@
   "flags": [
    "failed_attempt@4.4-4.6s"
   ],
-  "ours": 23,
+  "ours": 22,
   "theirs": 22,
   "unchanged": 19,
   "moved": [
@@ -1635,12 +1640,7 @@
     "t": 10.034780416
    }
   ],
-  "onlyOurs": [
-   {
-    "t": 7.73683072,
-    "content": "[auto:medium] place f0 0.30s"
-   }
-  ],
+  "onlyOurs": [],
   "onlyTheirs": []
  },
  {
@@ -1663,9 +1663,9 @@
  {
   "episode": 52,
   "flags": [],
-  "ours": 14,
+  "ours": 13,
   "theirs": 14,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [],
   "modified": [],
   "onlyOurs": [
@@ -1686,15 +1686,19 @@
    {
     "t": 4.523678208,
     "content": "transport"
+   },
+   {
+    "t": 9.442448896,
+    "content": "[auto:high] place f0 0.09s"
    }
   ]
  },
  {
   "episode": 53,
   "flags": [],
-  "ours": 17,
+  "ours": 16,
   "theirs": 17,
-  "unchanged": 15,
+  "unchanged": 14,
   "moved": [
    {
     "content": "transport",
@@ -1713,6 +1717,10 @@
    {
     "t": 5.066667079925537,
     "content": "grasp"
+   },
+   {
+    "t": 10.808099584,
+    "content": "[auto:high] place f1 0.30s"
    }
   ]
  },
@@ -1722,9 +1730,9 @@
    "failed_attempt@2.4-2.4s",
    "failed_attempt@3.4-3.4s"
   ],
-  "ours": 18,
+  "ours": 17,
   "theirs": 14,
-  "unchanged": 13,
+  "unchanged": 12,
   "moved": [
    {
     "content": "transport",
@@ -1751,14 +1759,19 @@
     "content": "[auto:low] drop f0"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 8.242117632,
+    "content": "[auto:high] place f1 0.30s"
+   }
+  ]
  },
  {
   "episode": 55,
   "flags": [],
-  "ours": 15,
+  "ours": 14,
   "theirs": 15,
-  "unchanged": 14,
+  "unchanged": 13,
   "moved": [
    {
     "content": "transport",
@@ -1768,16 +1781,21 @@
   ],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 7.60427136,
+    "content": "[auto:medium] place f1 0.30s"
+   }
+  ]
  },
  {
   "episode": 56,
   "flags": [
    "failed_attempt@5.1-6.8s"
   ],
-  "ours": 27,
+  "ours": 24,
   "theirs": 23,
-  "unchanged": 21,
+  "unchanged": 19,
   "moved": [],
   "modified": [],
   "onlyOurs": [
@@ -1792,10 +1810,6 @@
    {
     "t": 6.624460288,
     "content": "[auto:medium] place f1 0.19s"
-   },
-   {
-    "t": 6.668491264,
-    "content": "[auto:medium] place f1 0.30s"
    },
    {
     "t": 8.735607296,
@@ -1814,6 +1828,14 @@
    {
     "t": 11.333333015441895,
     "content": "transport"
+   },
+   {
+    "t": 13.017668608,
+    "content": "[auto:high] place f1 0.10s"
+   },
+   {
+    "t": 13.039703296,
+    "content": "[auto:high] place f0 0.13s"
    }
   ]
  },
@@ -1822,9 +1844,9 @@
   "flags": [
    "unlabeled_transition@8.9s"
   ],
-  "ours": 15,
+  "ours": 14,
   "theirs": 15,
-  "unchanged": 14,
+  "unchanged": 13,
   "moved": [
    {
     "content": "transport",
@@ -1834,16 +1856,21 @@
   ],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 9.441672704,
+    "content": "[auto:high] place f0 0.30s"
+   }
+  ]
  },
  {
   "episode": 58,
   "flags": [
    "unlabeled_transition@4.7s"
   ],
-  "ours": 13,
+  "ours": 12,
   "theirs": 13,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [
    {
     "content": "transport",
@@ -1853,14 +1880,19 @@
   ],
   "modified": [],
   "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 6.907012096,
+    "content": "[auto:high] place f0 0.10s"
+   }
+  ]
  },
  {
   "episode": 59,
   "flags": [],
-  "ours": 15,
+  "ours": 13,
   "theirs": 15,
-  "unchanged": 14,
+  "unchanged": 12,
   "moved": [],
   "modified": [],
   "onlyOurs": [
@@ -1873,6 +1905,14 @@
    {
     "t": 6.3270784,
     "content": "transport"
+   },
+   {
+    "t": 9.705779712,
+    "content": "[auto:high] place f0 0.07s"
+   },
+   {
+    "t": 9.705779712,
+    "content": "[auto:high] place f1 0.04s"
    }
   ]
  }

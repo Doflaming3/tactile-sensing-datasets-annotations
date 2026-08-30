@@ -296,7 +296,22 @@ async function runEpisode(
   }
   if (!series) throw new Error(`episode ${ep}: no tactile series`);
 
-  const result = detectEvents(series, gripper, args.thresholds, inputs.arm);
+  // episode outcome from her hand-recorded metadata, when mirrored
+  let epResult: string | undefined;
+  const annMetaPath = join(root, "annotations", "episode_annotations.json");
+  if (existsSync(annMetaPath)) {
+    try {
+      const annMeta = JSON.parse(readFileSync(annMetaPath, "utf-8")) as {
+        episodes?: Record<string, { result?: string }>;
+      };
+      epResult = annMeta.episodes?.[String(ep)]?.result;
+    } catch {
+      epResult = undefined;
+    }
+  }
+  const result = detectEvents(series, gripper, args.thresholds, inputs.arm, {
+    result: epResult,
+  });
   const atoms = resultToAtoms(result) as unknown as Atom[];
 
   if (!args.all) {
