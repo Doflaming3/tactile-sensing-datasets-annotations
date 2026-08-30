@@ -341,7 +341,8 @@
  {
   "episode": 16,
   "flags": [
-   "failed_attempt@2.6-2.8s"
+   "failed_attempt@2.6-2.8s",
+   "air_grasp@3.0-4.1s"
   ],
   "ours": 17,
   "theirs": 15,
@@ -498,7 +499,8 @@
  {
   "episode": 22,
   "flags": [
-   "failed_attempt@2.9-3.1s"
+   "failed_attempt@2.9-3.1s",
+   "air_grasp@3.1-5.3s"
   ],
   "ours": 24,
   "theirs": 21,
@@ -1473,7 +1475,10 @@
  },
  {
   "episode": 45,
-  "flags": [],
+  "flags": [
+   "failed_attempt@6.5-7.6s",
+   "air_grasp@3.4-4.1s"
+  ],
   "ours": 12,
   "theirs": 10,
   "unchanged": 9,
@@ -1527,6 +1532,11 @@
   "unchanged": 13,
   "moved": [
    {
+    "content": "grasp",
+    "ours": 7.668882688,
+    "theirs": 7.366666793823242
+   },
+   {
     "content": "transport",
     "ours": 9.075170304,
     "theirs": 8.699999809265137
@@ -1545,20 +1555,11 @@
     "content": "[auto:medium] contact_onset f0"
    },
    {
-    "t": 3.7066944,
-    "content": "grasp"
-   },
-   {
     "t": 8.777553664,
     "content": "[auto:medium] grasp_stable f0"
    }
   ],
-  "onlyTheirs": [
-   {
-    "t": 7.366666793823242,
-    "content": "grasp"
-   }
-  ]
+  "onlyTheirs": []
  },
  {
   "episode": 48,

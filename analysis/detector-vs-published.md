@@ -580,3 +580,58 @@ corrupted (3.71 vs ~8.3) until then; its attempt flag survives via the
 finger-level rule. Candidate v2 mitigation if the recorder fix stalls:
 long-span blink-rate analysis (a >8 s sub-2.3 N span with zero
 firmware dropouts is phantom-like; real contact blinks).
+
+### Addendum 6g: grasp definition formalized, ep45's two attempts recovered
+
+**Formal grasp-start definition** (Zheng asked; now explicit in code):
+the grasp subtask begins at the onset of the sustained jaw-closing
+motion that leads to the REAL grasp trial's contact — where the trial's
+contact is dated per finger by its latest non-LOW contact_onset at or
+before the deciding grasp_stable, weld-suspect candidates more than 2 s
+older than the newest discarded, earliest survivor wins. (Previously
+the reference was the grasp BOUT's first contact, which ep47's phantom
+weld dragged to 0.26 s, latching the selector onto the failed squeeze's
+closing at 3.7 s — a flagged failed attempt INSIDE the grasp segment,
+Zheng's catch.) Corpus effect: exactly one anchor changed — ep47 grasp
+3.71 -> 7.67; every other episode, video-anchored set included,
+bit-identical. Low-onset exclusion matters: ep25's gate-downgraded
+post-task chain otherwise drags the anchor to 13.8.
+
+**ep45's two failed attempts, both recovered without result metadata**
+(Zheng: "following our condition we can surely get those two" — right):
+1. air-miss @3.4-4.1: jaw closes 27->14 into empty air and reopens to
+   45, zero force on both pads. New gripper-only detector: a >=8-unit
+   close->reopen cycle with no finger span overlapping it, before the
+   grasp bout, past the 2 s episode-start reset window (the reset
+   guard kills false cycles on ep24/26/42/53/60).
+2. squeeze-through @6.5-7.6: after the stable 24 N hold, the ball
+   escapes and the jaw runs to 5 — >=8 units BELOW its own hold
+   position — with the hand quiet. New terminal-loss path beside the
+   jaw-reopen test; gated on span peak >= 5 N (ep35's 3.8 N motion-
+   phantom "stable" otherwise resurrects; ep40's residual drop is safe,
+   its jaw sits 36 units ABOVE its hold).
+
+Attempts 55/59. All four residual disagreements are HER metadata's
+errors per Zheng's video: ep21 (real touch, hers=1), ep22 (real touch,
+hers=1), ep54 (two real brief attempts, hers=2 vs our 3... hers
+undercounts, video-verified), ep39 (Zheng counts ONE attempt on video,
+hers=2). Two new air_grasp candidates for video: ep16 @3.0-4.1 and
+ep22 @3.1-5.3 (post-graze whiff cycles).
+
+Sweep corrections recorded: ep28 — both fingers real during the task;
+the anomaly is f1 never emits a terminal (residual holds it "in
+contact" past f0's 12.44 release, plus a phantom place @15.0) —
+residual family. ep22 f0 is fully normal (contact->stable->place->
+release 8.92); the earlier "silent finger" wording was wrong — the
+observation is f1 never RELEASES: its last exit is the verified
+residual drop @10.76. ep40 decoded: grab 3.2, carry at jaw 26, TRUE
+release ~6.9 (jaw 26->62) — which is exactly what its
+unlabeled_transition@6.9s changepoint marks — then drift; f1's drop
+@8.74 is a residual tail. ep39: correct through transport; the ball
+was dropped in AIR instead of the bowl — tactilely indistinguishable
+from a correct place; vision or human judgment territory. ep38 weak
+removal video-confirmed correct. ep36/41 set-zero question answered:
+post-place absorption was tried twice and reverted — the real
+slow-unload class (ep50, 0.95 s lag, video-verified) and the residual
+class (1.16-1.27 s) OVERLAP in time; separation is impossible at any
+threshold, not a noise-amplitude issue.

@@ -17,7 +17,7 @@ import {
   buildSeriesFromRawCsvs,
   clipSeries,
   detectEvents,
-  resultToAtoms,
+  resultToRecordedAtoms,
   DEFAULT_THRESHOLDS,
   type DetectionThresholds,
   type TactileSeries,
@@ -275,7 +275,9 @@ export default function AutoLabelPanel({
           ? isAutoEventAtom
           : isAutoAtom;
         for (const a of atoms.filter(replaceFilter)) deleteAtom(a);
-        const newAtoms = resultToAtoms(result);
+        // recording policy: panels show everything, the annotation set
+        // (what gets saved) keeps only the real events
+        const newAtoms = resultToRecordedAtoms(result);
         addAtoms(
           eventsOnlyRef.current
             ? newAtoms.filter((a) => a.style === "interjection")

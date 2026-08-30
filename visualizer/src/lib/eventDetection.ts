@@ -1528,9 +1528,43 @@ export function detectEvents(
     // contact_onset), and connected closing bouts are walked back as one
     // motion (a staged close pauses; an approach twitch is seconds apart).
     if (run >= sustain) closeRunEnds.push(n - 1);
-    // the grasp anchors to the closing motion leading to the GRASP BOUT's
-    // first contact (never a failed trial's)
-    const contactRefS = graspBout ? graspBout.startS : null;
+    // The grasp anchors to the closing motion leading to the REAL grasp
+    // trial's contact — the latest contact_onset (any finger) at/before
+    // the deciding stable — NOT the bout's first contact: a standing
+    // phantom span welds the bout open episodes earlier (ep47: f0's
+    // phantom "contact" never exits, the bout starts at 0.26 s, and the
+    // bout-start reference made the selector latch onto the FAILED
+    // squeeze's closing at 3.7 s, pulling the flagged attempt inside
+    // the grasp segment — Zheng's catch). The latest-onset reference is
+    // immune to one welded finger: the healthy finger dates the trial.
+    // Per finger: the latest non-LOW contact_onset at/before the stable
+    // (low = gate-downgraded phantoms — ep25's post-task chain otherwise
+    // drags the anchor to 13.8 s). The trial's start is the EARLIEST of
+    // those candidates, but a candidate more than 2 s older than the
+    // newest is a weld-suspect and is discarded (normal two-finger
+    // stagger is sub-second; ep47's phantom finger is 8 s early).
+    let contactRefS: number | null = null;
+    if (graspBout && lastStable) {
+      const perFinger = new Map<number, number>();
+      for (const e of cleaned) {
+        if (
+          e.label === "contact_onset" &&
+          e.confidence !== "low" &&
+          e.startS <= lastStable.startS + 1e-6
+        ) {
+          const cur = perFinger.get(e.finger);
+          if (cur === undefined || e.startS > cur) {
+            perFinger.set(e.finger, e.startS);
+          }
+        }
+      }
+      const cands = [...perFinger.values()];
+      if (cands.length > 0) {
+        const newest = Math.max(...cands);
+        contactRefS = Math.min(...cands.filter((c) => c >= newest - 2.0));
+      }
+    }
+    if (contactRefS === null && graspBout) contactRefS = graspBout.startS;
     const prevBoutEndS = graspBout
       ? (bouts[bouts.indexOf(graspBout) - 1]?.endS ?? -Infinity)
       : -Infinity;
@@ -1756,18 +1790,19 @@ export function detectEvents(
     //      sides, re-derive as verdicts grow), AND
     //   2. the loss is ACTED ON — the jaw re-opens to retry (measured:
     //      +22.8/+24.7 units on real attempts ep47/ep32, 0.0 on every
-    //      false case).
-    // KNOWN MISS: a terminal loss nobody retries (ep45: the failure
-    // just ends, jaw never moves again) is indistinguishable from a
-    // sensor-blind off-pad pinch that carries the object at 0.1 N with
-    // the jaw equally still (ep40, video-verified success) — hand and
-    // jaw signatures are IDENTICAL; only the episode outcome separates
-    // them. Flagging ep45 without inventing ep40 needs result-aware
-    // segmentation (episode result metadata plumbed in) — parked there.
+    //      false case), OR the jaw SQUEEZES THROUGH: within 2.5 s it
+    //      closes >= 8 units BELOW the position where this finger was
+    //      stably holding, with no force — a hand cannot sit that far
+    //      inside its own hold width empty-handed unless the object
+    //      left (ep45: holds at ~24, ball escapes, jaw runs to 5 —
+    //      video-verified terminal loss the retry test alone missed;
+    //      ep40's residual drop is safe: its jaw sits at 62, far ABOVE
+    //      its 26-unit hold).
     const HAND_LOSS_N = 1.0;
     const HAND_LOSS_MIN_S = 0.35;
     const JAW_RETRY_RISE = 5.0;
     const JAW_RETRY_WIN_S = 2.5;
+    const SQUEEZE_THROUGH_BELOW = 8.0;
     {
       const lastRelease = [...cleaned]
         .reverse()
@@ -1824,7 +1859,40 @@ export function detectEvents(
             continue;
           }
           if (!handQuietAfter(e.startS)) continue;
-          if (!jawReopensAfter(e.startS)) continue;
+          let squeezeThrough = false;
+          if (gripper) {
+            const stableInSpan = [...cleaned]
+              .reverse()
+              .find(
+                (s) =>
+                  s.finger === fi &&
+                  s.label === "grasp_stable" &&
+                  s.startS >= spanStart - 1e-6 &&
+                  s.startS <= e.startS + 1e-6,
+              );
+            // a squeeze-through implies the object was genuinely
+            // clamped — require a real-hold peak (>= 5 N sits between
+            // ep35's 3.8 N motion-phantom "stable" and ep45's 24 N
+            // verified hold; re-derive as verdicts grow)
+            let spanPk = 0;
+            for (let i = 0; i < n; i++) {
+              if (t[i] < spanStart - 0.05) continue;
+              if (t[i] > e.startS + 0.05) break;
+              if (fingers[fi].fnRaw[i] > spanPk) spanPk = fingers[fi].fnRaw[i];
+            }
+            if (stableInSpan && spanPk >= 5.0) {
+              const holdPos = jawPosAt(stableInSpan.startS);
+              for (let j = 0; j < gripper.t.length; j++) {
+                if (gripper.t[j] <= e.startS) continue;
+                if (gripper.t[j] > e.startS + JAW_RETRY_WIN_S) break;
+                if (gripper.pos[j] <= holdPos - SQUEEZE_THROUGH_BELOW) {
+                  squeezeThrough = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (!jawReopensAfter(e.startS) && !squeezeThrough) continue;
           let pk = 0;
           const f = fingers[fi];
           for (let i = 0; i < n; i++) {
@@ -1836,6 +1904,60 @@ export function detectEvents(
           if (flags.some((fl) => fl.endsWith(`@${span}`))) continue;
           flags.push(attemptFlag(spanStart, e.startS, pk));
         }
+      }
+    }
+
+    // AIR-MISS attempts: the jaw closes substantially and reopens with
+    // NO tactile contact in between — a grab that missed entirely
+    // (ep45's first attempt, video-verified: 27 -> 14 -> 45 at
+    // 3.5-4.5 s, zero force on both pads; distinct from the pads-meet
+    // air_grasp which bottoms out below 2). Gripper-only detection,
+    // before the grasp bout; suppressed while ANY finger span overlaps
+    // the cycle (a standing phantom span otherwise reads as "contact").
+    const AIR_MISS_TRAVEL = 8.0;
+    if (gripper && gripper.t.length > 2) {
+      const gt = gripper.t;
+      const gp = gripper.pos;
+      let peak = gp[0];
+      let peakT = gt[0];
+      let j = 0;
+      while (j < gt.length - 1) {
+        j++;
+        if (gp[j] >= peak) {
+          peak = gp[j];
+          peakT = gt[j];
+          continue;
+        }
+        if (peak - gp[j] < AIR_MISS_TRAVEL) continue;
+        // a substantial close began at peakT — find the trough and wait
+        // for a substantial reopen
+        let trough = gp[j];
+        let reopenT = -1;
+        while (j < gt.length - 1) {
+          j++;
+          if (gp[j] < trough) trough = gp[j];
+          if (gp[j] - trough >= AIR_MISS_TRAVEL) {
+            reopenT = gt[j];
+            break;
+          }
+        }
+        if (reopenT < 0) break;
+        const cycleEndsPreGrasp = reopenT <= graspBout.startS + 1e-6;
+        const touched = fingerSpans.some(
+          (s) => s.startS <= reopenT && s.endS >= peakT,
+        );
+        // cycles in the first 2 s are the previous episode's reset
+        // motion still settling (ep47 starts mid-open; ep42/ep60 wiggle
+        // in the first second), not grab attempts
+        const pastReset = peakT >= 2.0;
+        if (cycleEndsPreGrasp && !touched && pastReset) {
+          const span = `${peakT.toFixed(1)}-${reopenT.toFixed(1)}s`;
+          if (!flags.some((fl) => fl.endsWith(`@${span}`))) {
+            flags.push(`air_grasp@${span}`);
+          }
+        }
+        peak = gp[j];
+        peakT = gt[j];
       }
     }
   }
@@ -1871,4 +1993,43 @@ export function resultToAtoms(result: AutoLabelResult): LanguageAtom[] {
     });
   }
   return atoms.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
+ * Atoms to RECORD into the annotation set (Zheng's marker policy,
+ * 2026-08-29): the app's panels display every sensor-true marker, but
+ * saved annotations keep only the real ones — the events the post-task
+ * phantom gate classified (LOW confidence inside a post_task_contact
+ * span) are excluded so they cannot contaminate training or evaluation.
+ * The finger guard matters: a phantom span can contain the OTHER
+ * finger's genuine terminal (ep25: f0's real release at 14.18 sits
+ * inside f1's 14.1-16.6 phantom span) — those are medium/high and
+ * survive. Offline analysis (the runner, --compare) keeps using
+ * resultToAtoms: analysis wants the full record.
+ */
+export function resultToRecordedAtoms(result: AutoLabelResult): LanguageAtom[] {
+  // post-task spans can contain the OTHER finger's genuine terminal
+  // (ep25: f0's real release at 14.18 inside f1's phantom span), so only
+  // the gate-downgraded LOW events are dropped there. weak_contact spans
+  // are phantom by calibration (every video-verified false bout peaks
+  // <= 2.2 N) and their events are NOT downgraded (ep25's graze exits as
+  // a medium "release" at 1.83 s), so everything inside them is dropped.
+  const lowSpans: Array<[number, number]> = [];
+  const allSpans: Array<[number, number]> = [];
+  for (const fl of result.flags) {
+    const m = /^(post_task_contact|weak_contact)@([\d.]+)-([\d.]+)s$/.exec(fl);
+    if (!m) continue;
+    const span: [number, number] = [Number(m[2]) - 0.05, Number(m[3]) + 0.05];
+    (m[1] === "post_task_contact" ? lowSpans : allSpans).push(span);
+  }
+  const atoms = resultToAtoms(result);
+  if (lowSpans.length === 0 && allSpans.length === 0) return atoms;
+  const inside = (a: LanguageAtom, spans: Array<[number, number]>) =>
+    spans.some(([s, e]) => a.timestamp >= s && a.timestamp <= e);
+  return atoms.filter((a) => {
+    if (a.style !== "interjection") return true;
+    if (!a.content?.startsWith("[auto:")) return true;
+    if (inside(a, allSpans)) return false;
+    return !(a.content.startsWith("[auto:low]") && inside(a, lowSpans));
+  });
 }
