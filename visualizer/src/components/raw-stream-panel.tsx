@@ -34,10 +34,10 @@ const SENSOR_COLORS = ["#38bdf8", "#a78bfa", "#34d399", "#f472b6"];
 type RawStream = {
   name: string;
   hz: number;
-  t: Float64Array;      // episode-relative seconds
-  fz: Float64Array;     // resultant Fz (N)
-  shear: Float64Array;  // |Fxy| / max(|Fz|, 0.2)
-  peak: Float64Array;   // max per-taxel |F| (N)
+  t: Float64Array; // episode-relative seconds
+  fz: Float64Array; // resultant Fz (N)
+  shear: Float64Array; // |Fxy| / max(|Fz|, 0.2)
+  peak: Float64Array; // max per-taxel |F| (N)
 };
 
 function parseCsv(name: string, text: string): RawStream | null {
@@ -78,7 +78,11 @@ function parseCsv(name: string, text: string): RawStream | null {
     shear[r] = Math.hypot(vfx, vfy) / Math.max(Math.abs(vfz), 0.2);
     let p = 0;
     for (const [ix, iy, iz] of taxelTriples) {
-      const m = Math.hypot(Number(cols[ix]), Number(cols[iy]), Number(cols[iz]));
+      const m = Math.hypot(
+        Number(cols[ix]),
+        Number(cols[iy]),
+        Number(cols[iz]),
+      );
       if (m > p) p = m;
     }
     peak[r] = p;
@@ -128,13 +132,18 @@ export default function RawStreamPanel({
         for (const p of paths) {
           // buildVersionedUrl prepends the ?root= prefix already; the listing
           // paths are repo-relative, so strip the root prefix first.
-          const rel = root ? p.slice(root.replace(/^\/+|\/+$/g, "").length + 1) : p;
+          const rel = root
+            ? p.slice(root.replace(/^\/+|\/+$/g, "").length + 1)
+            : p;
           const url = buildVersionedUrl(repoId, "v3.0", rel);
           const res = await fetch(url, { headers: authHeaders() });
           if (!res.ok) continue;
           const text = await res.text();
           const parsed = parseCsv(
-            p.split("/").pop()!.replace(/\.csv$/i, ""),
+            p
+              .split("/")
+              .pop()!
+              .replace(/\.csv$/i, ""),
             text,
           );
           if (parsed) out.push(parsed);

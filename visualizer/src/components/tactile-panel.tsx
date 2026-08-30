@@ -28,7 +28,10 @@ import {
 } from "recharts";
 import { useTime } from "@/context/time-context";
 import { resolveTaxelLayout } from "@/lib/taxel-layouts";
-import { applyAdaptiveBaseline } from "@/lib/eventDetection";
+import {
+  applyAdaptiveBaseline,
+  type GripperSeries,
+} from "@/lib/eventDetection";
 import RawStreamPanel from "@/components/raw-stream-panel";
 import {
   computeFolderTactileAggregate,
@@ -120,7 +123,10 @@ function expandChannels(
   return [];
 }
 
-function channelsFrom(sensorFrames: SensorFramesMap): Channel[] {
+function channelsFrom(
+  sensorFrames: SensorFramesMap,
+  gripper?: GripperSeries | null,
+): Channel[] {
   const out: Channel[] = [];
   for (const [name, sf] of Object.entries(sensorFrames)) {
     // Show the DRIFT-CORRECTED signal everywhere (3D arrows, timeline,
@@ -133,11 +139,14 @@ function channelsFrom(sensorFrames: SensorFramesMap): Channel[] {
     try {
       if (sf.shape.length === 3 && sf.shape[0] <= 4) {
         frames =
-          (applyAdaptiveBaseline(sf.frames, sf.timestamps) as unknown[]) ??
-          sf.frames;
+          (applyAdaptiveBaseline(
+            sf.frames,
+            sf.timestamps,
+            gripper,
+          ) as unknown[]) ?? sf.frames;
       } else if (sf.shape.length === 2) {
         const wrapped = sf.frames.map((fr) => [fr]);
-        const corr = applyAdaptiveBaseline(wrapped, sf.timestamps);
+        const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper);
         if (corr) frames = corr.map((fr) => fr[0]);
       }
     } catch {
@@ -427,10 +436,15 @@ function ContactTimeline({
 
 export function TactileStats({
   sensorFrames,
+  gripper = null,
 }: {
   sensorFrames: SensorFramesMap;
+  gripper?: GripperSeries | null;
 }) {
-  const channels = useMemo(() => channelsFrom(sensorFrames), [sensorFrames]);
+  const channels = useMemo(
+    () => channelsFrom(sensorFrames, gripper),
+    [sensorFrames, gripper],
+  );
   const rows = useMemo(() => {
     return channels.map((ch) => {
       const n = ch.timestamps.length;
@@ -601,10 +615,12 @@ export default function TactilePanel({
   compact = false,
   repoId,
   root,
+  gripper = null,
 }: {
   sensorFrames: SensorFramesMap;
   fps: number;
   compact?: boolean;
+  gripper?: GripperSeries | null;
   /** org/dataset, enables the raw high-frequency stream loader. */
   repoId?: string;
   /** ?root= episode folder for per-episode-folder datasets. */
@@ -614,7 +630,10 @@ export default function TactilePanel({
   const [maxLen, setMaxLen] = useState(14);
   const [forceMax, setForceMax] = useState(5.0);
 
-  const channels = useMemo(() => channelsFrom(sensorFrames), [sensorFrames]);
+  const channels = useMemo(
+    () => channelsFrom(sensorFrames, gripper),
+    [sensorFrames, gripper],
+  );
   if (channels.length === 0) return null;
 
   // Aspect-ratio-driven (not fixed px) so the 3D views scale with container
@@ -714,15 +733,20 @@ export function TactileFingerView({
   fingerIndex,
   maxLen = 14,
   forceMax = 5.0,
+  gripper = null,
 }: {
   sensorFrames: SensorFramesMap;
   fps: number;
   fingerIndex: number;
   maxLen?: number;
   forceMax?: number;
+  gripper?: GripperSeries | null;
 }) {
   const { currentTime } = useTime();
-  const channels = useMemo(() => channelsFrom(sensorFrames), [sensorFrames]);
+  const channels = useMemo(
+    () => channelsFrom(sensorFrames, gripper),
+    [sensorFrames, gripper],
+  );
   const ch = channels[fingerIndex];
   if (!ch) return null;
   const fi = frameIndexFor(ch.timestamps, currentTime, fps);
@@ -751,10 +775,15 @@ export function TactileFingerView({
 /** Contact-force timeline as a standalone height-filling tile. */
 export function TactileSummary({
   sensorFrames,
+  gripper = null,
 }: {
   sensorFrames: SensorFramesMap;
+  gripper?: GripperSeries | null;
 }) {
-  const channels = useMemo(() => channelsFrom(sensorFrames), [sensorFrames]);
+  const channels = useMemo(
+    () => channelsFrom(sensorFrames, gripper),
+    [sensorFrames, gripper],
+  );
   if (channels.length === 0) return null;
   return (
     <div className="panel p-2 h-full min-h-0 flex flex-col">

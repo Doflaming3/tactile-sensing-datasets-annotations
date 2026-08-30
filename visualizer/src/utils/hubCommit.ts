@@ -24,13 +24,10 @@ export async function fetchAnnotationsFromHub(
 ): Promise<SavedAnnotations | null> {
   const path = annotationsPathFor(episodeId);
   const token = getAuthToken();
-  const res = await fetch(
-    `${HUB}/datasets/${repoId}/resolve/main/${path}`,
-    {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      cache: "no-store",
-    },
-  );
+  const res = await fetch(`${HUB}/datasets/${repoId}/resolve/main/${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
   if (!res.ok) return null;
   try {
     return (await res.json()) as SavedAnnotations;
@@ -66,7 +63,9 @@ export async function commitAnnotationsToHub(
     atoms,
   };
   const content = btoa(
-    String.fromCharCode(...new TextEncoder().encode(JSON.stringify(payload, null, 1))),
+    String.fromCharCode(
+      ...new TextEncoder().encode(JSON.stringify(payload, null, 1)),
+    ),
   );
   const ndjson =
     JSON.stringify({
@@ -80,17 +79,14 @@ export async function commitAnnotationsToHub(
       key: "file",
       value: { path, content, encoding: "base64" },
     });
-  const res = await fetch(
-    `${HUB}/api/datasets/${repoId}/commit/main`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-ndjson",
-      },
-      body: ndjson,
+  const res = await fetch(`${HUB}/api/datasets/${repoId}/commit/main`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/x-ndjson",
     },
-  );
+    body: ndjson,
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     if (res.status === 401 || res.status === 403) {
@@ -103,7 +99,6 @@ export async function commitAnnotationsToHub(
   }
   return path;
 }
-
 
 // ---- manual per-episode review status ---------------------------------------
 // One aggregated file so the sidebar needs a single fetch. Distinct from the
@@ -118,9 +113,7 @@ export function reviewStatusPath(): string {
   return `${getDatasetPathPrefix()}annotations/review_status.json`;
 }
 
-export async function fetchReviewStatus(
-  repoId: string,
-): Promise<ReviewStatus> {
+export async function fetchReviewStatus(repoId: string): Promise<ReviewStatus> {
   const token = getAuthToken();
   try {
     const res = await fetch(
@@ -184,7 +177,9 @@ export async function setEpisodeReviewed(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Review commit failed: ${res.status} ${body.slice(0, 150)}`);
+    throw new Error(
+      `Review commit failed: ${res.status} ${body.slice(0, 150)}`,
+    );
   }
   return status;
 }

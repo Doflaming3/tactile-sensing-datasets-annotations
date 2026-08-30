@@ -26,7 +26,6 @@ extended for tactile robot datasets (Paxini PX-6AX GEN3 and beyond):
   episode auto-discovery at any nesting depth, task.json cards, cross-episode statistics
 - paste-token auth fallback for private datasets (no OAuth setup needed)
 
-
 # LeRobot Dataset Visualizer
 
 LeRobot Dataset Tool and Visualizer is a web application for interactive exploration and visualization of robotics datasets, particularly those in the LeRobot format. It enables users to browse, view, and analyze episodes from large-scale robotics datasets, combining synchronized video playback with rich, interactive data graphs.

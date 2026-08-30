@@ -71,7 +71,6 @@ export async function fetchParquetFile(url: string): Promise<ParquetFile> {
   return wrapped;
 }
 
-
 // List the column names actually present in a parquet file. Lets callers
 // request optional columns (e.g. language_instruction) without hyparquet
 // throwing "parquet column not found" on datasets that lack them.

@@ -267,7 +267,7 @@ async function runEpisode(
   let source = args.source;
   if (args.source === "raw") {
     const texts = loadRawCsvTexts(root, ep, inputs.sensorName);
-    const raw = texts ? buildSeriesFromRawCsvs(texts, layout) : null;
+    const raw = texts ? buildSeriesFromRawCsvs(texts, layout, gripper) : null;
     if (raw && texts) {
       const tEnd = inputs.timestamps.length
         ? inputs.timestamps[inputs.timestamps.length - 1] + 0.1
@@ -287,7 +287,12 @@ async function runEpisode(
     }
   }
   if (!series) {
-    series = buildSeriesFromSensorFrames(inputs.frames, inputs.timestamps, layout);
+    series = buildSeriesFromSensorFrames(
+      inputs.frames,
+      inputs.timestamps,
+      layout,
+      gripper,
+    );
   }
   if (!series) throw new Error(`episode ${ep}: no tactile series`);
 

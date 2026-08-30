@@ -725,7 +725,11 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
                       {tk.render === "tick" &&
                         (
                           lanes[
-                            tk.key as "memory" | "interjection" | "tactile" | "vqa"
+                            tk.key as
+                              | "memory"
+                              | "interjection"
+                              | "tactile"
+                              | "vqa"
                           ] as Array<{
                             kind: "tick";
                             t: number;
@@ -741,10 +745,7 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
                           if (duration > 0 && m.t > duration * 1.02) {
                             return null;
                           }
-                          const left = Math.min(
-                            100,
-                            (m.t / duration) * 100,
-                          );
+                          const left = Math.min(100, (m.t / duration) * 100);
                           return (
                             <div
                               key={i}

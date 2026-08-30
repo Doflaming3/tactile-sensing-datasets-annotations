@@ -341,3 +341,242 @@ ep27/30/32/33/34/35/47/49/53/58 agree. Remaining: six residuals ≤ 0.75 s
 (0, 15, 17, 21, 52, 59) and ep56 at −1.5 s (arm repositions with the jaw
 done before the true lift — would need direction-aware, e.g.
 shoulder-lift-specific, motion to resolve).
+
+## Addendum 6: release/drop decoupled from place (Zheng's circularity catch)
+
+Zheng flagged a circular dependency in the exit classifier: release
+leaned on "a place just happened" (the ep25 rescue rule), while place is
+itself backfilled FROM releases, and the post-task phantom gate leaned on
+both. One bad place could then manufacture a release, which manufactured
+a place, which armed the gate. Ruling: place may derive from release,
+never the reverse.
+
+**Audit of all 150 terminal events** (scratch `exit-audit.ts`): the old
+two-instant jaw-velocity test handled 121; 11 real releases fell between
+its two samples (ep48: twin fingers exit 0.02 s apart, one caught, one
+missed); 5 had jaw opening only >1 s away; 13 had none. The place-rescue
+was found to have already produced a false release: **ep24 @5.23 —
+video-confirmed fumble** with the jaw closing 16 units, promoted to
+"release" by a false place during approach, which then backfilled
+another false place. ep21 @4.46 has the identical signature.
+
+**New classifier (no place anywhere):**
+- *Net-travel rule*: release iff net jaw-opening travel ≥ 2 units over
+  [exit −0.5 s, +1.0 s]. NET keeps attempt churn as drops (jaw jiggles
+  open but closes overall: ep16 −13, ep22 −15, ep49 −7 units); threshold
+  sits between the largest churn travel (+0.7) and the smallest real
+  release (+2.8). Asymmetric window covers weight-transfer lag (ep33:
+  exit 0.52 s before opening) and adhesion (ep50: opening 0.78 s first).
+- *Peel rule* (cross-finger, jaw-invisible exits): a drop whose finger
+  HELD in that bout (last grasp_stable inside it), with no re-contact
+  within 1.5 s, adjacent to the partner's jaw-visible release — early
+  peel: partner still holding, its release ≤3 s later (ep25 @11.68,
+  video-verified); late peel: partner released ≤1.5 s before while this
+  finger was already in contact (ep41 @7.34). The stable-inside-bout
+  guard rejects post-place grazes (ep33 @10.24, 0.8 N).
+- *Rejected*: force-decay shape — measured peels cliff in 0.01 s while
+  real drops can fade over 1.2 s; distributions fully overlap.
+
+**Corpus delta: exactly 4 label flips** — ep21 @4.46 and ep24 @5.23
+release→drop (the circular FPs; ep24's false backfilled place dies with
+it), ep36 @9.61 and ep47 @4.57 drop→release (late peel / net-travel;
+both queued for video). All video-anchored releases survive on the new
+evidence (ep25 @11.68 via early peel, ep41 via late peel, ep33/48/50 via
+net travel).
+
+**Bycatch — post-task gate bug (shipped with Addendum 5's follow-up,
+uncommitted):** the gate paired terminals with the last place *seen so
+far* in one forward scan, so an early false place + churn terminal
+marked a finger "done" at ~5 s and silently downgraded the REAL
+grasp/carry to low on ep0/21/24/31/32/38/47/56. Fixed: the finger's
+final place is computed over the full list first. The 8 wrongly-lowed
+real releases returned to medium/high; genuine spans (ep25 14.1–16.6,
+ep33 9.0–10.2) survive.
+
+Checks: attempts 51/59 unchanged; video-anchored subtask boundaries
+unchanged (ep2 6.138/7.007, ep24 grasp 5.303, ep30 5.728, ep56 8.736,
+ep25 place_release 13.805); 157/157 tests. Residual (pre-existing, out
+of scope): weak grazes whose exit coincides with pre-grasp jaw opening
+still label "release" (ep25 @1.83, identical before/after) — candidate
+for a bout-peak gate, to be decided with the place-precision work.
+
+### Addendum 6 correction: the closing veto (Zheng's ep47 video verdict)
+
+The ep36/ep47 "drop→release" line above is half-retracted. Zheng
+video-checked ep47 @4.575: **the ball escapes while the jaw is still
+clamping** — a squeeze-out, then the retry's pre-open (+22.8 units)
+lands inside Rule 1's forward window and read as a release. Measured
+split at the exit: back −5.7 (closing), forward +22.8. This is exactly
+the trap the net-travel design was supposed to avoid; the net test
+alone cannot see it when the retry opens big enough to swamp the
+squeeze.
+
+Fix: **closing veto** — release evidence at an exit is void if the jaw
+moved ≤ −1 unit in the 0.5 s before it (actively closing when the force
+died = the object left DURING clamping, never a let-go). Applied to
+Rule 1 and to the peel rules' partner checks.
+
+Corpus effect: exactly 4 flips vs the pre-veto state — ep47 @4.57 back
+to drop (its backfilled false place dies too), plus ep31 @5.03, ep31
+@7.14, ep32 @6.50 release→drop: all three carry the identical
+squeeze-out signature (closing at exit, retry pre-open right after),
+sitting in the squeeze phase Zheng already video-described on ep31
+("gripper closing while arm moving"). Long-standing mislabels, not new
+behavior. All peel survivors intact; attempts 51/59; 157/157.
+
+ep47's missing failed_attempt flag is NOT from this round: finger 0's
+standing phantom contact (onset 1.41 s, never exits until 14.61 s)
+bridges every trial into ONE bout, so no bout precedes the grasp bout
+and the flag loop has nothing to flag — it also corrupts ep47's grasp
+anchor (3.71 vs ~8.3 real). That is the parked phantom/recorder-re-zero
+issue, now with a second concrete casualty (flag + anchor). A
+finger-level attempt rule (f1's own 3.98–4.57 drop span inside the
+merged bout) is the candidate detector-side mitigation, to be designed
+with the result-aware segmentation work.
+
+### Addendum 6b: finger-level attempts inside a welded bout
+
+Detector-side mitigation for the ep47 flag casualty, shipped: when a
+standing phantom bridges every trial into one bout, failed attempts are
+recovered from the individual finger's own spans. A finger span counts
+as an attempt when it (1) ends in a drop (trustworthy post
+closing-veto), (2) lies inside the grasp bout, (3) ends before the
+hand's first grasp_stable of that bout (excludes mid-carry slips), and
+(4) is followed by ≥1.0 s of dead time before that finger re-contacts
+(regrip churn re-grabs in ~0.1 s; distinct trials sit seconds apart).
+Same weak/strong split at 2.3 N, flags only. Corpus effect: fires on
+exactly ONE episode — ep47 gains failed_attempt@4.0-4.6s, zero
+collateral; attempts agreement 51/59 -> 52/59 (ep47 now matches her
+hand count). ep47's grasp anchor (3.71 vs ~8.3) remains phantom-
+corrupted — that needs the context-gated re-zero, not flag logic.
+
+### Addendum 6c: Zheng's sweep — late-peel falsified, attempt rule rebuilt
+
+Sweep verdicts (2026-08-29): ep36 weak span 1.2-3.1 = drift, finger in
+air (gate worked); ep36 true task end at 8.4, the 9.61 "release" is a
+NON-RE-ZEROED SENSOR RESIDUAL, not contact; ep41 same mechanism. **The
+late-peel rule is falsified as gel adhesion — both corpus firings are
+phantom residuals after the true release.** The early-peel case (ep25
+@11.68, before the jaw opens) stands video-verified. Late-peel labels
+kept until the context-gated re-zero lands (it erases these residuals
+at the source; the rule is then deleted). ep21 @4.5 = real light touch
+=> drop + attempt flag correct, her metadata undercounts. ep33 @8.1:
+hand still HELD the ball while f1 read zero — the "official release"
+is 9.12; per-finger release markers overstate task semantics (see
+marker-contamination note below). ep32 @6.5 = real failed attempt.
+
+Attempt rule rebuilt on ep32's evidence (its failed touch reached
+momentary stability AND retried 0.4 s later — both old guards wrong):
+a finger span ending in a drop inside the grasp bout is an attempt
+UNLESS the hand still held the object (only possible after the bout's
+first stability with another finger in contact) or the finger's task
+was already release-completed (a drop-completed "task" = false place on
+a failed engagement, ep45, and does not suppress). Corpus: recovers
+ep32 @4.7-6.5 (video-anchored) and ep45 @6.5-7.6 (failure ep, toward
+her count of 2), keeps ep47; adds five UNVERIFIED candidates, all
+squeeze-out-signature: ep19 @3.3-3.7, ep22 @6.0-10.8, ep33 @4.3-4.5,
+ep35 @3.9-4.5, ep40 @3.4-8.7. Agreement vs her metadata 52 -> 50/59 —
+the five candidates await Zheng's video, and her counting semantics
+(does an escape-and-immediate-regrab count as an extra attempt?) is a
+Jingyi question.
+
+Marker-contamination issue (Zheng): auto events remain in the atom
+stream even when phantom-classified (downgraded low + flagged), and
+per-finger releases read as task events — a training/eval consumer that
+does not filter inherits them. Policy fork to decide: (a) machine-
+readable phantom marking + filtered export, (b) suppress phantom-
+classified events from atoms entirely, (c) two-tier output (hand-level
+task events + finger-level sensor markers). Affects the deliverable
+format — raise with Jingyi.
+
+### Addendum 6d: sweep round 2 — the attempt rule is now fully measured
+
+Zheng's second sweep falsified all five candidate flags from 6c's
+partner-in-contact rule (ep19: ball slid into the clamp, no loss; ep22
+@6.0-10.8: post-release phantom residual; ep33 @4.3-4.5: migration
+during grasp; ep35: phantom span; ep40: off-pad pinch carried the ball)
+and set the design principle: an attempt requires the HAND to lose the
+object in a continuous chunk — a single finger blinking out is normal
+grasp life. ep25 @11.68 was also inspected at data level after Zheng
+saw arrows while the detector said zero: table and raw agree (mapping
+r=.998/.996), f1 truly zeroes ~11.9-14.0 while f0 holds ~4 N to 14.0 —
+ep25 joins ep33/ep50 as asymmetric unloading during placement; "early
+peel" was never a peel, and the per-finger "release" NAME is the
+marker-policy issue, not a signal bug.
+
+Final rule (every constant measured, no fitted guesses): a span ending
+in a drop inside the grasp bout, before the last release, is an attempt
+iff the hand goes quiet (total force < 1.0 N — above ep47's 0.8 N
+standing phantom, below ep19's 1.4 N clamp — for 0.35 s, inside ep32's
+0.41 s retry gap, past ep35's phantom resurgence at +0.33 s) AND the
+jaw re-opens within 2.5 s (+22.8/+24.7 on real attempts, 0.0 on every
+false case). Corpus delta vs session baseline: EXACTLY ep32 @4.7-6.5
+and ep47 @4.0-4.6, both video-verified. Agreement 53/59.
+
+Two structural findings for the Jingyi list:
+- ep40: an off-pad pinch carries the object at 0.1 N — the tactile
+  channel is blind to the entire successful task; jaw never re-opens
+  before recording ends. Data-quality issue (sensor placement/grip
+  style), and it makes ep45 (true terminal loss, identical hand+jaw
+  signature) UNFLAGGABLE without episode-result metadata —
+  result-aware segmentation is the fix; ep45/ep39 stay as documented
+  under-counts until then.
+- ep35: a motion-coincident phantom peaked 3.8 N, breaking the 2.3 N
+  weak-contact calibration ("every false bout <= 2.2 N") — the gate
+  cannot be trusted alone above that line anymore; second casualty
+  count for the context re-zero.
+
+### Addendum 6e: air_grasp — Zheng's jaw-position insight, measured and shipped
+
+ep0 @2.2-2.7 verdict: real contact, but pads touching EACH OTHER — an
+air-close, not an object attempt — and Zheng's suggestion (read it off
+the gripper motor) is fully supported by measurement: the air-close
+dwells at jaw position 0.5, the ONLY sub-2.0 dwell in all 63 episodes;
+the nearest real hold compresses the foam ball to 2.8 (ep37 — thin
+margin, re-derive for harder objects). Shipped: any attempt-classified
+span whose jaw bottoms below 2.0 becomes `air_grasp@span` (excluded
+from attempt counting). Also noted: ep0's first grasp_stable at 2.5 s
+fired ON the pad-pad contact — false stability on an air-close is now a
+known mode. ep22 @2.9-3.1 video-confirmed as a real touch-the-ball
+failed attempt (her metadata undercounts, like ep21/ep54).
+
+Attempt agreement 54/59; all five residual disagreements are resolved:
+ep21/ep22/ep54 = our flags video-verified correct (her hand counts
+undercount), ep39/ep45 = unreachable without episode-result metadata
+(result-aware segmentation). Attempt detection is DONE for sotac.
+
+### Addendum 6f: context-gated re-zero — what shipped, what failed, what it proves
+
+Shipped (safe): the per-taxel zero now initializes from the median over
+the whole APPROACH PLATEAU instead of the first 0.4 s — the plateau
+ending at the first 2-unit closing from the jaw's RUNNING MAXIMUM
+(episodes can start mid-closed from the previous reset: ep47 begins at
+18 and opens to 39 at 1.5 s, so start-position-based windows silently
+become the whole episode). Gripper context is plumbed through
+detector, runner, auto-label panel, and every display component — one
+correction everywhere, unchanged when no gripper exists. Corpus effect:
+two weak-flag noise changes (ep38 loses a phantom weak span, ep40
+gains an early one), zero anchor changes, zero attempt changes
+(54/59), 157/157 tests.
+
+Failed and reverted, with evidence (both attempts preserved in git
+history via this doc):
+1. Fast-tau tracking over jaw-open windows: absorbed ~half of every
+   transient graze into the baseline and poisoned the rest of the
+   episode (ep24 place_release slid 10.97 -> 9.61, video-anchored).
+2. Max-open post-release window: ate the tails of REAL releases while
+   the fingers were still unloading (ep31 -1.1 s).
+
+What ep47 proves: its finger-0 phantom is a WANDERING 0.8-1.8 N signal
+across the whole episode — not a step offset. Medians cannot remove it
+(it rides above its own median exactly in the retry gap, keeping the
+weld); only continuous tracking can, and continuous tracking is
+globally unsafe (above). Combined with the zero-frame census (steady
+vs blinking inverted) this is the third independent proof that the
+settled/wandering phantom class is NOT separable in software.
+**Recorder-side per-episode re-zero is the fix — this is now the
+evidence package for the Jingyi request.** ep47's grasp anchor stays
+corrupted (3.71 vs ~8.3) until then; its attempt flag survives via the
+finger-level rule. Candidate v2 mitigation if the recorder fix stalls:
+long-span blink-rate analysis (a >8 s sub-2.3 N span with zero
+firmware dropouts is phantom-like; real contact blinks).

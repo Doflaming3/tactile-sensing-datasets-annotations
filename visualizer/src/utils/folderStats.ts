@@ -7,10 +7,7 @@
 //     it is opt-in behind a button (see TactileAggregate in tactile-panel).
 
 import { authHeaders } from "./auth";
-import {
-  fetchParquetFile,
-  readParquetAsObjects,
-} from "./parquetUtils";
+import { fetchParquetFile, readParquetAsObjects } from "./parquetUtils";
 import type {
   EpisodeLengthStats,
   EpisodeLengthInfo,
@@ -190,11 +187,10 @@ export async function computeFolderTactileAggregate(
         first.length <= 4;
       const nCh = isMulti ? first.length : 1;
       for (let k = 0; k < nCh; k++) {
-        const chName =
-          (isMulti ? `${col}[${k}]` : col).replace(
-            "observation.sensors.",
-            "",
-          );
+        const chName = (isMulti ? `${col}[${k}]` : col).replace(
+          "observation.sensors.",
+          "",
+        );
         let a = acc.get(chName);
         if (!a) {
           a = {
@@ -211,9 +207,9 @@ export async function computeFolderTactileAggregate(
         for (const r of rows) {
           const cell = r[col] as number[][][] | number[][] | undefined;
           if (!cell) continue;
-          const taxels = (isMulti
-            ? (cell as number[][][])[k]
-            : (cell as number[][])) as number[][];
+          const taxels = (
+            isMulti ? (cell as number[][][])[k] : (cell as number[][])
+          ) as number[][];
           if (!taxels) continue;
           n++;
           let framePeak = 0;

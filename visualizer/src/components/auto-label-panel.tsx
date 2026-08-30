@@ -166,8 +166,13 @@ export default function AutoLabelPanel({
     if (!entry) return null;
     const nTaxels = entry.shape.length >= 3 ? entry.shape[1] : entry.shape[0];
     const layout = resolveTaxelLayout(nTaxels)?.points ?? null;
-    return buildSeriesFromSensorFrames(entry.frames, entry.timestamps, layout);
-  }, [sensorFrames]);
+    return buildSeriesFromSensorFrames(
+      entry.frames,
+      entry.timestamps,
+      layout,
+      gripper,
+    );
+  }, [sensorFrames, gripper]);
 
   const loadRaw = useCallback(async () => {
     if (rawSeriesRef.current) return rawSeriesRef.current;
@@ -203,7 +208,7 @@ export default function AutoLabelPanel({
           ? Object.values(sensorFrames)[0].shape[1]
           : 52;
       const layout = resolveTaxelLayout(nTaxels)?.points ?? null;
-      const s = buildSeriesFromRawCsvs(texts, layout);
+      const s = buildSeriesFromRawCsvs(texts, layout, gripper);
       rawSeriesRef.current = s;
       setRawState(s ? "ready" : "missing");
       return s;
@@ -211,7 +216,7 @@ export default function AutoLabelPanel({
       setRawState("missing");
       return null;
     }
-  }, [repoId, episodeId, root, sensorFrames]);
+  }, [repoId, episodeId, root, sensorFrames, gripper]);
 
   const run = useCallback(
     async (th: Partial<DetectionThresholds>) => {

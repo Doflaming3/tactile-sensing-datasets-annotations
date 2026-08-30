@@ -1238,6 +1238,7 @@ function EpisodeViewerInner({
                       <Suspense fallback={null}>
                         <TactileFingerView
                           sensorFrames={data.sensorFrames!}
+                          gripper={gripperSeries}
                           fps={datasetInfo.fps}
                           fingerIndex={dashFingers[0]}
                         />
@@ -1265,6 +1266,7 @@ function EpisodeViewerInner({
                       <Suspense fallback={null}>
                         <TactileFingerView
                           sensorFrames={data.sensorFrames!}
+                          gripper={gripperSeries}
                           fps={datasetInfo.fps}
                           fingerIndex={dashFingers[1]}
                         />
@@ -1273,7 +1275,10 @@ function EpisodeViewerInner({
                   </div>
                   <div className="flex-[0.8] min-h-0">
                     <Suspense fallback={null}>
-                      <TactileSummary sensorFrames={data.sensorFrames!} />
+                      <TactileSummary
+                        sensorFrames={data.sensorFrames!}
+                        gripper={gripperSeries}
+                      />
                     </Suspense>
                   </div>
                 </div>
@@ -1429,6 +1434,7 @@ function EpisodeViewerInner({
                     <TactilePanel
                       sensorFrames={data.sensorFrames}
                       fps={datasetInfo.fps}
+                      gripper={gripperSeries}
                       repoId={org && dataset ? `${org}/${dataset}` : undefined}
                       root={innerRootParam}
                     />
@@ -1487,6 +1493,7 @@ function EpisodeViewerInner({
                         <Suspense fallback={null}>
                           <TactileFingerView
                             sensorFrames={data.sensorFrames!}
+                            gripper={gripperSeries}
                             fps={datasetInfo.fps}
                             fingerIndex={dashFingers[0]}
                           />
@@ -1496,6 +1503,7 @@ function EpisodeViewerInner({
                         <Suspense fallback={null}>
                           <TactileFingerView
                             sensorFrames={data.sensorFrames!}
+                            gripper={gripperSeries}
                             fps={datasetInfo.fps}
                             fingerIndex={dashFingers[1]}
                           />
@@ -1503,7 +1511,10 @@ function EpisodeViewerInner({
                       </div>
                       <div className="min-h-0">
                         <Suspense fallback={null}>
-                          <TactileSummary sensorFrames={data.sensorFrames!} />
+                          <TactileSummary
+                            sensorFrames={data.sensorFrames!}
+                            gripper={gripperSeries}
+                          />
                         </Suspense>
                       </div>
                     </div>
@@ -1562,7 +1573,10 @@ function EpisodeViewerInner({
               {data.sensorFrames &&
                 Object.keys(data.sensorFrames).length > 0 && (
                   <Suspense fallback={null}>
-                    <TactileStats sensorFrames={data.sensorFrames} />
+                    <TactileStats
+                      sensorFrames={data.sensorFrames}
+                      gripper={gripperSeries}
+                    />
                   </Suspense>
                 )}
               <StatsPanel

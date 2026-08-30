@@ -149,6 +149,46 @@ const BRIEF_CONTACT_STRONG_N = 2.0;
  * arm is still parked; sotac ep58 has a 2.2 N start-up spike at 0.25 s. */
 const BRIEF_CONTACT_SKIP_START_S = 0.5;
 
+/** Release vs drop is decided by NET jaw-opening travel in a window
+ * around the force exit, not by instantaneous velocity, and never by
+ * place context (that was circular: place is backfilled FROM releases).
+ * Corpus audit of all 150 terminals: the old two-instant velocity test
+ * missed 11 real releases whose opening bout fell between its samples
+ * (ep48: twin fingers exit 0.02 s apart, one caught, one missed), and
+ * the place-context rescue produced video-verified false releases on
+ * ep24 (approach fumble at 5.23 s, jaw CLOSING 16 units) and ep21.
+ * Window is asymmetric — placement transfers weight before the jaw
+ * opens (ep33: exit 0.52 s before opening), adhesion unloads after it
+ * (ep50: opening 0.78 s before exit). NET travel keeps attempt churn
+ * as drops: the jaw jiggles open near a fumbled graze but is closing
+ * overall (ep16 −13, ep22 −15, ep49 −7 units). Threshold sits between
+ * the largest churn travel (+0.7, ep40) and the smallest real-release
+ * travel (+2.8, ep48).
+ *
+ * Closing veto: opening in the FORWARD half only counts if the jaw was
+ * not actively closing when the force exited. A squeeze-out — the
+ * object escaping while the jaw clamps — is followed within a second by
+ * the retry's pre-open, which the forward window would otherwise read
+ * as a release (ep47 @4.575, video-verified: ball escapes with the jaw
+ * 5.7 units into a closing motion, retry opens +22.8 right after). */
+const RELEASE_TRAVEL_MIN = 2.0;
+const RELEASE_WIN_BEFORE_S = 0.5;
+const RELEASE_WIN_AFTER_S = 1.0;
+const RELEASE_CLOSING_VETO = -1.0;
+
+/** Staggered peel-offs: release is a HAND action but fingers exit
+ * staggered — the gel can let go while the partner still holds and the
+ * jaw only opens later (ep25 f1 peels off the placed ball at 11.68 s,
+ * jaw opens 2.5 s later; video-verified), or lag after the jaw already
+ * opened (ep41 f1 unloads 1.3 s after f0's jaw-visible release). Such
+ * exits are upgraded drop -> release when the finger was HOLDING in
+ * that very bout and does not re-contact right away (a fumble re-grabs
+ * immediately — ep24). Decay shape was tried and rejected: measured
+ * peel exits cliff in 0.01 s while real drops can fade over 1.2 s. */
+const PEEL_RECONTACT_S = 1.5;
+const PEEL_EARLY_MAX_S = 3.0;
+const PEEL_LATE_MAX_S = 1.5;
+
 export const DEFAULT_THRESHOLDS: DetectionThresholds = {
   contactEnterN: 0.15,
   contactExitN: 0.1,
@@ -253,6 +293,7 @@ function relStd(x: Float64Array, i0: number, i1: number): number {
 export function applyAdaptiveBaseline(
   frames: unknown[],
   timestamps: number[],
+  gripper?: GripperSeries | null,
 ): number[][][][] | null {
   if (!frames.length || !timestamps.length) return null;
   const first = frames[0] as number[][][];
@@ -265,7 +306,44 @@ export function applyAdaptiveBaseline(
   const rateHz = dur > 0 ? (n - 1) / dur : 30;
   const QUIET_MARGIN_N = 1.0;
   const BASELINE_TAU_S = 1.5;
-  const baseWin = Math.min(n, Math.max(3, Math.round(rateHz * 0.4)));
+
+  // Context-gated re-zero (Zheng): while the jaw still sits at its
+  // STARTING openness, nothing has been gripped yet — so the initial
+  // per-taxel zero is the median over that whole approach plateau, not
+  // just the first 0.4 s. This catches what the idle tracker cannot: an
+  // offset that SETTLES IN mid-approach and crosses the contact
+  // threshold locks itself in as "contact" and freezes the tracker
+  // forever (ep47 f0: settles at 1.41 s with the jaw untouched until
+  // ~3.7 s — present for >60% of the plateau, so the median absorbs
+  // it; previously it never exited, welded every trial into one bout
+  // and corrupted the grasp anchor to 3.71 s). The median is immune to
+  // brief real grazes during approach. Two live-tracking alternatives
+  // were tried and REVERTED: a fast-tau tracker over open-jaw windows
+  // absorbed half of every transient graze and poisoned the baseline
+  // for the rest of the episode (ep24 place_release slid 10.97 ->
+  // 9.61), and a max-open post-release window ate the tail of real
+  // releases. Post-release residuals stay handled by the post-task
+  // gate until the recorder-side per-episode re-zero. Assumes episodes
+  // START jaw-open (true for sotac; re-check for company data).
+  // The plateau ends at the first meaningful closing from the jaw's
+  // RUNNING MAXIMUM, not from its start position: episodes can begin
+  // with the jaw mid-closed from the previous episode's reset (ep47
+  // starts at 18, opens to 39 at 1.5 s) — measured against the start
+  // position such an episode never "closes" and the window would
+  // silently become the whole episode, putting real grip force under
+  // the median.
+  let baseWinSecs = 0.4;
+  if (gripper && gripper.t.length > 2) {
+    let runMax = -Infinity;
+    for (let j = 0; j < gripper.t.length; j++) {
+      if (gripper.pos[j] > runMax) runMax = gripper.pos[j];
+      if (gripper.pos[j] < runMax - 2) {
+        baseWinSecs = Math.max(0.4, gripper.t[j] - t[0]);
+        break;
+      }
+    }
+  }
+  const baseWin = Math.min(n, Math.max(3, Math.round(rateHz * baseWinSecs)));
 
   const out: number[][][][] = new Array(n);
   for (let i = 0; i < n; i++) {
@@ -334,6 +412,7 @@ export function buildSeriesFromSensorFrames(
   frames: unknown[],
   timestamps: number[],
   layout: [number, number, number][] | null,
+  gripper?: GripperSeries | null,
 ): TactileSeries | null {
   if (!frames.length || !timestamps.length) return null;
   const first = frames[0] as number[][][];
@@ -346,7 +425,7 @@ export function buildSeriesFromSensorFrames(
   const rateHz = dur > 0 ? (n - 1) / dur : 30;
 
   // one implementation of the drift correction, shared with the display
-  const corrected = applyAdaptiveBaseline(frames, timestamps);
+  const corrected = applyAdaptiveBaseline(frames, timestamps, gripper);
   const src: unknown[] = corrected ?? frames;
 
   const fingers: FingerSeries[] = [];
@@ -488,6 +567,7 @@ export function buildSeriesFromSensorFrames(
 export function buildSeriesFromRawCsvs(
   csvTexts: string[],
   layout: [number, number, number][] | null,
+  gripper?: GripperSeries | null,
 ): TactileSeries | null {
   const parsed = csvTexts.map(parseRawCsv).filter((p) => p !== null) as Array<{
     t: Float64Array;
@@ -516,6 +596,7 @@ export function buildSeriesFromRawCsvs(
     frames as unknown as unknown[],
     Array.from(base.t.subarray(0, n)),
     layout,
+    gripper,
   );
 }
 
@@ -797,6 +878,30 @@ export function detectEvents(
     }
   }
 
+  // jaw position sample-and-hold on the gripper's own clock, and the net
+  // opening travel around a timestamp (see RELEASE_TRAVEL_MIN)
+  const jawPosAt = (tq: number): number => {
+    if (!gripper || gripper.t.length === 0) return 0;
+    if (tq <= gripper.t[0]) return gripper.pos[0];
+    let lo = 0;
+    let hi = gripper.t.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (gripper.t[mid] <= tq) lo = mid;
+      else hi = mid - 1;
+    }
+    return gripper.pos[lo];
+  };
+  // release evidence at a force exit: net jaw opening over the window,
+  // vetoed when the jaw was actively closing AT the exit (squeeze-out —
+  // see RELEASE_CLOSING_VETO)
+  const jawReleaseAt = (tq: number): boolean => {
+    const back = jawPosAt(tq) - jawPosAt(tq - RELEASE_WIN_BEFORE_S);
+    if (back <= RELEASE_CLOSING_VETO) return false;
+    const fwd = jawPosAt(tq + RELEASE_WIN_AFTER_S) - jawPosAt(tq);
+    return back + fwd >= RELEASE_TRAVEL_MIN;
+  };
+
   const maxFn = Math.max(...fingers.map((f) => Math.max(...Array.from(f.fn))));
   if (maxFn < th.contactEnterN) {
     return {
@@ -853,14 +958,13 @@ export function detectEvents(
           inContact = false;
           const exitIdx = belowSince;
           belowSince = -1;
-          const opening =
-            gvel[exitIdx] > th.gripperVelEps || gvel[i] > th.gripperVelEps;
+          const releasing = jawReleaseAt(t[exitIdx]);
           events.push({
-            label: opening ? "release" : "drop",
+            label: releasing ? "release" : "drop",
             startS: t[exitIdx],
             endS: t[exitIdx],
             finger: fi,
-            confidence: opening
+            confidence: releasing
               ? "medium"
               : f.hf[i] > th.hfExit
                 ? "medium"
@@ -1006,12 +1110,103 @@ export function detectEvents(
         if (!recovered) lastPlaceEnd = t[i];
       }
     }
+  });
 
-    // place backfill: in real demos the object is often set down in the
-    // same motion as the gripper opening, so the jaw-static gate above
-    // never fires (the final force drop and the release coincide). If this
-    // finger has a release but no place in the preceding 2 s, recover the
-    // onset of the final force drop and label it as the place.
+  // ---- staggered peel-off upgrade (see PEEL_* constants): a drop whose
+  // finger was holding in that very bout, does not re-contact, and sits
+  // next to the partner finger's jaw-visible release is a peel, i.e. a
+  // release. Cross-finger, so it must run after every finger's pass.
+  {
+    const terms = events.filter(
+      (e) => e.label === "release" || e.label === "drop",
+    );
+    for (const e of terms) {
+      if (e.label !== "drop") continue;
+      const tEx = e.startS;
+      let boutOnset = -1;
+      for (const c of events) {
+        if (
+          c.finger === e.finger &&
+          c.label === "contact_onset" &&
+          c.startS < tEx &&
+          c.startS > boutOnset
+        ) {
+          boutOnset = c.startS;
+        }
+      }
+      // the finger must have HELD in this bout — its last grasp_stable
+      // lies inside it (a 0.8 N post-place graze never qualifies: ep33)
+      const heldThisBout = events.some(
+        (s) =>
+          s.finger === e.finger &&
+          s.label === "grasp_stable" &&
+          s.startS < tEx &&
+          s.startS >= boutOnset,
+      );
+      if (!heldThisBout) continue;
+      // a peel is final — an immediate re-grab means a fumble (ep24)
+      const recontacts = events.some(
+        (c) =>
+          c.finger === e.finger &&
+          c.label === "contact_onset" &&
+          c.startS > tEx &&
+          c.startS - tEx <= PEEL_RECONTACT_S,
+      );
+      if (recontacts) continue;
+      let peel = false;
+      for (const p of terms) {
+        if (p.finger === e.finger) continue;
+        const dt = p.startS - tEx;
+        // early peel (ep25): partner still holding at this exit, its own
+        // jaw-visible release follows within PEEL_EARLY_MAX_S
+        if (dt >= 0 && dt <= PEEL_EARLY_MAX_S && jawReleaseAt(p.startS)) {
+          let lastOn = -1;
+          let lastEx = -1;
+          for (const c of events) {
+            if (c.finger !== p.finger || c.startS >= tEx) continue;
+            if (c.label === "contact_onset" && c.startS > lastOn) {
+              lastOn = c.startS;
+            }
+            if (
+              (c.label === "release" || c.label === "drop") &&
+              c.startS > lastEx
+            ) {
+              lastEx = c.startS;
+            }
+          }
+          if (lastOn >= 0 && lastOn > lastEx) peel = true;
+        }
+        // late peel (ep41): partner's jaw-visible release preceded this
+        // exit by <= PEEL_LATE_MAX_S while this finger was already in
+        // contact (a contact STARTING after the release is post-task
+        // noise, never a peel)
+        if (
+          dt <= 0 &&
+          -dt <= PEEL_LATE_MAX_S &&
+          jawReleaseAt(p.startS) &&
+          boutOnset >= 0 &&
+          boutOnset <= p.startS
+        ) {
+          peel = true;
+        }
+        if (peel) break;
+      }
+      if (peel) {
+        e.label = "release";
+        e.confidence = "medium";
+        e.info = "peel";
+      }
+    }
+  }
+
+  // ---- place backfill: in real demos the object is often set down in
+  // the same motion as the gripper opening, so the jaw-static place gate
+  // never fires (the final force drop and the release coincide). If a
+  // finger has a release but no place in the preceding 2 s, recover the
+  // onset of the final force drop and label it as the place. Runs AFTER
+  // the peel upgrade so it keys on the final release set — the dependency
+  // is one-way: place derives from release, never the reverse.
+  fingers.forEach((f, fi) => {
     const releases = events.filter(
       (e) => e.finger === fi && e.label === "release",
     );
@@ -1151,6 +1346,58 @@ export function detectEvents(
   }
   cleaned.sort((a, b) => a.startS - b.startS);
 
+  // ---- post-task phantom contacts
+  // A new contact on a finger AFTER that finger already placed-and-
+  // released its object cannot be a grasp — nothing re-enters the grip
+  // without the jaw closing again, and a real re-grab is a new approach.
+  // Video-verified phantom on ep25: 0.2–0.8 N over 1–4 taxels wandering
+  // for 3 s after the carry ended, producing a fake contact/stable/drop
+  // chain. Downgrade every event of such a span to low confidence and
+  // flag it. (Multi-cycle tasks with real re-grabs would need a
+  // jaw-closing check here before this gate is applied to them.)
+  {
+    const taskDoneByFinger = new Map<number, number>();
+    // The finger's FINAL place must be computed over the full list before
+    // pairing it with a terminal. Using the running "last place so far"
+    // let an early false place + an attempt-churn terminal mark the
+    // finger done at ~5 s and silently downgrade the REAL grasp/carry to
+    // low (ep21, ep24, ep47, ep56 — caught by the release-decoupling
+    // audit).
+    const finalPlaceEndByFinger = new Map<number, number>();
+    for (const e of cleaned) {
+      if (e.label === "place") finalPlaceEndByFinger.set(e.finger, e.endS);
+    }
+    for (const e of cleaned) {
+      if (
+        (e.label === "release" || e.label === "drop") &&
+        finalPlaceEndByFinger.has(e.finger) &&
+        e.startS >= (finalPlaceEndByFinger.get(e.finger) ?? Infinity) - 0.2 &&
+        !taskDoneByFinger.has(e.finger)
+      ) {
+        taskDoneByFinger.set(e.finger, e.startS);
+      }
+    }
+    for (const [fi, doneS] of taskDoneByFinger) {
+      let spanStart: number | null = null;
+      let spanEnd = -1;
+      for (const e of cleaned) {
+        if (e.finger !== fi || e.startS <= doneS) continue;
+        if (e.label === "contact_onset" && spanStart === null) {
+          spanStart = e.startS;
+        }
+        if (spanStart !== null) {
+          e.confidence = "low";
+          spanEnd = Math.max(spanEnd, e.endS);
+        }
+      }
+      if (spanStart !== null) {
+        flags.push(
+          `post_task_contact@${spanStart.toFixed(1)}-${spanEnd.toFixed(1)}s`,
+        );
+      }
+    }
+  }
+
   // ---- contact bouts = grasp trials
   // Per finger, a contact_onset opens a span and the next release/drop on
   // that finger closes it; overlapping or near spans across fingers merge
@@ -1238,11 +1485,25 @@ export function detectEvents(
         }
       } else openRun = 0;
     }
-    // place_release starts at the opening bout that leads to the FINAL
-    // release/drop (not the first twitch after grasp). Fallback: last bout.
-    const lastTerminal = [...cleaned]
-      .reverse()
-      .find((e) => e.label === "release" || e.label === "drop");
+    // place_release starts at the opening bout that leads to the terminal
+    // event ENDING THE CARRY: the first release/drop after the last place.
+    // Anchoring to the last terminal overall instead lets a post-place
+    // re-touch (ep25, video-verified: a finger re-contacts the placed ball
+    // and loses it 2.4 s later) drag place_release seconds late and
+    // stretch transport. Fallback: last terminal, then last opening bout.
+    const lastPlace = [...cleaned].reverse().find((e) => e.label === "place");
+    let lastTerminal = lastPlace
+      ? cleaned.find(
+          (e) =>
+            (e.label === "release" || e.label === "drop") &&
+            e.startS >= lastPlace.endS - 0.2,
+        )
+      : undefined;
+    if (!lastTerminal) {
+      lastTerminal = [...cleaned]
+        .reverse()
+        .find((e) => e.label === "release" || e.label === "drop");
+    }
     let openStart = -1;
     if (openRuns.length > 0) {
       if (lastTerminal) {
@@ -1430,6 +1691,37 @@ export function detectEvents(
     // every real grab >= 2.4 N. The 2.3 N cut sits in that thin gap —
     // re-derive as verdicts grow.
     const WEAK_ATTEMPT_MAX_N = 2.3;
+    // Pads touching EACH OTHER, no object: the jaw bottoms out at its
+    // mechanical minimum, which an object between the pads never allows
+    // (Zheng's ep0 verdict + corpus survey: the air-close dwells at jaw
+    // 0.5 — the ONLY sub-2.0 dwell in all 63 episodes; the nearest real
+    // hold crushes the foam ball to 2.8, ep37 — thin margin, re-derive
+    // for harder objects). Such a span is a distinct outcome, not an
+    // object attempt, and is excluded from attempt counting.
+    const AIR_CLOSE_POS = 2.0;
+    const jawMinIn = (a: number, b: number): number => {
+      if (!gripper) return Infinity;
+      let mn = Infinity;
+      for (let j = 0; j < gripper.t.length; j++) {
+        if (gripper.t[j] < a) continue;
+        if (gripper.t[j] > b) break;
+        if (gripper.pos[j] < mn) mn = gripper.pos[j];
+      }
+      return mn;
+    };
+    const attemptFlag = (
+      startS: number,
+      endS: number,
+      peakN: number,
+    ): string => {
+      const span = `${startS.toFixed(1)}-${endS.toFixed(1)}s`;
+      if (jawMinIn(startS - 0.3, endS + 0.3) < AIR_CLOSE_POS) {
+        return `air_grasp@${span}`;
+      }
+      return peakN < WEAK_ATTEMPT_MAX_N
+        ? `weak_contact@${span}`
+        : `failed_attempt@${span}`;
+    };
     const boutPeakN = (b: { startS: number; endS: number }): number => {
       let pk = 0;
       for (const f of fingers) {
@@ -1443,11 +1735,107 @@ export function detectEvents(
     };
     for (const b of bouts) {
       if (b === graspBout) break;
-      const span = `${b.startS.toFixed(1)}-${b.endS.toFixed(1)}s`;
-      if (boutPeakN(b) < WEAK_ATTEMPT_MAX_N) {
-        flags.push(`weak_contact@${span}`);
-      } else {
-        flags.push(`failed_attempt@${span}`);
+      flags.push(attemptFlag(b.startS, b.endS, boutPeakN(b)));
+    }
+
+    // finger-level attempts hidden INSIDE the grasp bout. Zheng's ruling
+    // (sweep, video): an attempt requires the HAND to lose the object in
+    // a CONTINUOUS chunk — a single finger blinking out is normal grasp
+    // life (contact migration while the ball slides into the clamp, one
+    // pad unloading while the object is pinched or rests on the bowl)
+    // and is NEVER an attempt by itself. Both a partner-in-contact test
+    // and a pre-stability+gap test were tried and video-falsified
+    // (ep19/22/33/35/40). The shipped rule is fully measured: a span
+    // ending in a drop (inside the grasp bout, before the episode's
+    // last release) is an attempt iff
+    //   1. the hand goes QUIET — total force < HAND_LOSS_N for
+    //      HAND_LOSS_MIN_S after the drop (1.0 N sits above ep47's
+    //      0.8 N standing phantom and below ep19's 1.4 N immediate
+    //      clamp; 0.35 s sits inside ep32's 0.41 s retry gap and past
+    //      ep35's phantom resurgence at +0.33 s — thin margins on both
+    //      sides, re-derive as verdicts grow), AND
+    //   2. the loss is ACTED ON — the jaw re-opens to retry (measured:
+    //      +22.8/+24.7 units on real attempts ep47/ep32, 0.0 on every
+    //      false case).
+    // KNOWN MISS: a terminal loss nobody retries (ep45: the failure
+    // just ends, jaw never moves again) is indistinguishable from a
+    // sensor-blind off-pad pinch that carries the object at 0.1 N with
+    // the jaw equally still (ep40, video-verified success) — hand and
+    // jaw signatures are IDENTICAL; only the episode outcome separates
+    // them. Flagging ep45 without inventing ep40 needs result-aware
+    // segmentation (episode result metadata plumbed in) — parked there.
+    const HAND_LOSS_N = 1.0;
+    const HAND_LOSS_MIN_S = 0.35;
+    const JAW_RETRY_RISE = 5.0;
+    const JAW_RETRY_WIN_S = 2.5;
+    {
+      const lastRelease = [...cleaned]
+        .reverse()
+        .find((e) => e.label === "release");
+      const handQuietAfter = (tq: number): boolean => {
+        let sawEnd = false;
+        for (let i = 0; i < n; i++) {
+          if (t[i] < tq) continue;
+          if (t[i] > tq + HAND_LOSS_MIN_S) {
+            sawEnd = true;
+            break;
+          }
+          let sum = 0;
+          for (const f of fingers) sum += f.fn[i];
+          if (sum >= HAND_LOSS_N) return false;
+        }
+        return sawEnd; // window truncated by episode end doesn't count
+      };
+      const jawReopensAfter = (tq: number): boolean => {
+        if (!gripper) return false;
+        const base = jawPosAt(tq);
+        for (let j = 0; j < gripper.t.length; j++) {
+          if (gripper.t[j] <= tq) continue;
+          if (gripper.t[j] > tq + JAW_RETRY_WIN_S) break;
+          if (gripper.pos[j] - base >= JAW_RETRY_RISE) return true;
+        }
+        return false;
+      };
+      const byFinger = new Map<number, DetectedEvent[]>();
+      for (const e of cleaned) {
+        if (!byFinger.has(e.finger)) byFinger.set(e.finger, []);
+        byFinger.get(e.finger)!.push(e);
+      }
+      for (const [fi, list] of byFinger) {
+        if (fi < 0 || fi >= fingers.length) continue;
+        let open = -1;
+        for (const e of list) {
+          if (e.label === "contact_onset") {
+            if (open < 0) open = e.startS;
+            continue;
+          }
+          if (e.label !== "release" && e.label !== "drop") continue;
+          const spanStart = open;
+          open = -1;
+          if (spanStart < 0 || e.label !== "drop") continue;
+          if (
+            spanStart < graspBout.startS - 1e-6 ||
+            e.startS > graspBout.endS + 1e-6
+          ) {
+            continue;
+          }
+          // attempts happen before the task completes
+          if (lastRelease && e.startS >= lastRelease.startS - 1e-6) {
+            continue;
+          }
+          if (!handQuietAfter(e.startS)) continue;
+          if (!jawReopensAfter(e.startS)) continue;
+          let pk = 0;
+          const f = fingers[fi];
+          for (let i = 0; i < n; i++) {
+            if (t[i] < spanStart - 0.05) continue;
+            if (t[i] > e.startS + 0.05) break;
+            if (f.fnRaw[i] > pk) pk = f.fnRaw[i];
+          }
+          const span = `${spanStart.toFixed(1)}-${e.startS.toFixed(1)}s`;
+          if (flags.some((fl) => fl.endsWith(`@${span}`))) continue;
+          flags.push(attemptFlag(spanStart, e.startS, pk));
+        }
       }
     }
   }

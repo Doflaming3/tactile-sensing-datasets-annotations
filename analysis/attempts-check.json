@@ -2,7 +2,7 @@
  {
   "episode": 0,
   "flags": [
-   "failed_attempt@2.2-2.7s"
+   "air_grasp@2.2-2.7s"
   ],
   "ours": 24,
   "theirs": 29,
@@ -502,7 +502,7 @@
   ],
   "ours": 24,
   "theirs": 21,
-  "unchanged": 15,
+  "unchanged": 14,
   "moved": [
    {
     "content": "grasp",
@@ -536,6 +536,10 @@
     "content": "[auto:medium] grasp_stable f0"
    },
    {
+    "t": 8.801302528,
+    "content": "place_release"
+   },
+   {
     "t": 8.922188032,
     "content": "[auto:high] release f0"
    },
@@ -552,6 +556,10 @@
    {
     "t": 7.50351616,
     "content": "[auto:high] grasp_stable f0"
+   },
+   {
+    "t": 9.505694208,
+    "content": "place_release"
    },
    {
     "t": 9.571307008,
@@ -664,6 +672,7 @@
  {
   "episode": 25,
   "flags": [
+   "post_task_contact@14.1-16.6s",
    "weak_contact@1.3-1.8s"
   ],
   "ours": 27,
@@ -682,7 +691,7 @@
     "t": 10.569750016
    },
    {
-    "ours": "[auto:high] contact_onset f1",
+    "ours": "[auto:low] contact_onset f1",
     "theirs": "[auto:medium] contact_onset f1",
     "t": 14.112524544
    }
@@ -701,12 +710,12 @@
     "content": "grasp"
    },
    {
-    "t": 15.53738496,
-    "content": "[auto:medium] grasp_stable f1"
+    "t": 11.681496832,
+    "content": "[auto:high] release f1"
    },
    {
-    "t": 16.303966464,
-    "content": "place_release"
+    "t": 15.53738496,
+    "content": "[auto:low] grasp_stable f1"
    },
    {
     "t": 16.576724736,
@@ -723,8 +732,8 @@
     "content": "[auto:high] slip f1 0.39s"
    },
    {
-    "t": 13.80483968,
-    "content": "place_release"
+    "t": 11.681496832,
+    "content": "[auto:low] drop f1"
    }
   ]
  },
@@ -852,9 +861,9 @@
    "failed_attempt@4.3-5.0s",
    "failed_attempt@6.6-7.1s"
   ],
-  "ours": 29,
+  "ours": 28,
   "theirs": 25,
-  "unchanged": 20,
+  "unchanged": 18,
   "moved": [
    {
     "content": "transport",
@@ -885,8 +894,8 @@
     "content": "[auto:medium] place f1 0.30s"
    },
    {
-    "t": 4.94974208,
-    "content": "[auto:high] place f1 0.08s"
+    "t": 5.030293504,
+    "content": "[auto:low] drop f1"
    },
    {
     "t": 7.040611584,
@@ -899,21 +908,35 @@
    {
     "t": 7.139332864,
     "content": "grasp"
+   },
+   {
+    "t": 7.139332864,
+    "content": "[auto:low] drop f1"
    }
   ],
   "onlyTheirs": [
    {
     "t": 8.366665840148926,
     "content": "grasp"
+   },
+   {
+    "t": 5.030293504,
+    "content": "[auto:high] release f1"
+   },
+   {
+    "t": 7.139332864,
+    "content": "[auto:medium] release f1"
    }
   ]
  },
  {
   "episode": 32,
-  "flags": [],
-  "ours": 22,
+  "flags": [
+   "failed_attempt@4.7-6.5s"
+  ],
+  "ours": 21,
   "theirs": 21,
-  "unchanged": 19,
+  "unchanged": 18,
   "moved": [
    {
     "content": "transport",
@@ -928,23 +951,29 @@
     "content": "grasp"
    },
    {
-    "t": 6.325606656,
-    "content": "[auto:medium] place f1 0.18s"
+    "t": 6.501423872,
+    "content": "[auto:low] drop f1"
    }
   ],
   "onlyTheirs": [
    {
     "t": 4.466667175292969,
     "content": "grasp"
+   },
+   {
+    "t": 6.501423872,
+    "content": "[auto:medium] release f1"
    }
   ]
  },
  {
   "episode": 33,
-  "flags": [],
+  "flags": [
+   "post_task_contact@9.0-10.2s"
+  ],
   "ours": 20,
   "theirs": 16,
-  "unchanged": 15,
+  "unchanged": 14,
   "moved": [
    {
     "content": "transport",
@@ -963,15 +992,24 @@
     "content": "[auto:low] drop f0"
    },
    {
+    "t": 8.10971136,
+    "content": "[auto:high] release f1"
+   },
+   {
     "t": 8.968711168,
-    "content": "[auto:medium] contact_onset f1"
+    "content": "[auto:low] contact_onset f1"
    },
    {
     "t": 10.23584896,
     "content": "[auto:low] drop f1"
    }
   ],
-  "onlyTheirs": []
+  "onlyTheirs": [
+   {
+    "t": 8.10971136,
+    "content": "[auto:low] drop f1"
+   }
+  ]
  },
  {
   "episode": 34,
@@ -1066,7 +1104,7 @@
    "unlabeled_transition@7.0s",
    "weak_contact@1.2-3.1s"
   ],
-  "ours": 14,
+  "ours": 15,
   "theirs": 10,
   "unchanged": 7,
   "moved": [
@@ -1101,8 +1139,12 @@
     "content": "[auto:medium] place f0 0.30s"
    },
    {
+    "t": 8.46407808,
+    "content": "[auto:high] place f1 1.15s"
+   },
+   {
     "t": 9.609099264,
-    "content": "[auto:low] drop f1"
+    "content": "[auto:medium] release f1"
    }
   ],
   "onlyTheirs": []
@@ -1148,31 +1190,13 @@
  },
  {
   "episode": 38,
-  "flags": [
-   "weak_contact@0.3-2.4s"
-  ],
-  "ours": 18,
+  "flags": [],
+  "ours": 14,
   "theirs": 12,
   "unchanged": 10,
   "moved": [],
   "modified": [],
   "onlyOurs": [
-   {
-    "t": 0.293218816,
-    "content": "[auto:medium] contact_onset f1"
-   },
-   {
-    "t": 0.67820544,
-    "content": "[auto:medium] grasp_stable f1"
-   },
-   {
-    "t": 0.67820544,
-    "content": "[auto:medium] place f1 0.30s"
-   },
-   {
-    "t": 2.43883648,
-    "content": "[auto:medium] release f1"
-   },
    {
     "t": 4.210784768,
     "content": "[auto:high] contact_onset f1"
@@ -1267,9 +1291,10 @@
  {
   "episode": 40,
   "flags": [
-   "unlabeled_transition@6.9s"
+   "unlabeled_transition@6.9s",
+   "weak_contact@0.5-1.0s"
   ],
-  "ours": 18,
+  "ours": 20,
   "theirs": 19,
   "unchanged": 15,
   "moved": [
@@ -1281,6 +1306,14 @@
   ],
   "modified": [],
   "onlyOurs": [
+   {
+    "t": 0.481520384,
+    "content": "[auto:medium] contact_onset f1"
+   },
+   {
+    "t": 0.967424512,
+    "content": "[auto:low] drop f1"
+   },
    {
     "t": 3.52864768,
     "content": "[auto:medium] place f0 0.30s"
@@ -1310,7 +1343,7 @@
   "flags": [],
   "ours": 14,
   "theirs": 14,
-  "unchanged": 13,
+  "unchanged": 12,
   "moved": [
    {
     "content": "transport",
@@ -1319,8 +1352,18 @@
    }
   ],
   "modified": [],
-  "onlyOurs": [],
-  "onlyTheirs": []
+  "onlyOurs": [
+   {
+    "t": 7.335036672,
+    "content": "[auto:medium] release f1"
+   }
+  ],
+  "onlyTheirs": [
+   {
+    "t": 7.335036672,
+    "content": "[auto:low] drop f1"
+   }
+  ]
  },
  {
   "episode": 42,
@@ -1411,12 +1454,17 @@
   "flags": [],
   "ours": 13,
   "theirs": 13,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [
    {
     "content": "transport",
     "ours": 4.137317888,
     "theirs": 3.85098752
+   },
+   {
+    "content": "place_release",
+    "ours": 8.307990016,
+    "theirs": 8.704898816
    }
   ],
   "modified": [],
@@ -1471,7 +1519,9 @@
  },
  {
   "episode": 47,
-  "flags": [],
+  "flags": [
+   "failed_attempt@4.0-4.6s"
+  ],
   "ours": 18,
   "theirs": 16,
   "unchanged": 13,
@@ -1515,7 +1565,7 @@
   "flags": [],
   "ours": 19,
   "theirs": 15,
-  "unchanged": 12,
+  "unchanged": 11,
   "moved": [
    {
     "content": "transport",
@@ -1542,6 +1592,10 @@
     "content": "[auto:medium] place f1 0.30s"
    },
    {
+    "t": 12.183033856,
+    "content": "[auto:high] release f1"
+   },
+   {
     "t": 12.204642304,
     "content": "[auto:high] release f0"
    },
@@ -1554,6 +1608,10 @@
    {
     "t": 6.199999809265137,
     "content": "grasp"
+   },
+   {
+    "t": 12.183033856,
+    "content": "[auto:low] drop f1"
    },
    {
     "t": 12.204642304,

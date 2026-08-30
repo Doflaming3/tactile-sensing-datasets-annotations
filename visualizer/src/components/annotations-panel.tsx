@@ -662,66 +662,72 @@ export const AnnotationsPanel: React.FC<Props> = ({ cameraKeys }) => {
 
       {atoms.length === 0 && selectedAtom == null ? (
         <div className="rail-empty" style={{ padding: "28px 16px" }}>
-          No annotations yet, add a text atom above, draw a bbox/keypoint on
-          the video, or click the timeline to place one.
+          No annotations yet, add a text atom above, draw a bbox/keypoint on the
+          video, or click the timeline to place one.
         </div>
       ) : (
-      <div
-        className="workspace inspector-workspace"
-        style={selectedAtom == null ? { gridTemplateColumns: "1fr" } : undefined}
-      >
-        <div className="rail annotation-list">
-          <div className="list-head">
-            <div>
-              <span className="section-kicker">Annotations</span>
-              <p>{atoms.length} atoms in this episode</p>
-            </div>
-            <span className="ts-pill">{fmtTime(currentTime)}</span>
-          </div>
-          {(["persistent", "events"] as const).map((column) => {
-            const colGroups = groups.filter(({ def }) => def.column === column);
-            const total = colGroups.reduce(
-              (n, { entries }) => n + entries.length,
-              0,
-            );
-            if (total === 0) return null;
-            return (
-              <div className="rail-column" key={column}>
-                <div className={`rail-column-head ${column}`}>
-                  <span className="rail-column-title">
-                    {column === "persistent" ? "Persistent" : "Events"}
-                  </span>
-                  <span className="rail-column-sub">
-                    {column === "persistent"
-                      ? "language_persistent · broadcast across every frame"
-                      : "language_events · fire on a single frame"}
-                  </span>
-                </div>
-                {colGroups.map(({ def, entries }) => (
-                  <RailGroup
-                    key={def.key}
-                    title={def.title}
-                    dotClass={def.dotClass}
-                    entries={entries}
-                    currentTime={currentTime}
-                  />
-                ))}
+        <div
+          className="workspace inspector-workspace"
+          style={
+            selectedAtom == null ? { gridTemplateColumns: "1fr" } : undefined
+          }
+        >
+          <div className="rail annotation-list">
+            <div className="list-head">
+              <div>
+                <span className="section-kicker">Annotations</span>
+                <p>{atoms.length} atoms in this episode</p>
               </div>
-            );
-          })}
-        </div>
-
-        {selectedAtom != null && (
-          <div className="editor inspector">
-            <AtomEditor
-              atom={selectedAtom}
-              cameraKeys={cameraKeys}
-              onChange={(updates) => updateAtom(selectedIdx as number, updates)}
-              onDelete={() => deleteAtom(selectedAtom)}
-            />
+              <span className="ts-pill">{fmtTime(currentTime)}</span>
+            </div>
+            {(["persistent", "events"] as const).map((column) => {
+              const colGroups = groups.filter(
+                ({ def }) => def.column === column,
+              );
+              const total = colGroups.reduce(
+                (n, { entries }) => n + entries.length,
+                0,
+              );
+              if (total === 0) return null;
+              return (
+                <div className="rail-column" key={column}>
+                  <div className={`rail-column-head ${column}`}>
+                    <span className="rail-column-title">
+                      {column === "persistent" ? "Persistent" : "Events"}
+                    </span>
+                    <span className="rail-column-sub">
+                      {column === "persistent"
+                        ? "language_persistent · broadcast across every frame"
+                        : "language_events · fire on a single frame"}
+                    </span>
+                  </div>
+                  {colGroups.map(({ def, entries }) => (
+                    <RailGroup
+                      key={def.key}
+                      title={def.title}
+                      dotClass={def.dotClass}
+                      entries={entries}
+                      currentTime={currentTime}
+                    />
+                  ))}
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
+
+          {selectedAtom != null && (
+            <div className="editor inspector">
+              <AtomEditor
+                atom={selectedAtom}
+                cameraKeys={cameraKeys}
+                onChange={(updates) =>
+                  updateAtom(selectedIdx as number, updates)
+                }
+                onDelete={() => deleteAtom(selectedAtom)}
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

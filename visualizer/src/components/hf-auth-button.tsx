@@ -193,7 +193,6 @@ function SignedInMenu({
   );
 }
 
-
 // ---- paste-token fallback (no OAuth configured, e.g. local dev) ------------
 
 function TokenFallback({ variant }: { variant: Variant }) {

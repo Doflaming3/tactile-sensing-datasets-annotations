@@ -884,7 +884,9 @@ async function loadEpisodeDataV3(
             const isSensorArray =
               key.startsWith("observation.sensors.") &&
               feature.shape.length >= 2;
-            return isNumericOrBool && (feature.shape.length <= 1 || isSensorArray);
+            return (
+              isNumericOrBool && (feature.shape.length <= 1 || isSensorArray)
+            );
           })
           .map(([key]) => key),
       ]),

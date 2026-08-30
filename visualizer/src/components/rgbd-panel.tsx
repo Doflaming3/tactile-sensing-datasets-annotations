@@ -52,9 +52,17 @@ function nearestIdx(ts: number[], target: number): number {
 // Google Turbo colormap (Mikhailov 2019 polynomial), 256-entry LUT.
 const TURBO_LUT: Uint8Array = (() => {
   const lut = new Uint8Array(256 * 3);
-  const R = [0.13572138, 4.6153926, -42.66032258, 132.13108234, -152.94239396, 59.28637943];
-  const G = [0.09140261, 2.19418839, 4.84296658, -14.18503333, 4.27729857, 2.82956604];
-  const B = [0.1066733, 12.64194608, -60.58204836, 110.36276771, -89.90310912, 27.34824973];
+  const R = [
+    0.13572138, 4.6153926, -42.66032258, 132.13108234, -152.94239396,
+    59.28637943,
+  ];
+  const G = [
+    0.09140261, 2.19418839, 4.84296658, -14.18503333, 4.27729857, 2.82956604,
+  ];
+  const B = [
+    0.1066733, 12.64194608, -60.58204836, 110.36276771, -89.90310912,
+    27.34824973,
+  ];
   const poly = (c: number[], x: number) =>
     c[0] + x * (c[1] + x * (c[2] + x * (c[3] + x * (c[4] + x * c[5]))));
   for (let i = 0; i < 256; i++) {
@@ -118,8 +126,12 @@ function RgbdCamView({
         return;
       }
       const target = anchor + currentTime * 1e9;
-      const tColor = (nearestIdx(maps.color, target) / CONTAINER_FPS).toFixed(3);
-      const tDepth = (nearestIdx(maps.depth, target) / CONTAINER_FPS).toFixed(3);
+      const tColor = (nearestIdx(maps.color, target) / CONTAINER_FPS).toFixed(
+        3,
+      );
+      const tDepth = (nearestIdx(maps.depth, target) / CONTAINER_FPS).toFixed(
+        3,
+      );
       const base = `/api/videoframe?repo=${encodeURIComponent(repoId)}`;
       setColorUrl(
         `${base}&t=${tColor}&kind=color&path=${encodeURIComponent(`${cleanRoot}/videos/${cam}/color/data.mkv`)}`,
@@ -130,7 +142,8 @@ function RgbdCamView({
         `${base}&t=${tDepth}&kind=depth&w=${DEPTH_W}&h=${DEPTH_H}&path=${encodeURIComponent(`${cleanRoot}/videos/${cam}/depth/data.mkv`)}`,
       )
         .then(async (res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+          if (!res.ok)
+            throw new Error(`HTTP ${res.status}: ${await res.text()}`);
           const buf = await res.arrayBuffer();
           const d = new Uint16Array(buf);
           const canvas = canvasRef.current;
@@ -240,9 +253,10 @@ export function RgbdStreamView({
     rangeRef.current = null;
     let cancelled = false;
     (async () => {
-      const rel = kind === "depth"
-        ? `videos/${cam}/depth/timestamp.csv`
-        : `videos/${cam}/timestamp.csv`;
+      const rel =
+        kind === "depth"
+          ? `videos/${cam}/depth/timestamp.csv`
+          : `videos/${cam}/timestamp.csv`;
       const ts = await fetchTsColumn(buildVersionedUrl(repoId, "v3.0", rel));
       if (!cancelled && ts?.length) mapRef.current = ts;
     })();
@@ -281,7 +295,8 @@ export function RgbdStreamView({
           if (!canvas || d.length < DEPTH_W * DEPTH_H) return;
           if (!rangeRef.current) {
             const valid: number[] = [];
-            for (let i = 0; i < d.length; i += 149) if (d[i] > 0) valid.push(d[i]);
+            for (let i = 0; i < d.length; i += 149)
+              if (d[i] > 0) valid.push(d[i]);
             valid.sort((a, b) => a - b);
             rangeRef.current = [
               valid[Math.floor(valid.length * 0.02)] ?? 0,
@@ -375,8 +390,11 @@ export function useRgbdCams(repoId: string, root?: string | null) {
         if (m) found.add(m[1]);
       }
       const wristTs = await fetchTsColumn(
-        buildVersionedUrl(repoId, "v3.0",
-          "videos/observation.images.wrist/timestamp.csv"),
+        buildVersionedUrl(
+          repoId,
+          "v3.0",
+          "videos/observation.images.wrist/timestamp.csv",
+        ),
       );
       if (cancelled) return;
       setCams([...found].sort());
@@ -421,8 +439,11 @@ export default function RgbdPanel({
         if (m) found.add(m[1]);
       }
       const wristTs = await fetchTsColumn(
-        buildVersionedUrl(repoId, "v3.0",
-          "videos/observation.images.wrist/timestamp.csv"),
+        buildVersionedUrl(
+          repoId,
+          "v3.0",
+          "videos/observation.images.wrist/timestamp.csv",
+        ),
       );
       if (cancelled) return;
       setCams([...found].sort());

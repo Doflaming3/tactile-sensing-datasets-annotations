@@ -93,7 +93,9 @@ async function pruneCache() {
   }
 }
 
-function runFfmpeg(args: string[]): Promise<{ code: number; out: Buffer; err: string }> {
+function runFfmpeg(
+  args: string[],
+): Promise<{ code: number; out: Buffer; err: string }> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     const err: Buffer[] = [];
@@ -160,15 +162,27 @@ export async function GET(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   let local: string;
   try {
-    local = await cachedDownload(`${HF}/${repo}/resolve/main/${relPath}`, token);
+    local = await cachedDownload(
+      `${HF}/${repo}/resolve/main/${relPath}`,
+      token,
+    );
   } catch (e) {
     return new Response(`download failed: ${String(e).slice(0, 200)}`, {
       status: 502,
     });
   }
 
-  const args = ["-hide_banner", "-loglevel", "error",
-                "-ss", t.toFixed(3), "-i", local, "-frames:v", "1"];
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-ss",
+    t.toFixed(3),
+    "-i",
+    local,
+    "-frames:v",
+    "1",
+  ];
   if (kind === "depth") {
     args.push("-f", "rawvideo", "-pix_fmt", "gray16le", "pipe:1");
   } else {
@@ -187,6 +201,9 @@ export async function GET(req: NextRequest) {
             "x-height": String(h),
             "cache-control": "private, max-age=3600",
           }
-        : { "content-type": "image/jpeg", "cache-control": "private, max-age=3600" },
+        : {
+            "content-type": "image/jpeg",
+            "cache-control": "private, max-age=3600",
+          },
   });
 }

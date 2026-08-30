@@ -407,7 +407,9 @@ export const SimpleVideosPlayer = ({
                   </button>
                 </span>
               </p>
-              <div className={`relative w-full ${fill ? "flex-1 min-h-0" : ""}`}>
+              <div
+                className={`relative w-full ${fill ? "flex-1 min-h-0" : ""}`}
+              >
                 <video
                   ref={videoRefCallbacksRef.current[idx]}
                   className={`w-full object-contain ${
