@@ -69,13 +69,19 @@ How every rule was set, in one paragraph: we state the rule as physics or task l
 
 ### 3.1 Zeroing the sensors
 
-The firmware zeroes the sensors once per session, so later episodes read force while touching nothing. Our rule: before the jaw closes for the first time, the hand cannot be holding anything — so everything the sensor reads in that window is its true zero (we take the median). After that, the zero keeps following the signal whenever the finger is quiet (under 1 newton) and freezes the moment force rises, so real grip force is never absorbed.
+The firmware zeroes the sensors once per session, so later episodes read force while touching nothing. Two mechanisms fix that, and both work per taxel: each of the 52 sensing points on each finger keeps its own zero.
 
-How it was set: we also tried more aggressive zeroing (following the signal whenever the jaw was open), and it ate the tails of real releases, moving video-verified boundaries by up to 1.4 seconds. Both aggressive variants were reverted; that evidence is the core of the recorder request.
+First, the starting zero. From the start of the episode until the jaw first closes — "closes" meaning its position drops 2 units below the most-open position it has reached, a position test, not a speed test — the hand cannot be holding anything. Whatever each taxel reads in that window is offset, and its median becomes that taxel's zero.
+
+Second, drift tracking. After that, the zero keeps slowly following the signal (a time constant of 1.5 seconds), but only while the finger is quiet: quiet means the finger's total corrected force (the sum over its taxels after zero subtraction, checking both the normal push and the sideways shear) stays under 1 newton. The moment that total reaches 1 newton, the zero freezes where it is, and stays frozen until the finger is quiet again. The freeze is the guarantee that real grip force is never absorbed into the zero.
+
+How it was set: the known cost of the quiet rule is that a touch creeping in slower than the tracker, never exceeding about 1 newton, is absorbed as drift; fast touches keep full sensitivity. We also tried more aggressive zeroing (following the signal whenever the jaw was open), and it ate the tails of real releases, moving video-verified boundaries by up to 1.4 seconds. Both aggressive variants were reverted; that evidence is the core of the recorder request.
 
 ### 3.2 Touching and letting go
 
 A finger counts as touching when its total force stays above 0.15 newtons for a fifth of a second, and as having let go when force stays below 0.10 newtons for three tenths. The gap between the two levels and the hold times exist so approach brushes and single-frame sensor dropouts cannot create fake touch events.
+
+These thresholds apply to the corrected force, after the zero from 3.1 is subtracted — 0.15 newtons means 0.15 above the finger's own current zero. The two processes cannot fight each other: the zero drifts on a 1.5 second time constant while a real touch crosses the threshold within a couple of frames, and once force passes 1 newton the zero is frozen anyway.
 
 ### 3.3 Release or drop
 
@@ -135,10 +141,10 @@ When the recorded outcome says failure but the touch data looks like a complete 
 
 ## 6. Limits and next steps
 
-1. Recall is un-audited: verification pressure went into false events and wrong labels; missed events surface only by watching (one known example is documented).
-2. Rotation and lift detection are ineffective on this data; rotation needs a pattern-based redesign (calibration episode identified), lift never fires on the light foam object.
-3. Before use on other datasets: check the structural preconditions, re-run the calibration censuses, re-derive every constant.
-4. Next: the merge conversation (evidence package complete in `analysis/`), multi-cycle support for company-format data, the pattern-based rotation detector.
+1. We audited hard for false events, meaning events that should not be there. We have not systematically audited for missed events, meaning ones the detector should have found but did not. Those only show up when someone watches an episode. So if an episode looks thin on markers, suspect a miss first; we have one documented example.
+2. Two detectors do not really work on this data. Lift never fires, because the foam ball is too light to leave a force signature. Rotation fired once in 63 episodes, and when we found a real rotation on video, its torque spike was smaller than what ordinary handling produces in other episodes, so no threshold can fix it; rotation needs a smarter pattern-based detector, and we know exactly which episode to build it against.
+3. The rules are tuned for this robot and this dataset. On new data, three steps come before trusting anything: check the assumptions (one task per episode, jaw starting open, same sign conventions, clocks agreeing), rerun our measurement scripts on the new corpus, and re-derive every number the same way we derived it here.
+4. Coming next: the merge-back conversation with the evidence package we assembled, support for episodes with several pick-and-place cycles (the company data will have them), and the pattern-based rotation detector.
 
 ## Notation, units and abbreviations
 
