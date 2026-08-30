@@ -763,3 +763,38 @@ result_partial (no attempt flags — what happened?), ep56
 result_partial (consistent with its flagged trial-1). ep45 unflagged
 (the signal-side override already suppressed its template; metadata
 agrees).
+
+### Addendum 6m: Zheng's outcome-sweep verdicts — two new hygiene rules, two honest walls
+
+Verdicts: ep48 = unstable grasp (our slips correct), terminal "release"
+is really the foam cup ROTATING out of the bowl; ep51 = edge-grip
+"hug" carry dropped onto the bowl (result_partial covers); ep55 =
+nothing special on video despite her "partial" (metadata tension
+recorded); ep20 @4.40 place = false (still holding); ep56 @6.62 place
+= trial-1 jaw-open decay; ep1 D2-deletion confirmed correct.
+
+Measurements and what shipped:
+- Hygiene D6: no placement before the grasp bout (nothing was carried)
+  — kills exactly ep56 @6.62.
+- Hygiene D7: a real placement either unloads the finger promptly or
+  coincides with the jaw starting to open (measured +4.2 ep50's real
+  staged place, +15.3 ep24) — a dip with the jaw closed and the carry
+  continuing >=1 s is grip fluctuation (ep20: net -0.6, video: still
+  holding). Kills exactly ep20 @4.40. NOTE: Zheng's guessed mechanism
+  ("grippers open a little") was inverted by measurement — the jaw did
+  NOT open at ep20's dip; jaw opening is what REAL late places show.
+- ep20 recall note: the FP had suppressed the real backfill place near
+  its 6.09 release (2 s hasPlace window); deleting at hygiene time
+  cannot retroactively backfill — known miss.
+Two honest walls, recorded not hacked:
+- ep48's rotation IS in the data (tauZ spike to 15 N*mm at 12.0 s,
+  exactly at the cup's turn-out) but corpus per-episode max|tauZ| runs
+  30-48 N*mm in episodes with NO rotation — amplitude cannot separate;
+  the rotation detector needs a pattern-based v2 (sustained monotone
+  spin), with ep48 as its calibration episode. Also: the corpus's
+  smallest-travel "release" (2.8 u, ep48) is video-judged a failure
+  exit, so the release-travel calibration's "real minimum" is actually
+  ep42's 3.6 u — threshold 2.0 unchanged (churn max 0.7).
+- ep48's pre-grasp light touch produced ZERO signal (fnRaw < 0.05 N,
+  both fingers, 0-7 s): the sensor never saw it — third sensor-blind
+  exhibit (ep16 edge, ep40 pinch) for the Jingyi package.

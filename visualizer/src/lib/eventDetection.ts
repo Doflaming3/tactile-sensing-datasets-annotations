@@ -2042,6 +2042,16 @@ export function detectEvents(
   //  D4 inside an air_grasp span: nothing was held (ep0 @2.70)
   //  D5 starting >1.5 s after the place_release anchor: post-task
   //     artifact (ep28 @15.0, ep40 @8.7)
+  //  D6 ending before the grasp bout: the object was never carried, so
+  //     nothing could be placed (ep56 @6.62 — trial-1's jaw-open decay
+  //     backfilled as a "place"; Zheng video-verified)
+  //  D7 no jaw opening around the place AND the hold continues >=1 s:
+  //     a real placement either unloads the finger promptly (weight
+  //     transferred: ep25/ep33) or coincides with the jaw starting to
+  //     open (release beginning: measured +4.2 on ep50's real staged
+  //     place, +15.3 on ep24); a dip with the jaw closed and the carry
+  //     continuing is grip fluctuation (ep20 @4.40: jaw net -0.6,
+  //     Zheng video: still holding the ball)
   const deletedPlaces = new Set<DetectedEvent>();
   {
     const placeRelSub = subtasks.find((s) => s.label === "place_release");
@@ -2085,6 +2095,10 @@ export function detectEvents(
           deletedPlaces.add(p);
           continue;
         }
+        if (graspBout && p.endS < graspBout.startS - 1e-6) {
+          deletedPlaces.add(p);
+          continue;
+        }
         const nextTerm = cleaned.find(
           (x) =>
             x.finger === fi &&
@@ -2092,6 +2106,15 @@ export function detectEvents(
             x.startS >= p.endS - 0.25,
         );
         if (nextTerm && nextTerm.label === "drop") {
+          deletedPlaces.add(p);
+          continue;
+        }
+        if (
+          gripper &&
+          nextTerm &&
+          nextTerm.startS - p.endS >= 1.0 &&
+          jawPosAt(p.endS + 0.3) - jawPosAt(p.startS - 0.3) < 1.0
+        ) {
           deletedPlaces.add(p);
           continue;
         }
