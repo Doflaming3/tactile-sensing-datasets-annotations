@@ -26,11 +26,17 @@ for ep_str, m in sorted(meta.items(), key=lambda x: int(x[0])):
     if ep not in rows:
         continue
     flags = rows[ep]["flags"]
-    detected = 1 + sum(
+    n_flags = sum(
         1
         for f in flags
         if f.startswith("failed_attempt") or f.startswith("possible_attempt")
     )
+    # The base 1 stands for the FINAL engagement (the successful grab on
+    # success episodes, the last try on failures). On failure episodes
+    # whose terminal loss is itself flagged (squeeze-through / air-miss
+    # detectors), the base would double-count that same try.
+    base = 0 if (m.get("result") == "failure" and n_flags > 0) else 1
+    detected = base + n_flags
     hers = m.get("attempts", 1)
     total += 1
     if detected == hers:

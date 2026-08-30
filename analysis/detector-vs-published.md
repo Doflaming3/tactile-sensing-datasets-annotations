@@ -635,3 +635,36 @@ post-place absorption was tried twice and reverted — the real
 slow-unload class (ep50, 0.95 s lag, video-verified) and the residual
 class (1.16-1.27 s) OVERLAP in time; separation is impossible at any
 threshold, not a noise-amplitude issue.
+
+### Addendum 6h: air_grasp taxonomy collapsed (Zheng's ep16 verdict)
+
+ep16's "air_grasp" cycle was a real failed attempt (the edge-catch try
+itself) — the two-meaning air_grasp label is retired. Now: a no-touch
+close-reopen cycle = FAILED_ATTEMPT (merged into one span with a
+contiguous <=0.5 s touch-attempt: ep16 graze+whiff = one try
+@2.6-4.1; ep22 @2.9-5.3; ep45's standalone air-miss stands alone).
+air_grasp survives ONLY for the pads-meet case (jaw at mechanical
+floor, ep0) — the one physically distinct outcome. check_attempts base
+made result-aware (a failure episode whose terminal loss is itself
+flagged would double-count). Attempts 55/59, same four all-video-
+explained disagreements. Also verified for Zheng's generic-rules
+question: zero episode-conditionals in the detector — all 55 "epN"
+mentions are provenance comments; the risk is threshold calibration on
+few verdicts, not hidden code.
+
+### Addendum 6i: failure override + chronological flags (Zheng's ep45 round)
+
+Flag ordering was pipeline-pass order, not time order (ep45's
+squeeze-through pass ran before its air-miss pass, so the later flag
+listed first — looked hand-appended, was not); flags now sort
+chronologically at return. And the first slice of result-aware
+segmentation shipped, signal-side: an episode with NO release anywhere
+whose final loss is itself flagged as a failed attempt never completed
+a task — the success template is suppressed and approach spans the
+episode, attempts staying visible as flags. Fires on exactly ep45
+corpus-wide; ep40 (release-less sensor-blind SUCCESS) is protected
+because its residual drop carries no attempt flag; ep39
+(failure-by-wrong-location but tactilely complete, per Zheng) keeps
+the template correctly. Sweep verdicts recorded: ep16/22/45/0/25/33/37
+all correct, ep7/13 clean. The metadata-driven general case of
+result-aware segmentation remains the open structural item.

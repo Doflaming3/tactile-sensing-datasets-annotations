@@ -341,8 +341,7 @@
  {
   "episode": 16,
   "flags": [
-   "failed_attempt@2.6-2.8s",
-   "air_grasp@3.0-4.1s"
+   "failed_attempt@2.6-4.1s"
   ],
   "ours": 17,
   "theirs": 15,
@@ -456,8 +455,8 @@
  {
   "episode": 21,
   "flags": [
-   "unlabeled_transition@9.8s",
-   "failed_attempt@3.8-4.5s"
+   "failed_attempt@3.8-4.5s",
+   "unlabeled_transition@9.8s"
   ],
   "ours": 21,
   "theirs": 19,
@@ -499,8 +498,7 @@
  {
   "episode": 22,
   "flags": [
-   "failed_attempt@2.9-3.1s",
-   "air_grasp@3.1-5.3s"
+   "failed_attempt@2.9-5.3s"
   ],
   "ours": 24,
   "theirs": 21,
@@ -674,8 +672,8 @@
  {
   "episode": 25,
   "flags": [
-   "post_task_contact@14.1-16.6s",
-   "weak_contact@1.3-1.8s"
+   "weak_contact@1.3-1.8s",
+   "post_task_contact@14.1-16.6s"
   ],
   "ours": 27,
   "theirs": 24,
@@ -1103,8 +1101,8 @@
  {
   "episode": 36,
   "flags": [
-   "unlabeled_transition@7.0s",
-   "weak_contact@1.2-3.1s"
+   "weak_contact@1.2-3.1s",
+   "unlabeled_transition@7.0s"
   ],
   "ours": 15,
   "theirs": 10,
@@ -1293,8 +1291,8 @@
  {
   "episode": 40,
   "flags": [
-   "unlabeled_transition@6.9s",
-   "weak_contact@0.5-1.0s"
+   "weak_contact@0.5-1.0s",
+   "unlabeled_transition@6.9s"
   ],
   "ours": 20,
   "theirs": 19,
@@ -1476,28 +1474,15 @@
  {
   "episode": 45,
   "flags": [
-   "failed_attempt@6.5-7.6s",
-   "air_grasp@3.4-4.1s"
+   "failed_attempt@3.4-4.1s",
+   "failed_attempt@6.5-7.6s"
   ],
-  "ours": 12,
+  "ours": 9,
   "theirs": 10,
   "unchanged": 9,
   "moved": [],
   "modified": [],
-  "onlyOurs": [
-   {
-    "t": 5.6681536,
-    "content": "grasp"
-   },
-   {
-    "t": 7.90219392,
-    "content": "transport"
-   },
-   {
-    "t": 8.8058126592,
-    "content": "place_release"
-   }
-  ],
+  "onlyOurs": [],
   "onlyTheirs": [
    {
     "t": 3.368667904,

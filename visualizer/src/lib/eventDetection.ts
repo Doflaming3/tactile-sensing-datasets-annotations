@@ -30,7 +30,13 @@ export type EventLabel =
   | "rotation"
   | "place"
   | "release"
-  | "drop";
+  | "drop"
+  // real names (Zheng's marker-honesty pass): assigned by the rename
+  // pass at the END of detection, purely output-semantic — every
+  // anchor, bout, flag and gate is computed before any rename.
+  | "finger_unload" // real force exit while the HAND still holds
+  | "sensor_residual" // terminal lagging the hand's release: sensor discharge
+  | "phantom"; // post-task-gate classified, video-verified not-contact
 
 export type SubtaskLabel = "approach" | "grasp" | "transport" | "place_release";
 
@@ -1322,6 +1328,11 @@ export function detectEvents(
     place: 3,
     release: 4,
     drop: 4,
+    // rename-pass labels — never present during cleanup (assigned at
+    // the very end), listed only for Record completeness
+    finger_unload: 4,
+    sensor_residual: 4,
+    phantom: 4,
   };
   const cleaned: DetectedEvent[] = [];
   const perFinger = new Map<number, RawEvent[]>();
@@ -1355,6 +1366,9 @@ export function detectEvents(
   // chain. Downgrade every event of such a span to low confidence and
   // flag it. (Multi-cycle tasks with real re-grabs would need a
   // jaw-closing check here before this gate is applied to them.)
+  // Gate-classified events are renamed to "phantom" by the rename pass
+  // at the END (renaming here would corrupt bout building).
+  const phantomEvents = new Set<DetectedEvent>();
   {
     const taskDoneByFinger = new Map<number, number>();
     // The finger's FINAL place must be computed over the full list before
@@ -1387,6 +1401,7 @@ export function detectEvents(
         }
         if (spanStart !== null) {
           e.confidence = "low";
+          phantomEvents.add(e);
           spanEnd = Math.max(spanEnd, e.endS);
         }
       }
@@ -1951,9 +1966,29 @@ export function detectEvents(
         // in the first second), not grab attempts
         const pastReset = peakT >= 2.0;
         if (cycleEndsPreGrasp && !touched && pastReset) {
-          const span = `${peakT.toFixed(1)}-${reopenT.toFixed(1)}s`;
-          if (!flags.some((fl) => fl.endsWith(`@${span}`))) {
-            flags.push(`air_grasp@${span}`);
+          // a no-touch close-reopen cycle is a FAILED ATTEMPT, not its
+          // own category (Zheng: ep45's air-miss and ep16's edge-whiff
+          // are both tries — the signal cannot tell "closed past the
+          // ball's edge" from "closed on pure air"). A cycle contiguous
+          // (<=0.5 s) with a touch-attempt span is the SAME attempt
+          // whiffing on: merge into one span instead of double-flagging
+          // (ep16: graze 2.6-2.8 + whiff 3.0-4.1 = one attempt).
+          const mIdx = flags.findIndex((fl) => {
+            const m = /^(failed_attempt|weak_contact)@([\d.]+)-([\d.]+)s$/.exec(
+              fl,
+            );
+            return m !== null && Math.abs(peakT - Number(m[3])) <= 0.5;
+          });
+          if (mIdx >= 0) {
+            const m = /@([\d.]+)-/.exec(flags[mIdx]);
+            if (m) {
+              flags[mIdx] = `failed_attempt@${m[1]}-${reopenT.toFixed(1)}s`;
+            }
+          } else {
+            const span = `${peakT.toFixed(1)}-${reopenT.toFixed(1)}s`;
+            if (!flags.some((fl) => fl.endsWith(`@${span}`))) {
+              flags.push(`failed_attempt@${span}`);
+            }
           }
         }
         peak = gp[j];
@@ -1961,6 +1996,115 @@ export function detectEvents(
       }
     }
   }
+
+  // Result-aware failure override, signal-side: an episode with NO
+  // release anywhere, whose final loss is itself flagged as a failed
+  // attempt, never completed a task — the success template
+  // (grasp/transport/place_release) is false there (Zheng, ep45: two
+  // failed attempts and nothing else). Approach spans the episode; the
+  // attempts stay visible as flags. A sensor-blind success that is also
+  // release-less (ep40: the carry is invisible at 0.1 N) is protected:
+  // its residual drop is not flagged as an attempt.
+  const anyRelease = cleaned.some((e) => e.label === "release");
+  if (!anyRelease && subtasks.length > 1) {
+    const lastTerminal = [...cleaned].reverse().find((e) => e.label === "drop");
+    const lossFlagged =
+      lastTerminal !== undefined &&
+      flags.some((fl) => {
+        const m = /^failed_attempt@([\d.]+)-([\d.]+)s$/.exec(fl);
+        return (
+          m !== null &&
+          lastTerminal.startS >= Number(m[1]) - 0.05 &&
+          lastTerminal.startS <= Number(m[2]) + 0.05
+        );
+      });
+    if (lossFlagged) {
+      subtasks.length = 0;
+      subtasks.push({ label: "approach", startS: 0, endS: dur });
+    }
+  }
+
+  // ---- real names for the markers (Zheng's marker-honesty ruling).
+  // Runs LAST: every anchor, bout, flag and gate was computed on the
+  // original labels, so renames are output semantics only.
+  // 1. Gate-classified post-task chains -> "phantom" (ep25's tail).
+  // 2. The HAND's release is the one at the jaw opening — the first
+  //    release at/after the place_release anchor. A release well before
+  //    it, with the partner still holding, is a FINGER_UNLOAD: real
+  //    signal, but the object was not released (ep33 @8.11 — "the
+  //    gripper was still holding the ball"; ep25 @11.68; ep50 @12.18,
+  //    all video-verified). A terminal well after it whose contact
+  //    predates it is a SENSOR_RESIDUAL — the non-re-zeroed sensor
+  //    discharging (ep36 @9.61, ep41 @7.34, ep22 @10.76,
+  //    video-verified).
+  for (const e of cleaned) {
+    if (phantomEvents.has(e)) {
+      e.info = `was ${e.label}`;
+      e.label = "phantom";
+    }
+  }
+  const placeRel = subtasks.find((s) => s.label === "place_release");
+  const handRelease = placeRel
+    ? cleaned.find(
+        (e) => e.label === "release" && e.startS >= placeRel.startS - 0.3,
+      )
+    : undefined;
+  if (handRelease) {
+    const partnerHolding = (fi: number, tq: number): boolean => {
+      for (const c of cleaned) {
+        if (c.finger === fi || c.finger < 0) continue;
+        if (c.startS >= tq) break;
+        // walking in time order: the partner holds if its latest
+        // engagement-opening precedes tq with no terminal in between
+      }
+      let lastOn = -1;
+      let lastEx = -1;
+      for (const c of cleaned) {
+        if (c.finger === fi || c.startS >= tq) continue;
+        if (c.label === "contact_onset") lastOn = Math.max(lastOn, c.startS);
+        if (c.label === "release" || c.label === "drop") {
+          lastEx = Math.max(lastEx, c.startS);
+        }
+      }
+      return lastOn >= 0 && lastOn > lastEx;
+    };
+    for (const e of cleaned) {
+      if (e.label === "release" && e.startS < handRelease.startS - 0.3) {
+        if (partnerHolding(e.finger, e.startS)) {
+          e.info = "hand still holding";
+          e.label = "finger_unload";
+        }
+      } else if (
+        (e.label === "release" || e.label === "drop") &&
+        e !== handRelease &&
+        e.startS > handRelease.startS + 0.5
+      ) {
+        let ownOnset = -1;
+        for (const c of cleaned) {
+          if (
+            c.finger === e.finger &&
+            c.label === "contact_onset" &&
+            c.startS < e.startS &&
+            c.startS > ownOnset
+          ) {
+            ownOnset = c.startS;
+          }
+        }
+        if (ownOnset >= 0 && ownOnset <= handRelease.startS) {
+          e.info = "sensor not re-zeroed";
+          e.label = "sensor_residual";
+        }
+      }
+    }
+  }
+
+  // flags in chronological order — they are appended in pipeline-pass
+  // order, which put ep45's air-miss after its later squeeze-through
+  const flagTime = (fl: string): number => {
+    const m = /@([\d.]+)/.exec(fl);
+    return m ? Number(m[1]) : Infinity;
+  };
+  flags.sort((a, b) => flagTime(a) - flagTime(b));
 
   return { subtasks, events: cleaned, flags };
 }
