@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-We optimized the tactile auto-annotation pipeline for the SoTac dataset in an independent repository, without touching the original code or data, for a single reviewed merge at the end. Every rule in the detector is a generic physical or task-logic rule; there are no per-episode conditionals (verified: all 55 episode references in the detector file are provenance comments). Rules were developed in a fixed loop: propose a physical rule, measure every instance across all 63 episodes, place thresholds inside measured margins, then verify the borderline cases on video before keeping the rule.
+We optimized the tactile auto-annotation pipeline for the SoTac dataset in an independent repository, without touching the original code or data, for a single reviewed merge at the end. Every rule in the detector is a generic physical or task-logic rule; there are no per-episode conditionals (verified: all 55 episode references in the detector file are provenance comments).
 
 Headline numbers: attempt counts now match the hand-recorded metadata on 55 of 59 episodes, and all four remaining disagreements are errors in the metadata itself, proven by video. The place-event census went from 130 events to 107 after five artifact classes were removed on physical grounds. Thirteen markers received honest names (finger unload, sensor residual, phantom). The unit test suite is 162 tests, all passing.
 
@@ -11,132 +11,138 @@ Headline numbers: attempt counts now match the hand-recorded metadata on 55 of 5
 1. Data: pinned local mirrors of both datasets (main table at 30 Hz plus raw 91 Hz sensor sidecar files per episode).
 2. Detector: one shared implementation drives the web visualizer and an offline runner, validated bit-exact against the app.
 3. Verification loop: the offline runner replays all 63 episodes per change; every corpus-wide diff is enumerated before a change is kept; video verdicts arbitrate.
-4. Recording policy: the visualizer displays every sensor-true marker; the saved annotation set keeps only real events (phantom and sensor-residual markers are excluded at save time).
+4. Recording policy: the visualizer displays every sensor-true marker; the saved annotation set keeps only real events.
 
 ## 2. Demo script
 
-Launch: `cd visualizer` then `bun --bun run dev --port 3005`, open `http://localhost:3005`, open the dataset, pick an episode, press Auto-label.
+Launch: `cd visualizer`, then `bun --bun run dev --port 3005`, open `http://localhost:3005`, pick the episode, press Auto-label. Six episodes, each making one point. For each: what to show, what to say, and what on screen may look wrong — with the answer.
 
-1. `ep24` — the clean full story. A fumbled first touch is flagged `weak_contact@4.7-5.2s`, the lost graze is a drop at 5.23, grasp starts at 5.30, transport at 6.61, place and release end the task at 10.97-11.57. Show the four-phase segmentation, the event timeline, the three-dimensional force arrows, and the live threshold sliders.
-2. `ep45` — a failure episode. The success template is suppressed (approach spans the episode) and the two real failed attempts are flags: an air-miss at 3.4-4.1 (the jaw closed 13 units into empty air and reopened) and the terminal loss at 6.5-7.6 (the jaw squeezed 17 units below its own hold width with zero force).
-3. `ep25` — honest marker names. Finger 1 truly unloads at 11.68 while the hand still holds (`finger_unload`); the post-task chain at 14.1-16.6 is `phantom`; the recorded annotation set excludes the phantom chain while keeping finger 0's real release inside the same span.
-4. `ep47` — the recorder evidence. A wandering 0.8-1.8 newton phantom on finger 0 spans the whole episode; three software removal attempts failed on measured evidence, which is the case for a per-episode re-zero in the recorder.
-5. `ep48` — the special one. Unstable grasp with five slip events, then the foam cup rotates out of the bowl: the spin-torque channel spikes to 15 newton-millimeters at exactly 12.0 seconds. Amplitude cannot separate this rotation from routine handling (episodes with no rotation reach 30-48), so rotation detection is a planned pattern-based redesign with this episode as its calibration case.
-6. `ep0` — quick close: the jaw bottoms out at position 0.5, the only sub-2.0 dwell in the corpus, and the pads touching each other are flagged `air_grasp`.
+### 2.1 `ep24` — what the annotator does on a normal episode
 
-## 3. How rules are set
+Show: the four-phase segmentation, the event timeline, the three-dimensional force arrows while scrubbing, then click "tune thresholds" in the Auto-label panel (right column) and drag a slider to recompute live.
 
-The method is the same for every rule.
+Say: "This is the default behavior. The robot fumbles its first touch — the system flags that span as a weak contact and marks the lost touch as a drop. The real grasp starts where the jaw closes on the ball, transport starts where the arm actually lifts it, and the place-release phase closes the task. Everything recomputes live when I change a threshold."
 
-1. State the rule as physics or task logic, never as a dataset pattern.
-2. Run a census: measure the quantity for every instance in all 63 episodes (the census scripts are in `scripts/calibration/` and double as the porting protocol for new datasets).
-3. Place the threshold inside the measured margin between the two classes, not at either edge.
-4. Hand the members nearest the line to video review; a verdict against the rule re-opens the rule, not just the number.
+Heads-up: the fumble's markers are visible on the timeline but are excluded from saved annotations — displays show sensor truth, recordings keep real events. That split is deliberate and comes up again on `ep25`.
 
-Portability has three tiers, documented in `analysis/portability.md`. Tier 1 is pure logic and ports as-is. Tier 2 is calibration constants: the rule ports, the number is re-derived per rig by re-running the census. Tier 3 is structural preconditions to check before porting: single-cycle episodes, jaw starting open, sign conventions, clock agreement.
+### 2.2 `ep45` — what happens when the task fails
 
-## 4. The rules
+Show: the timeline has no grasp, transport, or place-release segments; two flags carry the story.
 
-### 4.1 Baseline (software re-zero)
+Say: "Before, every episode got the same success story of grasp, transport, and place, even when nothing was ever picked up. Now the annotator recognizes there was no completed task: the whole episode is approach, plus two failed-attempt flags. And the flags match the video exactly: first the gripper closes on empty air and reopens — a miss; then it grabs the cup, loses it, and squeezes shut through the space where the cup was — 17 units below its own holding width, with zero force on the pads."
 
-| Condition | How it was set |
-|---|---|
-| `per-taxel zero = median over the approach plateau` | The firmware zeroes once per session, so later episodes start with standing offsets. Nothing can be grasp-loaded before the jaw first closes, so the median over that whole window is a safe zero; the plateau ends at the first 2-unit closing from the jaw's running maximum, because episodes can begin with the jaw mid-closed from the previous reset. |
-| `track the zero while idle (< 1 N, time constant 1.5 s); freeze under load` | Tracking absorbs slow drift; freezing guarantees grip force is never absorbed. Two aggressive variants (tracking during jaw-open windows) were reverted after they shifted video-anchored boundaries by up to 1.4 seconds. |
+Heads-up: contact and stable-grip markers are still visible inside the attempt spans. That is sensor truth (the pads really touched); the interpretation — failed attempt — is carried by the flags.
 
-### 4.2 Contact
+### 2.3 `ep25` — markers that say what they mean
 
-| Condition | How it was set |
-|---|---|
-| `enter: force > 0.15 N sustained 0.2 s` | Above the sensor noise floor; the debounce stops approach brushes from spamming contact-drop pairs. |
-| `exit: force < 0.10 N sustained 0.3 s` | Hysteresis below the entry level; the debounce filters single-frame firmware dropouts. |
+Show: the marker at 11.68 named `finger_unload`, the chain at 14.1-16.6 named `phantom`, then the annotations list after auto-label.
 
-### 4.3 Release against drop
+Say: "Every marker is what the sensor reported, but not everything the sensor reports is real, and the names now say which is which. At 11.68 one finger genuinely unloads while the hand is still holding the ball. That used to say release, which overstates it; now it says finger unload. After the task ends, the pads keep reporting force while touching nothing — those markers say phantom. The display shows all of it; the saved annotations keep the real events and drop the phantoms."
 
-| Condition | How it was set |
-|---|---|
-| `release: net jaw opening >= 2 units over [-0.5 s, +1.0 s] around the exit` | An audit of all 150 terminal events showed instantaneous velocity misses real releases (twin fingers exiting 0.02 s apart: one caught, one missed). Net travel keeps retry churn as drops (the jaw jiggles open but closes overall: measured -13, -15, -7 units). Margin: churn maximum +0.7 against real minimum +3.6 units. |
-| `closing veto: no release if the jaw closed > 1 unit in the prior 0.5 s` | Video verdict on `ep47`: the ball escaped while the jaw clamped, and the retry's re-open (+22.8 units) landed inside the forward window. An object that leaves during clamping was never released. |
-| `early peel: an exit while the partner still holds, with the partner's jaw-visible release within 3 s` | One finger can unload before the hand releases; the partner's later jaw-visible release corroborates it. Guarded by requiring a stable hold in that same contact span and no re-contact within 1.5 s (a fumble re-grabs in 0.1 s). |
-| `place context is never consulted` | The original rule "a place just happened, so call it a release" was circular (place is reconstructed from releases) and produced two video-verified false releases before removal. |
+Heads-up: if someone asks why we keep phantom markers visible at all — because the reviewer needs to see what the sensor claimed to trust what the annotator excluded.
 
-### 4.4 Marker names
+### 2.4 `ep47` — the case for a recorder change
 
-| Condition | How it was set |
-|---|---|
-| `the hand's release = the first release at or after the place-release anchor (the jaw opening)` | Video ruling on `ep33`: one finger read zero at 8.11 while the gripper still held the ball; the real release is at the jaw opening. |
-| `finger_unload: a release well before the hand's release, partner still holding` | Real signal, wrong task word: nothing was released. Kept in recordings. |
-| `sensor_residual: a terminal lagging the hand's release > 0.5 s, contact predating it` | The non-re-zeroed sensor discharging after the true release (video-verified on three episodes). Excluded from recordings, along with place events built from the same discharge. |
-| `phantom: events inside a post-task contact span` | After a finger has placed and released, re-entry into the grip requires the jaw to close again; the video-verified tail on `ep25` reads 0.2-0.8 newtons on pads touching nothing. Excluded from recordings. |
+Show: finger 0's contact starting near 0.3 seconds and never ending; the failed-attempt flag at 4.0-4.6; the grasp segment starting at 7.67.
 
-### 4.5 Grasp and transport anchors
+Say: "Finger 0 reports contact for 14 straight seconds; on video it touches nothing for most of that. Its zero-point wandered mid-episode between 0.8 and 1.8 newtons. We built three software fixes; each one measurably damaged real episodes (one shifted a video-verified boundary by 1.4 seconds), and we can show this signal class is not separable in software. One line in the recorder removes the entire class: re-zero the sensors at each episode start, when the hand is provably empty. Until then the annotator works around it: the real failed squeeze at 4.0-4.6 is still flagged, and the grasp anchor is recovered by dating the trial from the healthy finger."
 
-| Condition | How it was set |
-|---|---|
-| `grasp starts at the sustained closing leading to the real trial's contact` | The real trial's contact is each finger's latest trustworthy contact before the deciding stable grip; candidates more than 2 s older than the newest are weld suspects (a phantom span otherwise drags the anchor 4 s early). Corpus effect of this reference: exactly one episode changed. |
-| `arm-driven fallback: anchor at contact minus 0.3 s when the chosen closing precedes contact by > 2 s` | Video verdict on `ep30`: the selector had latched onto an invisible 2-unit jaw settle; the hand-set boundaries lead contact by 0.2-1.5 s. |
-| `transport starts at the first sustained arm motion (12 units/s for 0.15 s) at or after grip stability` | Definition ruling: transport begins when the object leaves its resting plane. Grip statistics cannot mark lift-off for a light object; arm motion is the reliable signal. The threshold sits in a measured bimodal valley (parked joints 0-1 units/s, carrying 30 and above). Postponed while 8 or more units of jaw closing lie within the next second (squeezing in place is not carrying, video-verified). |
+Heads-up: the never-ending finger 0 contact is the exhibit, not a bug — say so before anyone asks.
 
-### 4.6 Attempts
+### 2.5 `ep48` — the limits, honestly
 
-| Condition | How it was set |
-|---|---|
-| `an attempt requires the hand to lose the object in a continuous chunk` | Design ruling after five false flags were video-refuted in one sweep: a single finger blinking out is normal grasp life (contact migration, pinch support). |
-| `hand quiet: total force < 1.0 N for 0.35 s after the drop` | The 1.0 sits above a 0.8 newton standing phantom and below a 1.4 newton immediate clamp; the 0.35 s sits inside a 0.41 s retry gap and past a phantom resurgence at 0.33 s. Thin margins on both sides, documented. |
-| `acted on: the jaw re-opens >= 5 units within 2.5 s, or squeezes >= 8 units below its own hold width` | Measured: +22.8 and +24.7 units of re-opening on the two video-verified real attempts, 0.0 on every false case. The squeeze-through path covers terminal losses nobody retries; it is self-referenced to the episode's own hold position and gated on a 5 newton real-hold peak. |
-| `air-miss: a >= 8 unit close-reopen cycle with no contact, before the grasp, after the first 2 s` | The jaw closed into empty air and reopened; the first 2 seconds are excluded because the previous episode's reset motion still settles there. Contiguous with a touch attempt (0.5 s), it merges into one attempt span. |
-| `air_grasp: an attempt span whose jaw bottoms below 2.0` | Pads touching each other: the corpus's only sub-2.0 dwell is at 0.5, and the tightest real hold compresses the foam to 2.8. Excluded from attempt counting. |
+Show: the five slip markers during the hold; the `result_failure` flag; the release markers at 12.18.
 
-### 4.7 Place detection and hygiene
+Say: "The metadata says this episode failed; the touch data looks like a complete task. What failed is invisible to force alone: the foam cup rotated out of the bowl after the jaw opened. The spin-torque channel actually spikes right at the turn — but at 15 newton-millimeters, and ordinary handling reaches 30 to 48 in episodes with no rotation at all, so amplitude cannot detect rotation; a pattern-based rotation detector is planned, and this episode is its calibration case. Meanwhile the annotator does the honest thing: it flags the contradiction for human review instead of guessing."
 
-A real placement sits at the place-release anchor, never regains grip, and its finger next unloads or releases. Census over all 130 place events; seven deletion rules, each physical:
+Heads-up: the marker at 12.18 still says release. That is correct at the signal level, since the jaw did open; the failure lives in the flag. Also say: the slips during the hold were confirmed correct on video — the grasp really was unstable.
 
-| Condition | How it was set |
-|---|---|
-| `D1: same-finger overlapping places are one detection` | Two placements cannot overlap on one finger; the main path and the backfill both fire on one placement (about 14 corpus events). |
-| `D2: grip recovers >= 25 % and the carry continues > 1.5 s` | Placement transfers weight permanently. Settling dips recovered 36-706 percent; real staged placements survive through the unload-gap side (real maximum 1.43 s against false minimum 1.7 s — the thinnest margin in the system). |
-| `D3: the finger's next terminal is a drop` | A dip before losing the object is not a placement. |
-| `D4: inside an air-grasp span` | Nothing held, nothing placeable. |
-| `D5: starting > 1.5 s after the place-release anchor` | Post-task artifacts from residual discharge. |
-| `D6: ending before the grasp bout` | The object was never carried, so nothing could be placed (a failed trial's jaw-open decay had been reconstructed as a place). |
-| `D7: no jaw opening around the place and the hold continues >= 1 s` | A real placement either unloads the finger promptly or coincides with the jaw starting to open (measured +4.2 and +15.3 units on real places, -0.6 on the false one). A dip with the jaw closed and the carry continuing is grip fluctuation. |
+### 2.6 `ep0` — ten-second close
 
-### 4.8 Trials, gates, outcome flags
+Show: the `air_grasp` flag at 2.2-2.7.
 
-| Condition | How it was set |
-|---|---|
-| `a trial = overlapping finger contact spans merged (0.5 s); the grasp is the trial holding the last stable grip` | Keying on the first stability mistakes a failed trial's brief false stability for the grasp (video-verified two-trial episode). Failed trials before the grasp are flagged. |
-| `weak_contact: pre-grasp spans peaking < 2.3 N` | Calibrated on seven video verdicts (false spans at or under 2.2, real grabs at or over 2.4). One later phantom peaked 3.8, so the line is known-broken upward and downgrades only. |
-| `post-task gate: contacts after a finger's own place-and-release are downgraded and flagged` | A real re-grab is a new approach (taxonomy ruling); the pairing uses the finger's final place, after a bug that paired with earlier false places silently downgraded eight episodes' real grasps. |
-| `result_failure / result_partial: recorded outcome contradicts a full success template` | A wrong-location release is tactilely indistinguishable from success (video ruling); the tension is flagged for human or vision review, never guessed. |
+Say: "The gripper closes on air and the pads touch each other. Jaw position alone identifies it: the jaw bottoms out at 0.5, and the tightest real hold in the whole corpus never compresses below 2.8. Flagged as an air grasp and excluded from attempt counting."
 
-## 5. Results
+## 3. The rules, in plain English
 
-1. Attempt counts: 55 of 59 episodes match the hand-recorded metadata. The four disagreements are metadata errors, each proven by video (three undercounts of real touches, one count of two where the video shows one attempt).
-2. Boundaries: the grasp, transport, and place-release anchors on the video-anchored episode set are stable across every change; a phantom-welded episode's grasp anchor was recovered from 3.71 to 7.67 seconds with zero other anchors moving.
+How every rule was set, in one paragraph: we state the rule as physics or task logic, measure every instance of it across all 63 episodes (the census scripts are kept in `scripts/calibration/`), place each threshold inside the measured gap between the two classes it separates, and hand the borderline cases to video review. A video verdict against a rule re-opens the rule, not just the number. For other datasets: the logic ports as-is, the numbers are re-derived by re-running the same censuses, and a short list of structural preconditions is checked first (single-cycle episodes, jaw starting open, sign conventions, clock agreement) — all documented in `analysis/portability.md`.
+
+### 3.1 Zeroing the sensors
+
+The firmware zeroes the sensors once per session, so later episodes read force while touching nothing. Our rule: before the jaw closes for the first time, the hand cannot be holding anything — so everything the sensor reads in that window is its true zero (we take the median). After that, the zero keeps following the signal whenever the finger is quiet (under 1 newton) and freezes the moment force rises, so real grip force is never absorbed.
+
+How it was set: we also tried more aggressive zeroing (following the signal whenever the jaw was open), and it ate the tails of real releases, moving video-verified boundaries by up to 1.4 seconds. Both aggressive variants were reverted; that evidence is the core of the recorder request.
+
+### 3.2 Touching and letting go
+
+A finger counts as touching when its total force stays above 0.15 newtons for a fifth of a second, and as having let go when force stays below 0.10 newtons for three tenths. The gap between the two levels and the hold times exist so approach brushes and single-frame sensor dropouts cannot create fake touch events.
+
+### 3.3 Release or drop
+
+When a finger's force disappears, we ask one question: did the jaw actually open around that moment? We total the jaw's net movement from half a second before the loss to one second after; at least 2 units of net opening means release, otherwise drop.
+
+Why net movement: during fumbles the jaw twitches open but is closing overall, and net movement ignores twitches. Why 2 units: across all 150 force-loss events in the corpus, fumbles never net-open more than 0.7 units and real releases never less than 3.6 — the threshold sits in that gap. One veto on top: if the jaw was actively closing when the force vanished, it is never a release — the ball was squeezed out; we watched exactly that happen on video. One special case: a finger may let go early while the other still holds; that counts as a release only when the partner's own jaw-opening release follows within 3 seconds and the finger never touches again.
+
+What we removed: release used to consult whether a "place" had just happened. Place is itself reconstructed from releases, so that was circular — and it manufactured two false releases before we caught it on video and deleted it.
+
+### 3.4 Honest marker names
+
+A release marker must mean the hand released the object. Three situations used to borrow that word and now have their own names. When a single finger unloads while the hand still holds (the ball resting into the bowl, one pad losing pressure), the marker says finger unload; real signal, kept in recordings. When force lingers after the hand's release because the sensor is still discharging, it says sensor residual; excluded from recordings, along with place events built from the same discharge. When contact appears after the task is over, on pads touching nothing, it says phantom; excluded. The reference point for "the hand's release" is the jaw opening.
+
+### 3.5 Where grasp and transport begin
+
+Grasp begins at the jaw-closing motion that leads to the real grip — "real" meaning the contact that becomes the final stable hold, so failed tries stay in the approach phase. Each finger dates the trial by its latest trustworthy contact; a finger whose contact is seconds older than its partner's is a welded phantom and is ignored (that one guard recovered a grasp anchor by 4 seconds while changing nothing else in the corpus). If the chosen closing happened more than 2 seconds before the touch, the jaw was merely pre-positioned and the arm descended — then the anchor sits just before the touch, matching hand-set boundaries that lead contact by 0.2 to 1.5 seconds.
+
+Transport begins when the arm starts moving after the grip is stable. Our agreed definition: transport is the object leaving its resting plane. A light foam ball's weight transfer is invisible in grip force, so arm motion is the only reliable lift-off signal; the motion threshold sits in an empty measured valley (parked joints jitter at 0-1 units per second, carrying runs at 30 and above). If the jaw is still actively squeezing, transport is postponed — repositioning while gripping is not carrying; that came from a video verdict.
+
+### 3.6 Failed attempts
+
+A failed attempt means the hand lost the object — not a finger. One finger blinking out is normal grasp life: contact migrates as the ball slides into the clamp, one pad unloads while the object rests on the bowl. We learned this the hard way when five finger-level attempt flags were all refuted on video in a single sweep.
+
+The rule now: total force across both fingers must drop below 1 newton for a third of a second, and the loss must be acted on — either the jaw reopens to retry (on the two video-verified real attempts it reopened by 22 and 25 units; on every false case, zero) or the jaw squeezes straight through where the object was, at least 8 units below its own holding width. The thresholds sit between measured neighbors: 1 newton is above a 0.8 newton standing phantom and below a 1.4 newton clamp; the timing sits inside a 0.41 second retry gap.
+
+Two more attempt types come from the jaw alone. Closing at least 8 units into empty air and reopening with no contact is a miss; the first 2 seconds of each episode are excluded because the previous episode's reset motion still settles there. And closing until the pads touch each other — an air grasp, identified by the jaw bottoming below 2.0 where the tightest real hold never goes below 2.8; excluded from attempt counting.
+
+### 3.7 Placements
+
+A real placement has three properties: it sits at the end of the task, the grip force never comes back (the weight went to the table for good), and the finger lets go soon after. We measured all 130 place events in the corpus against those properties and deleted seven violation classes: duplicates (two detection paths firing on one placement, about 14 events); dips where the grip recovered by a quarter or more and the carry continued (settling wobbles — one recovered seven-fold); dips right before the object was lost (a dip before losing is not placing); "places" during air grasps (nothing held, nothing placeable); after the task (residual discharge); before anything was ever carried (a failed trial's decay reconstructed as a place); and dips where the jaw never began opening while the hold simply went on (measured: real late placements open by 4 to 15 units; the false one closed by 0.6).
+
+The protections for real placements are measured too: staged placements, where the object is set into the bowl in two steps, survive because their finger unloads within a second and a half. That margin (1.43 seconds on the real side against 1.7 on the false side) is the thinnest in the system, and it is documented as such.
+
+### 3.8 Trials, phantoms after the task, and outcomes
+
+Touches group into trials: overlapping finger contacts merge, and the trial containing the last stable grip is the grasp — everything before it is a flagged failed trial. Keying on the first stability instead would mistake a failed trial's brief false stability for the grasp; a two-trial episode proved that on video.
+
+After a finger has placed and released its object, new contact on it cannot be a grasp — nothing re-enters the grip without the jaw closing again, and a real re-grab is a new approach (a taxonomy ruling). Such contacts are downgraded and flagged.
+
+When the recorded outcome says failure but the touch data looks like a complete task, the annotator does not guess: the episode is flagged for human or vision review, because a ball released over the wrong spot feels identical to the sensors.
+
+## 4. Results
+
+1. Attempt counts match the hand-recorded metadata on 55 of 59 episodes; the four disagreements are metadata errors, each proven by video.
+2. The grasp, transport, and place-release anchors on the video-anchored episode set are stable across every change; one phantom-welded grasp anchor was recovered by 4 seconds with zero other anchors moving.
 3. Places: 130 events reduced to 107; every deletion class is physical, and spot-checked deletions were confirmed on video.
-4. Marker honesty: 13 markers renamed across 6 episodes, each on a video-verdict location; recordings exclude the non-real classes.
-5. Tests: 162 unit tests pass; the detector file is lint-clean; the full corpus runs without errors.
+4. Thirteen markers renamed across six episodes, each on a video-verdict location; recordings exclude the non-real classes.
+5. 162 unit tests pass; the detector file is lint-clean; the full corpus runs without errors.
 
-## 6. Findings for the group
+## 5. Findings for the group
 
-1. **Recorder re-zero request.** The firmware zeroes once per session. Standing and wandering offsets create phantom contacts that software cannot remove: three removal strategies were built and reverted on measured evidence, and the wandering case is proven inseparable at signal level. A per-episode re-zero at recording time (with the hand provably empty) resolves the entire class.
-2. **Sensor-blind grips.** Three video-verified cases where real contact produced no measurable signal: an edge touch, an off-pad pinch that carried the object at 0.1 newtons, and a light pre-grasp touch reading zero. A sensor placement and grip-style conversation.
-3. **Metadata errors.** Five hand-recorded fields are contradicted by video: four attempt counts and one "partial" outcome with nothing visible on video.
-4. **Naming.** Three marker names (finger unload, sensor residual, phantom) are outside the established event taxonomy; one of them reaches the recorded set and needs a naming decision.
-5. **Definitions to align.** Transport = the object leaves its resting plane (lift-off). Grasp start = the closing motion that leads to the real trial's contact. Both are now formal in code and should be agreed across the team.
+1. Recorder re-zero request. The firmware zeroes once per session; standing and wandering offsets create phantom contacts software cannot remove (three strategies built and reverted on measured evidence). A per-episode re-zero at recording time, with the hand provably empty, resolves the class.
+2. Sensor-blind grips. Three video-verified cases where real contact produced no measurable signal: an edge touch, an off-pad pinch carrying the object at 0.1 newtons, and a light pre-grasp touch reading zero. A sensor-placement and grip-style conversation.
+3. Metadata errors. Five hand-recorded fields contradicted by video: four attempt counts and one "partial" outcome with nothing visible on video.
+4. Naming. Three marker names (finger unload, sensor residual, phantom) are outside the established event taxonomy; one reaches the recorded set and needs a naming decision.
+5. Definitions to align. Transport = the object leaves its resting plane. Grasp start = the closing motion leading to the real trial's contact. Both are formal in code and should be agreed across the team.
 
-## 7. Limits and next steps
+## 6. Limits and next steps
 
-1. Recall is un-audited: the verification pressure went into false events and wrong labels; missed events surface only by watching (one known example is documented).
+1. Recall is un-audited: verification pressure went into false events and wrong labels; missed events surface only by watching (one known example is documented).
 2. Rotation and lift detection are ineffective on this data; rotation needs a pattern-based redesign (calibration episode identified), lift never fires on the light foam object.
-3. Three tiers of portability apply before any use on other datasets: check the structural preconditions, re-run the calibration censuses, re-derive every constant.
-4. Next: the merge conversation (evidence package is complete in `analysis/`), multi-cycle support for company-format data, and the pattern-based rotation detector.
+3. Before use on other datasets: check the structural preconditions, re-run the calibration censuses, re-derive every constant.
+4. Next: the merge conversation (evidence package complete in `analysis/`), multi-cycle support for company-format data, the pattern-based rotation detector.
 
 ## Notation, units and abbreviations
 
-- N: newton (force). Hz: hertz (sample rate). s: seconds. mm: millimeter.
-- Jaw positions and travel are in the gripper's raw position units (about 0-60 over its range; only differences are used).
+- N: newton (force). Hz: hertz (sample rate). s: seconds.
+- Jaw positions and travel are in the gripper's raw position units (about 0-60 over its range; only differences are used). Spin torque is in newton-millimeters.
 - Taxel: one sensing element of the fingertip array (52 per finger, three force axes each).
 - `ep24` style tokens are episode indices; `weak_contact@4.7-5.2s` style tokens are review flags with time spans.
-- D1-D7: the seven place-hygiene deletion rules in Section 4.7.

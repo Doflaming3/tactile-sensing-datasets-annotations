@@ -216,7 +216,8 @@ interface Atom {
   timestamp: number;
 }
 
-const AUTO_RE = /^\[auto:(\w+)\] (\w+)(?: (f\d))?(?: ([\d.]+)s)?$/;
+// tolerant of the data-info suffix appended after label/finger/span
+const AUTO_RE = /^\[auto:(\w+)\] (\w+)(?: (f\d))?(?: ([\d.]+)s)?/;
 
 function atomKey(a: Atom): string {
   const m = AUTO_RE.exec(a.content);

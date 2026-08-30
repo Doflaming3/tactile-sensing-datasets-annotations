@@ -798,3 +798,21 @@ Two honest walls, recorded not hacked:
 - ep48's pre-grasp light touch produced ZERO signal (fnRaw < 0.05 N,
   both fingers, 0-7 s): the sensor never saw it — third sensor-blind
   exhibit (ep16 edge, ep40 pinch) for the Jingyi package.
+
+### Addendum 6n: data info restored to markers (Zheng's request)
+
+Every marker now carries its measured quantities as a compact content
+suffix — the info the upstream compact-labels commit (bd55a13) removed
+and never replaced, restored as numbers instead of prose: contact and
+stable markers carry the force level, terminals carry the pre-exit
+plateau and the net jaw travel that decided release-vs-drop, slips
+carry peak high-frequency energy, incipient slips their divergence,
+rotations their peak spin torque, places their pre-drop plateau; the
+renamed classes append their reason ("hand still holding", "was
+contact_onset", "inferred"). Implementation: a structured `data` field
+on DetectedEvent populated at each emission site, serialized by
+resultToAtoms; no UI changes needed (timeline and annotation list
+render content verbatim), tolerant regex in the runner. The suffix
+reaches saved annotations — a deliberate reversal of the upstream
+compactness decision, flagged for the merge conversation. Content-only
+change: flags, anchors, attempts all untouched; 162 tests.

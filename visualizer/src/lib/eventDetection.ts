@@ -47,6 +47,13 @@ export interface DetectedEvent {
   finger: number; // -1 = merged/any
   confidence: Confidence;
   info?: string;
+  /** Measured quantities behind the marker (Zheng: "fill in the data
+   * info together with the marker" — the upstream code dropped its info
+   * suffixes and never replaced them). Serialized as a compact suffix
+   * in the atom content: n = force (N), jaw = net jaw travel (units),
+   * hf = high-frequency shear energy, div = slip divergence, tau =
+   * spin torque (N*mm). */
+  data?: Record<string, number>;
 }
 
 export interface DetectedSubtask {
@@ -947,6 +954,7 @@ export function detectEvents(
             endS: t[aboveSince],
             finger: fi,
             confidence: "medium",
+            data: { n: fn },
             order: events.length,
           });
           aboveSince = -1;
@@ -964,6 +972,10 @@ export function detectEvents(
           const exitIdx = belowSince;
           belowSince = -1;
           const releasing = jawReleaseAt(t[exitIdx]);
+          let exitPlateau = 0;
+          for (let k = exitIdx; k >= 0 && t[exitIdx] - t[k] <= 1.0; k--) {
+            if (f.fn[k] > exitPlateau) exitPlateau = f.fn[k];
+          }
           events.push({
             label: releasing ? "release" : "drop",
             startS: t[exitIdx],
@@ -974,6 +986,12 @@ export function detectEvents(
               : f.hf[i] > th.hfExit
                 ? "medium"
                 : "low",
+            data: {
+              n: exitPlateau,
+              jaw:
+                jawPosAt(t[exitIdx] + RELEASE_WIN_AFTER_S) -
+                jawPosAt(t[exitIdx] - RELEASE_WIN_BEFORE_S),
+            },
             order: events.length,
           });
           slipActive = incActive = rotActive = liftActive = -1;
@@ -998,6 +1016,7 @@ export function detectEvents(
           endS: t[i],
           finger: fi,
           confidence: "medium",
+          data: { n: fn },
           order: events.length,
         });
       }
@@ -1029,12 +1048,17 @@ export function detectEvents(
         Math.abs(dFs[i]) > th.slipShearRateNps;
       if (slipActive < 0 && slipNow) slipActive = i;
       else if (slipActive >= 0 && f.hf[i] < th.hfExit) {
+        let hfPk = 0;
+        for (let k = slipActive; k <= i; k++) {
+          if (f.hf[k] > hfPk) hfPk = f.hf[k];
+        }
         events.push({
           label: "slip",
           startS: t[slipActive],
           endS: t[i],
           finger: fi,
           confidence: "medium",
+          data: { hf: hfPk },
           order: events.length,
         });
         slipActive = -1;
@@ -1053,7 +1077,7 @@ export function detectEvents(
             endS: t[i],
             finger: fi,
             confidence: "low",
-            info: `slipDiv max ${f.slipDiv[incActive].toFixed(2)}`,
+            data: { div: f.slipDiv[incActive] },
             order: events.length,
           });
         }
@@ -1065,12 +1089,17 @@ export function detectEvents(
       if (rotActive < 0 && rotNow) rotActive = i;
       else if (rotActive >= 0 && !rotNow) {
         if (t[i] - t[rotActive] >= th.rotationMinS) {
+          let tauPk = 0;
+          for (let k = rotActive; k <= i; k++) {
+            if (Math.abs(f.tauZ[k]) > tauPk) tauPk = Math.abs(f.tauZ[k]);
+          }
           events.push({
             label: "rotation",
             startS: t[rotActive],
             endS: t[i],
             finger: fi,
             confidence: "medium",
+            data: { tau: tauPk },
             order: events.length,
           });
         }
@@ -1109,6 +1138,7 @@ export function detectEvents(
             endS: t[i],
             finger: fi,
             confidence: "medium",
+            data: { n: refFn },
             order: events.length,
           });
         }
@@ -1240,6 +1270,7 @@ export function detectEvents(
         finger: fi,
         confidence: "medium",
         info: "inferred",
+        data: { n: plateau },
         order: events.length,
       });
     }
@@ -1286,7 +1317,8 @@ export function detectEvents(
             endS: t[start],
             finger: fi,
             confidence: "low",
-            info: `brief ${peak.toFixed(1)}N`,
+            info: "brief",
+            data: { n: peak },
             order: events.length,
           });
           events.push({
@@ -1295,6 +1327,7 @@ export function detectEvents(
             endS: t[i - 1],
             finger: fi,
             confidence: "low",
+            data: { n: peak },
             order: events.length,
           });
         }
@@ -2278,9 +2311,24 @@ export function resultToAtoms(result: AutoLabelResult): LanguageAtom[] {
   for (const e of result.events) {
     const span = e.endS > e.startS ? ` ${(e.endS - e.startS).toFixed(2)}s` : "";
     const finger = e.finger >= 0 ? ` f${e.finger}` : "";
+    // the measured quantities behind the marker, as a compact suffix —
+    // restores the data info the upstream commit dropped, as numbers
+    const parts: string[] = [];
+    const d = e.data;
+    if (d) {
+      if (d.n !== undefined) parts.push(`${d.n.toFixed(1)}N`);
+      if (d.jaw !== undefined) {
+        parts.push(`jaw${d.jaw >= 0 ? "+" : ""}${d.jaw.toFixed(1)}u`);
+      }
+      if (d.hf !== undefined) parts.push(`hf${d.hf.toFixed(0)}`);
+      if (d.div !== undefined) parts.push(`div${d.div.toFixed(2)}`);
+      if (d.tau !== undefined) parts.push(`tau${d.tau.toFixed(0)}`);
+    }
+    if (e.info) parts.push(`(${e.info})`);
+    const suffix = parts.length ? ` ${parts.join(" ")}` : "";
     atoms.push({
       role: "user",
-      content: `[auto:${e.confidence}] ${e.label}${finger}${span}${""}`,
+      content: `[auto:${e.confidence}] ${e.label}${finger}${span}${suffix}`,
       style: "interjection",
       timestamp: e.startS,
       camera: null,
