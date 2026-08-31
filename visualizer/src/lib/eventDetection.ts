@@ -232,6 +232,38 @@ const SLIDE_LOAD_MIN_N = 1.0;
 const SLIDE_MED_HALF_S = 0.15;
 const SLIDE_MERGE_GAP_S = 1.0;
 
+/** Hesitation: the episode moved slower than the task required at multiple
+ * stages, with no retry or failure to blame (Zheng's ep50 ruling — see the
+ * pass in detectEvents). Corpus p90 stage durations, seconds, in
+ * approach / grasp / transport / place order — 2026-08-31 census over 62
+ * episodes (scripts scratch: stage_durations census; medians 4.20 / 1.07 /
+ * 3.13 / 0.23). Tier-2 numbers: re-derive per rig AND per task tempo.
+ * The strong gate is what separates video-verified hesitation from "not
+ * that obvious": ep50 fires at 1.23x/1.28x p90 and ep25's place runs 2.2x;
+ * ep28 peaks at 1.16x across three marginal stages and stays silent —
+ * 1.16 vs 1.23 is a THIN margin, re-derive as verdicts accumulate. */
+export const HESITATION_P90_S = [6.32, 2.2, 4.56, 1.26];
+const HESITATION_MIN_SLOW_STAGES = 2;
+const HESITATION_STRONG = 1.2;
+
+/** Pure hesitation decision — exported for tests. `stageDurs` in the
+ * HESITATION_P90_S stage order; null = stage missing (failure episodes). */
+export function computeHesitation(
+  stageDurs: Array<number | null>,
+  excused: boolean,
+): boolean {
+  if (excused) return false;
+  let over = 0;
+  let strong = false;
+  for (let i = 0; i < HESITATION_P90_S.length; i++) {
+    const d = stageDurs[i];
+    if (d === null || d === undefined) continue;
+    if (d > HESITATION_P90_S[i]) over++;
+    if (d >= HESITATION_STRONG * HESITATION_P90_S[i]) strong = true;
+  }
+  return over >= HESITATION_MIN_SLOW_STAGES && strong;
+}
+
 /** Staggered peel-offs: release is a HAND action but fingers exit
  * staggered — the gel can let go while the partner still holds and the
  * jaw only opens later (ep25 f1 peels off the placed ball at 11.68 s,
@@ -2462,6 +2494,42 @@ export function detectEvents(
     subtasks.some((s2) => s2.label === "place_release")
   ) {
     flags.push(`result_${context.result}`);
+  }
+
+  // Hesitation (Zheng's ep50 video ruling, 2026-08-31: "every step took
+  // longer than expected, but no single step failed" — hesitation is NOT
+  // an attempt). Detectable from stage durations alone: >= 2 stages above
+  // the corpus p90 with at least one >= HESITATION_STRONG x p90, and no
+  // retry/failure flag to excuse the time (an episode slow because it
+  // retried is retrying, not hesitating — ep31/ep47/ep48 are excused).
+  // Runs AFTER the result flag so the excuse check sees it.
+  {
+    const seq: SubtaskLabel[] = [
+      "approach",
+      "grasp",
+      "transport",
+      "place_release",
+    ];
+    // last labeled instant, matching the calibration census (max atom
+    // timestamp) — series dur overshoots on episodes with long tails
+    let lastS = 0;
+    for (const s2 of subtasks) lastS = Math.max(lastS, s2.startS);
+    for (const e of cleaned) {
+      if (!deletedPlaces.has(e)) lastS = Math.max(lastS, e.endS);
+    }
+    const stageDurs: Array<number | null> = seq.map((label, i) => {
+      const a = subtasks.find((s2) => s2.label === label)?.startS;
+      if (a === undefined) return null;
+      const b =
+        i + 1 < seq.length
+          ? subtasks.find((s2) => s2.label === seq[i + 1])?.startS
+          : lastS;
+      return b === undefined ? null : b - a;
+    });
+    const excused = flags.some(
+      (f) => f.startsWith("failed_attempt") || f.startsWith("result_"),
+    );
+    if (computeHesitation(stageDurs, excused)) flags.push("hesitation");
   }
 
   // flags in chronological order — they are appended in pipeline-pass
