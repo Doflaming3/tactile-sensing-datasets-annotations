@@ -140,6 +140,9 @@
 .annotations-skin .dot-speech {
   background: var(--hf-orange);
 }
+.annotations-skin .dot-failed {
+  background: #fbbf24;
+}
 
 /* ----- Annotation rows ----- */
 .annotations-skin .row-anno {
@@ -420,6 +423,11 @@
   background: rgba(183, 139, 255, 0.25);
   border: 1px solid var(--hf-purple);
   color: #e3d4ff;
+}
+.annotations-skin .tl-seg.failed {
+  background: rgba(251, 191, 36, 0.22);
+  border: 1px solid #fbbf24;
+  color: #fde68a;
 }
 .annotations-skin .tl-tick {
   position: absolute;

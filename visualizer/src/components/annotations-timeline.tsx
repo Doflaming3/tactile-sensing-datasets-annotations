@@ -90,6 +90,14 @@ const TRACK_GROUPS = [
       // lane so they don't masquerade as speech.
       { key: "tactile", label: "tactile", color: "#fb923c", render: "tick" },
       { key: "vqa", label: "vqa", color: "#34d399", render: "tick" },
+      // Human-verified failed-attempt spans (added via the Auto-label
+      // panel's review flow). Spans, not ticks — an attempt has duration.
+      {
+        key: "failed",
+        label: "failed att.",
+        color: "#fbbf24",
+        render: "span-ro",
+      },
     ],
   },
 ] as const;
@@ -173,6 +181,7 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
     const subtask: SpanMarker[] = [];
     const task_aug: SpanMarker[] = [];
     const plan: SpanMarker[] = [];
+    const failed: SpanMarker[] = [];
     const memory: TickMarker[] = [];
     const interjection: TickMarker[] = [];
     const tactile: TickMarker[] = [];
@@ -247,6 +256,22 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
         });
       } else if (
         a.style === "interjection" &&
+        a.content?.startsWith("failed_attempt")
+      ) {
+        // human-verified attempt spans: "failed_attempt 0.60s (verified)" —
+        // the duration lives in the content, the atom sits at span start
+        const dm = a.content.match(/failed_attempt\s+([\d.]+)s/);
+        const dur = dm ? Number(dm[1]) : 0;
+        failed.push({
+          kind: "span",
+          start: a.timestamp,
+          end: Math.min(duration, a.timestamp + Math.max(dur, 0.05)),
+          label: a.content,
+          atom: a,
+          atomIdx: i,
+        });
+      } else if (
+        a.style === "interjection" &&
         a.content?.startsWith("[auto:")
       ) {
         // tactile auto-label events: "[auto:conf] label f0 0.21s"
@@ -286,6 +311,7 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
       task_aug,
       subtask,
       plan,
+      failed,
       memory,
       interjection,
       tactile,
@@ -675,7 +701,7 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
                           next refresh). Click seeks + selects; no resize. */}
                       {tk.render === "span-ro" &&
                         (
-                          lanes[tk.key as "plan"] as Array<{
+                          lanes[tk.key as "plan" | "failed"] as Array<{
                             kind: "span";
                             start: number;
                             end: number;
