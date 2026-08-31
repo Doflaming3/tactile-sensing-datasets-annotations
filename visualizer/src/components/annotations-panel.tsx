@@ -42,7 +42,18 @@ function fmtTime(s: number): string {
   return s.toFixed(3) + "s";
 }
 
-function StylePill({ style }: { style: string | null }) {
+function StylePill({
+  style,
+  content,
+}: {
+  style: string | null;
+  content?: string | null;
+}) {
+  // verified failed-attempt atoms keep interjection style (schema-stable)
+  // but read as their own kind everywhere in the UI
+  if (style === "interjection" && content?.startsWith("failed_attempt")) {
+    return <span className="style-pill failed">failed attempt</span>;
+  }
   const cls = style ?? "speech";
   return <span className={`style-pill ${cls}`}>{style ?? "speech"}</span>;
 }
@@ -395,11 +406,23 @@ const RAIL_GROUPS: RailGroupDef[] = [
     label: (a, { firstLine }) => firstLine(a.content),
   },
   {
+    key: "failed",
+    title: "failed attempt",
+    dotClass: "dot-failed",
+    column: "events",
+    // human-verified attempt spans from the Auto-label review flow — same
+    // atom schema as interjections, but their own lane and pill
+    match: (a) =>
+      a.style === "interjection" && !!a.content?.startsWith("failed_attempt"),
+    label: (a) => a.content || "(empty)",
+  },
+  {
     key: "interjection",
     title: "interjection",
     dotClass: "dot-interjection",
     column: "events",
-    match: (a) => a.style === "interjection",
+    match: (a) =>
+      a.style === "interjection" && !a.content?.startsWith("failed_attempt"),
     label: (a) => a.content || "(empty)",
   },
   {
@@ -823,7 +846,7 @@ const AtomEditor: React.FC<{
     <div className="inspector-body">
       <div className="editor-head inspector-head">
         <div className="inspector-title">
-          <StylePill style={atom.style} />
+          <StylePill style={atom.style} content={atom.content} />
           <div>
             <strong>{fmtTime(atom.timestamp)}</strong>
             <span>

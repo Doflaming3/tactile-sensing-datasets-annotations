@@ -143,7 +143,8 @@ export default function AutoLabelPanel({
   root?: string | null;
   episodeId: number;
 }) {
-  const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms } = useAnnotations();
+  const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms, setDetectorFlags } =
+    useAnnotations();
   const { seek } = useTime();
   const [open, setOpen] = useState(false);
   // Human-review queue (Zheng's verify-and-add flow): failed_attempt span
@@ -298,6 +299,7 @@ export default function AutoLabelPanel({
         );
         setLastResult(result);
         setReview({});
+        setDetectorFlags(result.flags);
         const subStr = result.subtasks
           .map(
             (s) =>
@@ -324,6 +326,7 @@ export default function AutoLabelPanel({
       deleteAtom,
       addAtoms,
       episodeId,
+      setDetectorFlags,
     ],
   );
 
@@ -356,8 +359,9 @@ export default function AutoLabelPanel({
     setRawState("none");
     setLastResult(null);
     setReview({});
+    setDetectorFlags([]);
     setStatus("");
-  }, [repoId, episodeId]);
+  }, [repoId, episodeId, setDetectorFlags]);
 
   if (!series30) return null;
 

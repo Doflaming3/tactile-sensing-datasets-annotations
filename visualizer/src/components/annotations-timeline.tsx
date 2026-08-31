@@ -136,7 +136,8 @@ interface PendingCreate {
 }
 
 export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
-  const { atoms, addAtom, updateAtom, snap, selectAtom } = useAnnotations();
+  const { atoms, addAtom, updateAtom, snap, selectAtom, detectorFlags } =
+    useAnnotations();
   const { currentTime, seek, setIsPlaying } = useTime();
   const trackBandRef = useRef<HTMLDivElement | null>(null);
 
@@ -319,6 +320,24 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
       subWithIdx,
     };
   }, [atoms, duration]);
+
+  // Detector-proposed failed-attempt spans (flags from the latest auto-label
+  // run — no atom exists yet). Shown dashed on the failed lane; suppressed
+  // once a verified atom span covers the same stretch.
+  const autoFailed = useMemo(() => {
+    const out: Array<{ start: number; end: number }> = [];
+    for (const f of detectorFlags) {
+      const m = /^failed_attempt@([\d.]+)-([\d.]+)s$/.exec(f);
+      if (!m) continue;
+      const start = Number(m[1]);
+      const end = Number(m[2]);
+      const covered = lanes.failed.some(
+        (s) => s.start < end + 0.25 && s.end > start - 0.25,
+      );
+      if (!covered) out.push({ start, end });
+    }
+    return out;
+  }, [detectorFlags, lanes.failed]);
 
   // ============ Pixel <-> time mapping ============
   // The full-width track band (no label margin) is `trackBandRef`. Convert
@@ -741,6 +760,47 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
                                 }}
                               >
                                 {s.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                      {/* Detector-proposed (unverified) failed-attempt
+                          spans — dashed; verify in the Auto-label panel */}
+                      {tk.key === "failed" &&
+                        autoFailed.map((s, k) => {
+                          const left = (s.start / duration) * 100;
+                          const width = Math.max(
+                            0.3,
+                            ((s.end - s.start) / duration) * 100,
+                          );
+                          return (
+                            <div
+                              key={`auto-${k}`}
+                              className="tl-seg failed auto"
+                              style={{ left: `${left}%`, width: `${width}%` }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                jumpAndSelect(s.start, null);
+                              }}
+                              onMouseEnter={(e) =>
+                                showTip(
+                                  e,
+                                  `failed att. · auto · ${s.start.toFixed(2)}s → ${s.end.toFixed(2)}s`,
+                                  "detector-proposed, unverified — confirm in the Auto-label panel",
+                                )
+                              }
+                              onMouseMove={moveTip}
+                              onMouseLeave={hideTip}
+                            >
+                              <span
+                                style={{
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                auto
                               </span>
                             </div>
                           );

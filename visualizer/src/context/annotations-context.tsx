@@ -114,6 +114,12 @@ interface AnnotationsContextType {
   deleteAtom: (atom: LanguageAtom) => void;
   resetAtoms: () => void;
 
+  /** Flags from the latest auto-label run (episode-scoped, NOT persisted,
+   * not atoms) — lets the timeline show detector-proposed spans that have
+   * no atom yet, e.g. unverified failed_attempt@A-Bs. */
+  detectorFlags: string[];
+  setDetectorFlags: (flags: string[]) => void;
+
   setPendingDraw: (draw: PendingDraw) => void;
   clearPendingDraw: () => void;
 
@@ -144,6 +150,7 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [episodeId, setEpisodeId] = useState<number | null>(null);
   const [ident, setIdent] = useState<DatasetIdent>({});
   const [atoms, setAtoms] = useState<LanguageAtom[]>([]);
+  const [detectorFlags, setDetectorFlags] = useState<string[]>([]);
   const [frameTimestamps, setFrameTimestamps] = useState<number[]>([]);
   const [pendingDraw, setPendingDrawState] = useState<PendingDraw>(null);
   const [activeCamera, setActiveCameraState] = useState<string | null>(null);
@@ -378,6 +385,8 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       updateAtom,
       deleteAtom,
       resetAtoms,
+      detectorFlags,
+      setDetectorFlags,
       setPendingDraw,
       clearPendingDraw,
       save,
@@ -408,6 +417,8 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       updateAtom,
       deleteAtom,
       resetAtoms,
+      detectorFlags,
+      setDetectorFlags,
       setPendingDraw,
       clearPendingDraw,
       save,

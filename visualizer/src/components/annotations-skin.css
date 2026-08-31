@@ -429,6 +429,16 @@
   border: 1px solid #fbbf24;
   color: #fde68a;
 }
+.annotations-skin .tl-seg.failed.auto {
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px dashed rgba(251, 191, 36, 0.65);
+  color: rgba(253, 230, 138, 0.75);
+}
+.annotations-skin .style-pill.failed {
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+}
 .annotations-skin .tl-tick {
   position: absolute;
   top: 0;
