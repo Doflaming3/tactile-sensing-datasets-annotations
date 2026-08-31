@@ -11,3 +11,6 @@ backend/**/*.pyc
 # Lockfiles
 bun.lock
 package-lock.json
+
+# Generated signal-screen reference corpus (scripts/build-screen-reference.ts)
+src/lib/screen-reference.json

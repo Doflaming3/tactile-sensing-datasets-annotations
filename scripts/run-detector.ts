@@ -84,7 +84,7 @@ function localParquet(path: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 }
 
-interface EpisodeMeta {
+export interface EpisodeMeta {
   episode_index: number;
   dataChunk: number;
   dataFile: number;
@@ -93,7 +93,7 @@ interface EpisodeMeta {
   length: number;
 }
 
-async function loadEpisodesMeta(root: string): Promise<EpisodeMeta[]> {
+export async function loadEpisodesMeta(root: string): Promise<EpisodeMeta[]> {
   const base = join(root, "meta", "episodes");
   const out: EpisodeMeta[] = [];
   for (const chunk of readdirSync(base).sort()) {
@@ -118,7 +118,7 @@ async function loadEpisodesMeta(root: string): Promise<EpisodeMeta[]> {
 
 // ---------------------------------------------------------------- episode IO
 
-interface Info {
+export interface Info {
   fps: number;
   features: Record<
     string,
@@ -126,7 +126,7 @@ interface Info {
   >;
 }
 
-interface EpisodeInputs {
+export interface EpisodeInputs {
   timestamps: number[];
   gripper: { t: number[]; pos: number[] } | null;
   arm: { t: number[]; joints: number[][] } | null;
@@ -137,7 +137,7 @@ interface EpisodeInputs {
 
 const pad6 = (n: number) => String(n).padStart(6, "0");
 
-async function loadEpisodeInputs(
+export async function loadEpisodeInputs(
   root: string,
   info: Info,
   meta: EpisodeMeta,
@@ -199,7 +199,7 @@ async function loadEpisodeInputs(
   return { timestamps, gripper, arm, frames, sensorName, nTaxels };
 }
 
-function loadRawCsvTexts(root: string, ep: number, sensorName: string): string[] | null {
+export function loadRawCsvTexts(root: string, ep: number, sensorName: string): string[] | null {
   const dir = join(root, "sensors", sensorName, `episode_${pad6(ep)}`);
   if (!existsSync(dir)) return null;
   const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
@@ -312,6 +312,7 @@ async function runEpisode(
   }
   const result = detectEvents(series, gripper, args.thresholds, inputs.arm, {
     result: epResult,
+    episodeIndex: ep,
   });
   const atoms = resultToAtoms(result) as unknown as Atom[];
 
@@ -382,32 +383,38 @@ async function runEpisode(
   return { ok, line };
 }
 
-const args = parseArgs(process.argv.slice(2));
-const root = args.dataset;
-const info = JSON.parse(readFileSync(join(root, "meta", "info.json"), "utf-8")) as Info;
-const episodes = await loadEpisodesMeta(root);
+// CLI entry — guarded so build-screen-reference.ts can import the loaders
+// above without running a detection pass.
+if (import.meta.main) {
+  const args = parseArgs(process.argv.slice(2));
+  const root = args.dataset;
+  const info = JSON.parse(
+    readFileSync(join(root, "meta", "info.json"), "utf-8"),
+  ) as Info;
+  const episodes = await loadEpisodesMeta(root);
 
-if (args.all) {
-  let matches = 0;
-  let total = 0;
-  for (const meta of episodes) {
-    try {
-      const { ok, line } = await runEpisode(root, info, meta, args);
-      if (line) console.log(line);
-      if (ok) matches++;
-      total++;
-    } catch (e) {
-      console.log(`ep${meta.episode_index}: ERROR ${(e as Error).message}`);
-      total++;
+  if (args.all) {
+    let matches = 0;
+    let total = 0;
+    for (const meta of episodes) {
+      try {
+        const { ok, line } = await runEpisode(root, info, meta, args);
+        if (line) console.log(line);
+        if (ok) matches++;
+        total++;
+      } catch (e) {
+        console.log(`ep${meta.episode_index}: ERROR ${(e as Error).message}`);
+        total++;
+      }
     }
+    if (args.compare) console.log(`\n${matches}/${total} episodes match published annotations`);
+    if (args.report) {
+      await Bun.write(args.report, JSON.stringify(reportRows, null, 1));
+      console.log(`wrote ${args.report}`);
+    }
+  } else {
+    const meta = episodes.find((e) => e.episode_index === args.episode);
+    if (!meta) throw new Error(`episode ${args.episode} not in meta/episodes`);
+    await runEpisode(root, info, meta, args);
   }
-  if (args.compare) console.log(`\n${matches}/${total} episodes match published annotations`);
-  if (args.report) {
-    await Bun.write(args.report, JSON.stringify(reportRows, null, 1));
-    console.log(`wrote ${args.report}`);
-  }
-} else {
-  const meta = episodes.find((e) => e.episode_index === args.episode);
-  if (!meta) throw new Error(`episode ${args.episode} not in meta/episodes`);
-  await runEpisode(root, info, meta, args);
 }

@@ -245,7 +245,11 @@ export default function AutoLabelPanel({
           return;
         }
         const t0 = performance.now();
-        const result = detectEvents(series, gripper, th, arm);
+        // episodeIndex keeps the signal screen from letting a corpus
+        // episode's own reference windows vote for it on replays
+        const result = detectEvents(series, gripper, th, arm, {
+          episodeIndex: episodeId,
+        });
         // Diagnostics: everything needed to compare a browser run against the
         // offline reference. Read via DevTools: window.__autolabelDebug
         if (typeof window !== "undefined") {
@@ -300,7 +304,17 @@ export default function AutoLabelPanel({
         setRunning(false);
       }
     },
-    [series30, useRaw, loadRaw, gripper, arm, atoms, deleteAtom, addAtoms],
+    [
+      series30,
+      useRaw,
+      loadRaw,
+      gripper,
+      arm,
+      atoms,
+      deleteAtom,
+      addAtoms,
+      episodeId,
+    ],
   );
 
   // Re-detect only tactile events, leaving subtask segments (including

@@ -17,6 +17,8 @@
 
 import type { LanguageAtom } from "@/types/language.types";
 
+import { screenBackgroundVotes, SCREEN_VOTE_MIN } from "./signalScreen";
+
 // ---------------------------------------------------------------- types
 
 export type EventLabel =
@@ -85,6 +87,13 @@ export interface FingerSeries {
    * CoP slides 4 mm down the finger; a static hold decays force too,
    * but its CoP stays put). */
   copY?: Float64Array;
+  /** |sum of taxel (fx, fy)| UNsmoothed — the signal-screen featurizer
+   * (signalScreen.ts) needs the same channels its reference corpus was
+   * built from, without median-5 phase distortion. */
+  fsRaw?: Float64Array;
+  /** count of taxels with |fz| > 0.15 N (above the 0.1 N/LSB floor) —
+   * contact-patch size channel for the signal screen. */
+  active?: Float64Array;
 }
 
 export interface TactileSeries {
@@ -483,6 +492,7 @@ export function buildSeriesFromSensorFrames(
     const slipDiv = new Float64Array(n);
     const edgeRateRatio = new Float64Array(n);
     const copYSeries = new Float64Array(n).fill(NaN);
+    const active = new Float64Array(n);
     let prevShear: Float64Array | null = null; // [nTaxels*2]
     const curShear = new Float64Array(nTaxels * 2);
 
@@ -502,6 +512,7 @@ export function buildSeriesFromSensorFrames(
         sfx += fx;
         sfy += fy;
         sfz += fz;
+        if (Math.abs(fz) > 0.15) active[i]++;
         curShear[k * 2] = fx;
         curShear[k * 2 + 1] = fy;
         if (layout && fz > 0.05) {
@@ -605,6 +616,8 @@ export function buildSeriesFromSensorFrames(
       edgeRateRatio,
       hf: hf.map((v) => v / Math.max(rateHz / 30, 1)) as Float64Array,
       copY: copYSeries,
+      fsRaw: fs,
+      active,
     });
   }
   return { t, rateHz, fingers };
@@ -669,6 +682,8 @@ export function clipSeries(s: TactileSeries, tMax: number): TactileSeries {
       edgeRateRatio: f.edgeRateRatio.slice(0, n),
       hf: f.hf.slice(0, n),
       copY: f.copY?.slice(0, n),
+      fsRaw: f.fsRaw?.slice(0, n),
+      active: f.active?.slice(0, n),
     })),
   };
 }
@@ -906,7 +921,7 @@ export function detectEvents(
   gripper: GripperSeries | null,
   thresholds?: Partial<DetectionThresholds>,
   arm?: ArmMotionSeries | null,
-  context?: { result?: string },
+  context?: { result?: string; episodeIndex?: number },
 ): AutoLabelResult {
   const th: DetectionThresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
   const { t, rateHz, fingers } = series;
@@ -2398,6 +2413,44 @@ export function detectEvents(
     }
   }
 
+  // Signal screen (second artifact layer, context-free — see
+  // signalScreen.ts provenance): every terminal event's raw window is
+  // voted against the reference corpus; ≥ SCREEN_VOTE_MIN background
+  // neighbors marks it artifact-like. Real terminals renamed by the
+  // context rules (sensor_residual/phantom) just get the vote recorded
+  // as corroborating data; still-real-labeled place/release/drop
+  // additionally raise a residual_suspect flag for review — the screen
+  // never renames or deletes (one adjudicated residual mimics a real
+  // place and passes any signal screen; renaming stays context-rule
+  // territory). Raw path only: the featurizer's per-sample hf channel
+  // distorts at table rate.
+  if (series.rateHz > 60) {
+    for (const e of cleaned) {
+      if (deletedPlaces.has(e)) continue;
+      if (
+        e.label !== "place" &&
+        e.label !== "release" &&
+        e.label !== "drop" &&
+        e.label !== "finger_unload" &&
+        e.label !== "sensor_residual" &&
+        e.label !== "phantom"
+      ) {
+        continue;
+      }
+      const votes = screenBackgroundVotes(
+        series,
+        e.finger,
+        e.startS,
+        context?.episodeIndex,
+      );
+      if (votes === null || votes < SCREEN_VOTE_MIN) continue;
+      e.data = { ...e.data, scr: votes };
+      if (e.label === "place" || e.label === "release" || e.label === "drop") {
+        flags.push(`residual_suspect@${e.startS.toFixed(1)}s`);
+      }
+    }
+  }
+
   // Recorded outcome (when metadata supplies it) vs our story: a full
   // success template with a non-success outcome is tactilely
   // indistinguishable from success (ep39/ep48: the object was released
@@ -2459,6 +2512,7 @@ export function resultToAtoms(result: AutoLabelResult): LanguageAtom[] {
       if (d.hf !== undefined) parts.push(`hf${d.hf.toFixed(0)}`);
       if (d.div !== undefined) parts.push(`div${d.div.toFixed(2)}`);
       if (d.tau !== undefined) parts.push(`tau${d.tau.toFixed(0)}`);
+      if (d.scr !== undefined) parts.push(`scr${d.scr.toFixed(0)}/7`);
     }
     if (e.info) parts.push(`(${e.info})`);
     const suffix = parts.length ? ` ${parts.join(" ")}` : "";
