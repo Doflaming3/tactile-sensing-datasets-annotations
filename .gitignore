@@ -12,6 +12,9 @@ visualizer/node_modules/
 visualizer/.next/
 visualizer/tsconfig.tsbuildinfo
 
+# Python bytecode from the analysis scripts
+__pycache__/
+
 # Editor / OS noise
 .vscode/
 Thumbs.db

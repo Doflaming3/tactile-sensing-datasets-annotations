@@ -1,0 +1,14 @@
+episode,t,finger,label
+22,10.764146176,f1,sensor_residual
+25,11.681496832,f1,finger_unload
+25,14.112524544,f1,phantom
+25,15.53738496,f1,phantom
+25,16.576724736,f1,phantom
+33,8.10971136,f1,finger_unload
+33,8.968711168,f1,phantom
+33,10.23584896,f1,phantom
+36,8.46407808,f1,sensor_residual
+36,9.609099264,f1,sensor_residual
+41,6.65856768,f1,sensor_residual
+41,7.335036672,f1,sensor_residual
+50,12.182201856,f1,finger_unload

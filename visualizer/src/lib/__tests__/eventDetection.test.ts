@@ -123,3 +123,26 @@ describe("resultToRecordedAtoms", () => {
     expect(resultToRecordedAtoms(noSpan)).toEqual(resultToAtoms(noSpan));
   });
 });
+
+describe("slide data suffix", () => {
+  it("serializes slide (signed mm) and jaw travel on an enriched slip", () => {
+    const withSlide: AutoLabelResult = {
+      subtasks: [],
+      events: [
+        {
+          label: "slip",
+          startS: 10.3,
+          endS: 10.5,
+          finger: 0,
+          confidence: "medium",
+          data: { slide: -2.47, jaw: 5.11 },
+        },
+      ],
+      flags: ["sustained_slide@10.2s"],
+    };
+    const contents = resultToAtoms(withSlide).map((a) => a.content);
+    expect(contents).toContain(
+      "[auto:medium] slip f0 0.20s slide-2.5mm jaw+5.1u",
+    );
+  });
+});

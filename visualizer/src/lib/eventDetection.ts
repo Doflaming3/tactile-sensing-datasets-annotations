@@ -78,6 +78,13 @@ export interface FingerSeries {
   slipDiv: Float64Array; // edge/center shear-direction divergence, 0..1
   edgeRateRatio: Float64Array; // edge vs center shear-rate ratio
   hf: Float64Array; // high-frequency shear energy (N/s RMS)
+  /** fz-weighted center of pressure along the finger long axis (mm, +Y
+   * of the taxel layout); NaN when unloaded (< 0.2 N) or without layout.
+   * Motion of this point is object motion RELATIVE TO THE PAD — the
+   * signal grip force cannot carry (ep23: force decays 2.6→1.2 N while
+   * CoP slides 4 mm down the finger; a static hold decays force too,
+   * but its CoP stays put). */
+  copY?: Float64Array;
 }
 
 export interface TactileSeries {
@@ -186,6 +193,35 @@ const RELEASE_TRAVEL_MIN = 2.0;
 const RELEASE_WIN_BEFORE_S = 0.5;
 const RELEASE_WIN_AFTER_S = 1.0;
 const RELEASE_CLOSING_VETO = -1.0;
+
+/** Sustained loosening slide (Zheng's ep23 video finding, 2026-08-31):
+ * the object sliding through an ESTABLISHED grip while the jaw loosens —
+ * the reflex-relevant precursor a controller could correct by re-closing.
+ * Detected on CoP travel, not force: >= SLIDE_MIN_MM of fz-weighted CoP
+ * motion along the finger within SLIDE_WIN_S, while the jaw net-opened
+ * >= SLIDE_JAW_OPEN_MIN over the same window. Corpus census (69 slide
+ * events >= 2 mm/1 s): 62 happen under a CLOSING jaw (-10..-35 units) =
+ * grasp-formation seating (ep30 video-verified normal) and die on the
+ * jaw-opening gate alone. The 7 jaw-opening survivors were all
+ * video-adjudicated, giving two vetoes:
+ *  - squeeze rebound: foam pressed hard springs the jaw back open while
+ *    grip HOLDS (ep22 @6.6, ep31 @9.8, ep56 @5.7 — all preceded by a
+ *    >= 5-unit close within 1.5 s; real slides: ep48 -0.3, ep23 +7.8).
+ *  - terminal mechanics: unloading at a place/release is not an in-grip
+ *    slide (ep53 @9.7, place 0.46 s ahead; ep23's own place is 1.48 s
+ *    ahead — THIN margin, re-derive on new rigs).
+ * Survivors: ep23 @10.2 (ball slides 2.5 mm as jaw opens +5.1 — Zheng's
+ * verified loosening slide) and ep48 @11.3 (cup rotating out of the
+ * jaws 0.7 s before its tauZ spike — verified escape precursor). */
+const SLIDE_WIN_S = 1.0;
+const SLIDE_MIN_MM = 2.0;
+const SLIDE_JAW_OPEN_MIN = 1.0;
+const SLIDE_SQUEEZE_LOOKBACK_S = 1.5;
+const SLIDE_SQUEEZE_VETO_U = -5.0;
+const SLIDE_TERMINAL_VETO_S = 1.0;
+const SLIDE_LOAD_MIN_N = 1.0;
+const SLIDE_MED_HALF_S = 0.15;
+const SLIDE_MERGE_GAP_S = 1.0;
 
 /** Staggered peel-offs: release is a HAND action but fingers exit
  * staggered — the gel can let go while the partner still holds and the
@@ -446,6 +482,7 @@ export function buildSeriesFromSensorFrames(
     const tauZ = new Float64Array(n);
     const slipDiv = new Float64Array(n);
     const edgeRateRatio = new Float64Array(n);
+    const copYSeries = new Float64Array(n).fill(NaN);
     let prevShear: Float64Array | null = null; // [nTaxels*2]
     const curShear = new Float64Array(nTaxels * 2);
 
@@ -477,6 +514,7 @@ export function buildSeriesFromSensorFrames(
       const copValid = layout && sfz > 0.2;
       const copX = copValid ? cx / sfz : 0;
       const copY = copValid ? cy / sfz : 0;
+      if (copValid) copYSeries[i] = copY;
 
       // torque proxy + edge/center split need layout
       if (layout) {
@@ -566,6 +604,7 @@ export function buildSeriesFromSensorFrames(
       slipDiv,
       edgeRateRatio,
       hf: hf.map((v) => v / Math.max(rateHz / 30, 1)) as Float64Array,
+      copY: copYSeries,
     });
   }
   return { t, rateHz, fingers };
@@ -629,6 +668,7 @@ export function clipSeries(s: TactileSeries, tMax: number): TactileSeries {
       slipDiv: f.slipDiv.slice(0, n),
       edgeRateRatio: f.edgeRateRatio.slice(0, n),
       hf: f.hf.slice(0, n),
+      copY: f.copY?.slice(0, n),
     })),
   };
 }
@@ -2265,6 +2305,99 @@ export function detectEvents(
     }
   }
 
+  // Sustained loosening slide (see SLIDE_* provenance). Runs on final
+  // renamed events — the terminal veto must see honest place/release
+  // labels. Flags-only plus data enrichment of coincident slips: no
+  // event class is added (Table VIII is partner-owned).
+  {
+    const graspAnchorS = subtasks.find((s2) => s2.label === "grasp")?.startS;
+    const placeAnchorS =
+      subtasks.find((s2) => s2.label === "place_release")?.startS ?? dur;
+    if (graspAnchorS !== undefined && gripper && gripper.t.length > 2) {
+      for (let f = 0; f < fingers.length; f++) {
+        const cop = fingers[f].copY;
+        if (!cop) continue;
+        const fn = fingers[f].fn;
+        // loaded-median CoP in a ±SLIDE_MED_HALF_S window (NaN-skipping;
+        // CoP is meaningless below SLIDE_LOAD_MIN_N)
+        const copMed = (tc: number): number => {
+          const vals: number[] = [];
+          for (let i = 0; i < t.length; i++) {
+            if (t[i] < tc - SLIDE_MED_HALF_S) continue;
+            if (t[i] > tc + SLIDE_MED_HALF_S) break;
+            if (fn[i] >= SLIDE_LOAD_MIN_N && Number.isFinite(cop[i])) {
+              vals.push(cop[i]);
+            }
+          }
+          if (vals.length < 3) return NaN;
+          vals.sort((a, b) => a - b);
+          return vals[vals.length >> 1];
+        };
+        // On a known non-success episode the veto is DISABLED: failure
+        // episodes get success-template place/release markers that are
+        // really the failure exit itself (Zheng's ep48 ruling; the
+        // 45/48-extra-place result-aware segmentation gap), and vetoing
+        // on those hides the slide that PRECEDES the loss — ep48's cup
+        // rotates out at 11.3 s, "place" 11.875 is the cup escaping.
+        const terminalVeto = !context?.result || context.result === "success";
+        const terminalNear = (tc: number): boolean =>
+          terminalVeto &&
+          cleaned.some(
+            (e) =>
+              e.finger === f &&
+              (e.label === "place" ||
+                e.label === "release" ||
+                e.label === "finger_unload") &&
+              e.startS >= tc - 0.25 &&
+              e.startS <= tc + SLIDE_TERMINAL_VETO_S,
+          );
+        let best: { tc: number; dcop: number; djaw: number } | null = null;
+        let lastHitS = -Infinity;
+        const emitBest = () => {
+          if (!best) return;
+          flags.push(`sustained_slide@${best.tc.toFixed(1)}s`);
+          for (const e of cleaned) {
+            if (
+              e.label === "slip" &&
+              e.finger === f &&
+              e.startS >= best.tc - 0.25 &&
+              e.startS <= best.tc + SLIDE_WIN_S + 0.25
+            ) {
+              e.data = { ...e.data, slide: best.dcop, jaw: best.djaw };
+            }
+          }
+          best = null;
+        };
+        for (
+          let tc = graspAnchorS;
+          tc + SLIDE_WIN_S <= placeAnchorS;
+          tc += 0.1
+        ) {
+          const c0 = copMed(tc);
+          const c1 = copMed(tc + SLIDE_WIN_S);
+          if (!Number.isFinite(c0) || !Number.isFinite(c1)) continue;
+          const dcop = c1 - c0;
+          if (Math.abs(dcop) < SLIDE_MIN_MM) continue;
+          const djaw = jawPosAt(tc + SLIDE_WIN_S) - jawPosAt(tc);
+          if (djaw < SLIDE_JAW_OPEN_MIN) continue;
+          if (
+            jawPosAt(tc) - jawPosAt(tc - SLIDE_SQUEEZE_LOOKBACK_S) <=
+            SLIDE_SQUEEZE_VETO_U
+          ) {
+            continue;
+          }
+          if (terminalNear(tc)) continue;
+          if (tc - lastHitS > SLIDE_MERGE_GAP_S) emitBest();
+          if (!best || Math.abs(dcop) > Math.abs(best.dcop)) {
+            best = { tc, dcop, djaw };
+          }
+          lastHitS = tc;
+        }
+        emitBest();
+      }
+    }
+  }
+
   // Recorded outcome (when metadata supplies it) vs our story: a full
   // success template with a non-success outcome is tactilely
   // indistinguishable from success (ep39/ep48: the object was released
@@ -2317,6 +2450,9 @@ export function resultToAtoms(result: AutoLabelResult): LanguageAtom[] {
     const d = e.data;
     if (d) {
       if (d.n !== undefined) parts.push(`${d.n.toFixed(1)}N`);
+      if (d.slide !== undefined) {
+        parts.push(`slide${d.slide >= 0 ? "+" : ""}${d.slide.toFixed(1)}mm`);
+      }
       if (d.jaw !== undefined) {
         parts.push(`jaw${d.jaw >= 0 ? "+" : ""}${d.jaw.toFixed(1)}u`);
       }
