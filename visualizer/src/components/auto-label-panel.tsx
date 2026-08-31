@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotations } from "@/context/annotations-context";
+import { useTime } from "@/context/time-context";
 import {
   buildSeriesFromSensorFrames,
   buildSeriesFromRawCsvs,
@@ -142,8 +143,16 @@ export default function AutoLabelPanel({
   root?: string | null;
   episodeId: number;
 }) {
-  const { atoms, addAtoms, deleteAtom, resetAtoms } = useAnnotations();
+  const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms } = useAnnotations();
+  const { seek } = useTime();
   const [open, setOpen] = useState(false);
+  // Human-review queue (Zheng's verify-and-add flow): failed_attempt span
+  // flags render as adjustable spans; a human watches the clip, nudges the
+  // boundaries, and confirms — only then does an event atom exist. Keyed by
+  // the original flag string; cleared on re-run and episode change.
+  const [review, setReview] = useState<
+    Record<string, { start: number; end: number; done?: "added" | "dismissed" }>
+  >({});
   const [thresholds, setThresholds] = useState<Partial<DetectionThresholds>>(
     {},
   );
@@ -288,6 +297,7 @@ export default function AutoLabelPanel({
             : newAtoms,
         );
         setLastResult(result);
+        setReview({});
         const subStr = result.subtasks
           .map(
             (s) =>
@@ -345,6 +355,7 @@ export default function AutoLabelPanel({
     rawSeriesRef.current = null;
     setRawState("none");
     setLastResult(null);
+    setReview({});
     setStatus("");
   }, [repoId, episodeId]);
 
@@ -469,6 +480,134 @@ export default function AutoLabelPanel({
                 : ""}
               .
             </p>
+          );
+        })()}
+
+      {lastResult &&
+        (() => {
+          // failed_attempt spans are FLAGS (no event atom exists) until a
+          // human verifies them here. Click the span to seek the video,
+          // nudge the boundaries, confirm to add the atom. Verified atoms
+          // carry no [auto:] prefix, so re-running auto-label keeps them.
+          const spans = lastResult.flags
+            .map((f) => ({
+              flag: f,
+              m: /^failed_attempt@([\d.]+)-([\d.]+)s$/.exec(f),
+            }))
+            .filter((s) => s.m !== null);
+          if (spans.length === 0) return null;
+          const nudge = (
+            key: string,
+            edge: "start" | "end",
+            delta: number,
+            s0: number,
+            e0: number,
+          ) =>
+            setReview((r) => {
+              const cur = r[key] ?? { start: s0, end: e0 };
+              let { start, end } = cur;
+              if (edge === "start") {
+                start = Math.max(0, Math.min(start + delta, end - 0.01));
+              } else {
+                end = Math.max(start + 0.01, end + delta);
+              }
+              start = Math.round(start * 100) / 100;
+              end = Math.round(end * 100) / 100;
+              return { ...r, [key]: { ...cur, start, end } };
+            });
+          const nudgeBtns = (
+            key: string,
+            edge: "start" | "end",
+            s0: number,
+            e0: number,
+          ) => (
+            <span className="inline-flex items-center gap-0.5">
+              <span className="text-slate-500 mr-0.5">{edge}</span>
+              {[-0.1, -0.01, 0.01, 0.1].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => nudge(key, edge, d, s0, e0)}
+                  className="px-1 rounded border border-slate-600/60 text-slate-300 hover:bg-slate-700/60 tabular"
+                >
+                  {d > 0 ? `+${d}` : d}
+                </button>
+              ))}
+            </span>
+          );
+          return (
+            <div className="space-y-1.5 pt-1 border-t border-slate-700/40">
+              <p className="text-[11px] text-amber-400/90">
+                {spans.length} failed-attempt span
+                {spans.length > 1 ? "s" : ""} awaiting human review — click a
+                span to seek the video there, adjust, then verify:
+              </p>
+              {spans.map(({ flag, m }) => {
+                const s0 = Number(m![1]);
+                const e0 = Number(m![2]);
+                const st = review[flag]?.start ?? s0;
+                const en = review[flag]?.end ?? e0;
+                const done = review[flag]?.done;
+                if (done) {
+                  return (
+                    <p key={flag} className="text-[11px] text-slate-500">
+                      failed_attempt {st.toFixed(2)}–{en.toFixed(2)} s —{" "}
+                      {done === "added" ? "✓ event added" : "dismissed"}
+                    </p>
+                  );
+                }
+                return (
+                  <div
+                    key={flag}
+                    className="flex items-center gap-2 flex-wrap text-[11px]"
+                  >
+                    <button
+                      type="button"
+                      title="Seek the video to this span"
+                      onClick={() => seek(st)}
+                      className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 tabular"
+                    >
+                      failed_attempt {st.toFixed(2)}–{en.toFixed(2)} s
+                    </button>
+                    {nudgeBtns(flag, "start", s0, e0)}
+                    {nudgeBtns(flag, "end", s0, e0)}
+                    <button
+                      type="button"
+                      title="Verified on video — add as an event annotation"
+                      onClick={() => {
+                        addAtom({
+                          role: "user",
+                          content: `failed_attempt ${(en - st).toFixed(2)}s (verified)`,
+                          style: "interjection",
+                          timestamp: st,
+                          camera: null,
+                          tool_calls: null,
+                        });
+                        setReview((r) => ({
+                          ...r,
+                          [flag]: { start: st, end: en, done: "added" },
+                        }));
+                      }}
+                      className="px-2 py-0.5 rounded bg-emerald-600/80 hover:bg-emerald-500 text-white"
+                    >
+                      ✓ yes, add event
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setReview((r) => ({
+                          ...r,
+                          [flag]: { start: st, end: en, done: "dismissed" },
+                        }))
+                      }
+                      className="text-slate-500 hover:text-slate-300 underline"
+                    >
+                      dismiss
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           );
         })()}
     </div>
