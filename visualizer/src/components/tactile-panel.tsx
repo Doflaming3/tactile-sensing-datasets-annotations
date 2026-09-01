@@ -560,7 +560,7 @@ export function TactileAggregate({
               onClick={() => void run()}
               className="text-xs px-3 py-1.5 rounded-md border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10 transition-colors"
             >
-              Compute (downloads each episode's data)
+              Compute (downloads each episode&apos;s data)
             </button>
           )}
           {progress !== null && (
