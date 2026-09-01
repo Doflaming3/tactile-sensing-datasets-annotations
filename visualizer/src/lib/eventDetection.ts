@@ -701,6 +701,16 @@ export function buildSeriesFromRawCsvs(
   csvTexts: string[],
   layout: [number, number, number][] | null,
   gripper?: GripperSeries | null,
+  opts?: {
+    /** CP5 of analysis/duplicate-investigation.md: the sidecar rows are a
+     * fixed 90.88 Hz LOGGER loop over a latest-frame buffer while the
+     * device tops out at ~83 Hz (Paxini manual; Zheng's catch) — 10-30%
+     * of rows are byte-identical re-reads. This drops a time sample only
+     * when EVERY finger's frame equals its predecessor (per-finger dedup
+     * would desync the shared time base). Default OFF: every threshold is
+     * calibrated on the logger-rate stream. */
+    dedupFrames?: boolean;
+  },
 ): TactileSeries | null {
   const parsed = csvTexts.map(parseRawCsv).filter((p) => p !== null) as Array<{
     t: Float64Array;
@@ -708,7 +718,38 @@ export function buildSeriesFromRawCsvs(
     nTaxels: number;
   }>;
   if (!parsed.length) return null;
-  const n = Math.min(...parsed.map((p) => p.t.length));
+  let n = Math.min(...parsed.map((p) => p.t.length));
+  if (opts?.dedupFrames) {
+    const keep: number[] = [0];
+    for (let i = 1; i < n; i++) {
+      let fresh = false;
+      for (const p of parsed) {
+        const w = p.nTaxels * 3;
+        for (let k = 0; k < w; k++) {
+          if (p.taxels[i * w + k] !== p.taxels[(i - 1) * w + k]) {
+            fresh = true;
+            break;
+          }
+        }
+        if (fresh) break;
+      }
+      if (fresh) keep.push(i);
+    }
+    if (keep.length < n) {
+      for (const p of parsed) {
+        const w = p.nTaxels * 3;
+        const t2 = new Float64Array(keep.length);
+        const x2 = new Float64Array(keep.length * w);
+        keep.forEach((src, dst) => {
+          t2[dst] = p.t[src];
+          x2.set(p.taxels.subarray(src * w, (src + 1) * w), dst * w);
+        });
+        p.t = t2;
+        p.taxels = x2;
+      }
+      n = keep.length;
+    }
+  }
   const base = parsed[0];
   // reconstruct nested frames [i][finger][taxel][3] lazily via accessor
   const frames: number[][][][] = new Array(n);

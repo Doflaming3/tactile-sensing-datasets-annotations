@@ -39,6 +39,7 @@ interface Args {
   compare: boolean;
   json: string | null;
   report: string | null;
+  dedup: boolean;
   thresholds: Partial<DetectionThresholds>;
 }
 
@@ -51,6 +52,7 @@ function parseArgs(argv: string[]): Args {
     compare: false,
     json: null,
     report: null,
+    dedup: false,
     thresholds: {},
   };
   for (let i = 0; i < argv.length; i++) {
@@ -62,6 +64,7 @@ function parseArgs(argv: string[]): Args {
     else if (k === "--compare") a.compare = true;
     else if (k === "--json") a.json = argv[++i];
     else if (k === "--report") a.report = argv[++i];
+    else if (k === "--dedup") a.dedup = true;
     else if (k === "--th") {
       const [key, val] = argv[++i].split("=");
       (a.thresholds as Record<string, number>)[key] = Number(val);
@@ -268,7 +271,11 @@ async function runEpisode(
   let source = args.source;
   if (args.source === "raw") {
     const texts = loadRawCsvTexts(root, ep, inputs.sensorName);
-    const raw = texts ? buildSeriesFromRawCsvs(texts, layout, gripper) : null;
+    const raw = texts
+      ? buildSeriesFromRawCsvs(texts, layout, gripper, {
+          dedupFrames: args.dedup,
+        })
+      : null;
     if (raw && texts) {
       const tEnd = inputs.timestamps.length
         ? inputs.timestamps[inputs.timestamps.length - 1] + 0.1
