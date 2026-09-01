@@ -243,6 +243,44 @@ const SLIDE_MERGE_GAP_S = 1.0;
  * ep28 peaks at 1.16x across three marginal stages and stays silent —
  * 1.16 vs 1.23 is a THIN margin, re-derive as verdicts accumulate. */
 export const HESITATION_P90_S = [6.32, 2.2, 4.56, 1.26];
+
+/** Short transport: a wrong-location failure can be tactilely complete
+ * (ep39: grasp, carry, real release — but the arm never went to the bowl;
+ * Zheng: vision territory, EXCEPT the transport stage is "amazingly
+ * short"). Corpus census 2026-08-31: ep39's transport = 0.78 s, the
+ * minimum by nearly 2x (next ep16 1.46 s, p5 1.55 s) — 1.0 s splits the
+ * gap with wide margins. Fires a review flag; the panel renders it as a
+ * human-check card (never auto-counts as an attempt). */
+const SHORT_TRANSPORT_MIN_S = 1.0;
+
+/** Combine function for failed_attempt spans (Zheng's ep54 verdict: one
+ * finger nudges the cup onto the other finger, still graspable, one grab
+ * finishes it — that chain is ONE attempt, not two). Discriminator is his
+ * own attempt definition (an attempt = a grab-and-miss CYCLE): merge
+ * adjacent spans only when the jaw never re-opened between them. Census:
+ * ep54's gap reopens 0.1 units (merge); ep31's 17.4 and ep45's 17.2
+ * (real retry cycles — keep separate). Threshold 5 units = the existing
+ * jaw-reopen vocabulary; margins are wide on both sides. */
+const ATTEMPT_MERGE_REOPEN_U = 5.0;
+
+/** Pure merge decision over chronologically sorted attempt spans —
+ * exported for tests. `reopenBetween[k]` = max jaw reopen (units) between
+ * span k and span k+1. */
+export function mergeAttemptSpans(
+  spans: Array<[number, number]>,
+  reopenBetween: number[],
+): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (let k = 0; k < spans.length; k++) {
+    const prev = out[out.length - 1];
+    if (k > 0 && prev && reopenBetween[k - 1] < ATTEMPT_MERGE_REOPEN_U) {
+      prev[1] = Math.max(prev[1], spans[k][1]);
+    } else {
+      out.push([spans[k][0], spans[k][1]]);
+    }
+  }
+  return out;
+}
 const HESITATION_MIN_SLOW_STAGES = 2;
 const HESITATION_STRONG = 1.2;
 
@@ -2480,6 +2518,55 @@ export function detectEvents(
       if (e.label === "place" || e.label === "release" || e.label === "drop") {
         flags.push(`residual_suspect@${e.startS.toFixed(1)}s`);
       }
+    }
+  }
+
+  // Combine chained failed_attempt spans (see mergeAttemptSpans
+  // provenance): no jaw reopen between two spans = still the same grab.
+  {
+    const spanRe = /^failed_attempt@([\d.]+)-([\d.]+)s$/;
+    const spans: Array<[number, number]> = [];
+    for (const f of flags) {
+      const m = spanRe.exec(f);
+      if (m) spans.push([Number(m[1]), Number(m[2])]);
+    }
+    if (spans.length > 1 && gripper) {
+      spans.sort((a, b) => a[0] - b[0]);
+      const reopen: number[] = [];
+      for (let k = 0; k < spans.length - 1; k++) {
+        let runMin = Infinity;
+        let maxRise = 0;
+        for (let j = 0; j < gripper.t.length; j++) {
+          if (gripper.t[j] < spans[k][1]) continue;
+          if (gripper.t[j] > spans[k + 1][0]) break;
+          runMin = Math.min(runMin, gripper.pos[j]);
+          maxRise = Math.max(maxRise, gripper.pos[j] - runMin);
+        }
+        reopen.push(maxRise);
+      }
+      const merged = mergeAttemptSpans(spans, reopen);
+      if (merged.length < spans.length) {
+        for (let i = flags.length - 1; i >= 0; i--) {
+          if (spanRe.test(flags[i])) flags.splice(i, 1);
+        }
+        for (const [a, b] of merged) {
+          flags.push(`failed_attempt@${a.toFixed(1)}-${b.toFixed(1)}s`);
+        }
+      }
+    }
+  }
+
+  // Short transport → human-check card (see SHORT_TRANSPORT_MIN_S
+  // provenance; ep39's wrong-location failure is otherwise invisible).
+  {
+    const tA = subtasks.find((s2) => s2.label === "transport")?.startS;
+    const tB = subtasks.find((s2) => s2.label === "place_release")?.startS;
+    if (
+      tA !== undefined &&
+      tB !== undefined &&
+      tB - tA < SHORT_TRANSPORT_MIN_S
+    ) {
+      flags.push(`short_transport@${tA.toFixed(1)}-${tB.toFixed(1)}s`);
     }
   }
 

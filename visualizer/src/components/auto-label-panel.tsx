@@ -496,7 +496,9 @@ export default function AutoLabelPanel({
           const spans = lastResult.flags
             .map((f) => ({
               flag: f,
-              m: /^failed_attempt@([\d.]+)-([\d.]+)s$/.exec(f),
+              m: /^(failed_attempt|short_transport)@([\d.]+)-([\d.]+)s$/.exec(
+                f,
+              ),
             }))
             .filter((s) => s.m !== null);
           if (spans.length === 0) return null;
@@ -542,20 +544,27 @@ export default function AutoLabelPanel({
           return (
             <div className="space-y-1.5 pt-1 border-t border-slate-700/40">
               <p className="text-[11px] text-amber-400/90">
-                {spans.length} failed-attempt span
-                {spans.length > 1 ? "s" : ""} awaiting human review — click a
-                span to seek the video there, adjust, then verify:
+                {spans.length} span{spans.length > 1 ? "s" : ""} awaiting human
+                review — click a span to seek the video there, adjust, then
+                verify:
               </p>
               {spans.map(({ flag, m }) => {
-                const s0 = Number(m![1]);
-                const e0 = Number(m![2]);
+                // short_transport (ep39-class wrong-location failure) is a
+                // possible failed task — the card proposes a failed_attempt
+                // for the human to confirm, same flow
+                const label =
+                  m![1] === "short_transport"
+                    ? "short transport → failed?"
+                    : "failed_attempt";
+                const s0 = Number(m![2]);
+                const e0 = Number(m![3]);
                 const st = review[flag]?.start ?? s0;
                 const en = review[flag]?.end ?? e0;
                 const done = review[flag]?.done;
                 if (done) {
                   return (
                     <p key={flag} className="text-[11px] text-slate-500">
-                      failed_attempt {st.toFixed(2)}–{en.toFixed(2)} s —{" "}
+                      {label} {st.toFixed(2)}–{en.toFixed(2)} s —{" "}
                       {done === "added" ? "✓ event added" : "dismissed"}
                     </p>
                   );
@@ -571,7 +580,7 @@ export default function AutoLabelPanel({
                       onClick={() => seek(st)}
                       className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 tabular"
                     >
-                      failed_attempt {st.toFixed(2)}–{en.toFixed(2)} s
+                      {label} {st.toFixed(2)}–{en.toFixed(2)} s
                     </button>
                     {nudgeBtns(flag, "start", s0, e0)}
                     {nudgeBtns(flag, "end", s0, e0)}

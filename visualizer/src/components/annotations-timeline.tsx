@@ -327,7 +327,10 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
   const autoFailed = useMemo(() => {
     const out: Array<{ start: number; end: number }> = [];
     for (const f of detectorFlags) {
-      const m = /^failed_attempt@([\d.]+)-([\d.]+)s$/.exec(f);
+      // short_transport = ep39-class possible failed task, same review flow
+      const m = /^(?:failed_attempt|short_transport)@([\d.]+)-([\d.]+)s$/.exec(
+        f,
+      );
       if (!m) continue;
       const start = Number(m[1]);
       const end = Number(m[2]);
