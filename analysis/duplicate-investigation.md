@@ -181,3 +181,34 @@ Actions:
 4. Portability: any rig that logs at arrival rate needs FULL threshold
    re-derivation (CP4d: derivative statistics shift up to 8x) — added to the
    porting recipe as step zero: measure the duplicate rate first.
+
+---
+
+## CP7 — Zheng's beat-model plan (2026-08-31, follow-up round)
+
+Hypothesis under test: the artifacts ("sensor loses info while grabbing",
+"sensor feels something when not attached") are a SYNCHRONIZATION problem —
+a regular 83.33 Hz (12 ms) device polled at ~91 Hz, duplicates = beat
+re-reads; correcting the axis should change the annotator's story.
+
+- **Step 1 (discover + rate fit)**: fitting (period, phase) against observed
+  duplicate positions in dynamic stretches: balanced accuracy 0.56–0.63 vs
+  chance 0.5, FLAT over 10.9–12.8 ms, no peak at 12.00. **The regular-grid
+  beat model is rejected** — duplicates are not phase-locked re-reads.
+  (`scripts/beat_model_fit.py`)
+- **Step 2 (correct the axis, time preserved)**: `deviceGridHz` builder
+  option — first frame per 12 ms slot, stamped at the slot boundary; uniform
+  83.33 Hz axis without compressing real time (supersedes the CP5 collapse,
+  which deleted held time and scrambled every rule). `run-detector
+  --device-grid`.
+- **Step 3 (rerun annotator)**: stages match **63/63** episodes (all four
+  anchors within 0.033 s ≈ 3 device frames). Abnormal interjections
+  **persist**: phantoms 5/5, sensor_residuals 5/5, finger_unloads 3/3, drops
+  24/25, contact/release/place ≥96% stable. Only slip churns (28 lost / 40
+  gained of 247 ≈ 13%) — hf texture statistics are sampling-sensitive
+  (calibration effect, not artifact causation).
+
+**CP7 verdict: synchronization hypothesis tested and closed.** The artifact
+classes are value-level device output; they reproduce identically on the
+corrected axis. Slip is the one detector whose calibration is axis-bound —
+already covered by the porting recipe's step zero.
