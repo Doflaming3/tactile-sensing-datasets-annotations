@@ -4,18 +4,18 @@
 
 We optimized the tactile auto-annotation pipeline for the SoTac dataset in an independent repository, without touching the original code or data, for a single reviewed merge at the end. Every rule in the detector is a generic physical or task-logic rule; there are no per-episode conditionals (verified: all 55 episode references in the detector file are provenance comments).
 
-Headline numbers: attempt counts now match the hand-recorded metadata on 55 of 59 episodes, and all four remaining disagreements are errors in the metadata itself, proven by video. The place-event census went from 130 events to 107 after five artifact classes were removed on physical grounds. Thirteen markers received honest names (finger unload, sensor residual, phantom). The unit test suite is 162 tests, all passing.
+Headline numbers: attempt counts now match the hand-recorded metadata on 56 of 59 episodes, and all three remaining disagreements are errors in the metadata itself, proven by video (a fourth divergence, on an episode outside the audited 59, counts hesitation as an attempt — ruled not one). The place-event census went from 130 events to 107 after artifact classes were removed on physical grounds. Thirteen markers received honest names (finger unload, sensor residual, phantom). The unit test suite is 179 tests, all passing. See the update section at the end for everything added after this briefing was first written.
 
 ## 1. The pipeline
 
-1. Data: pinned local mirrors of both datasets (main table at 30 Hz plus raw 91 Hz sensor sidecar files per episode).
+1. Data: pinned local mirrors of both datasets (main table at 30 Hz plus raw sensor sidecar files per episode — logged at 90.88 Hz, the recorder's clock; see item 6 of the update section).
 2. Detector: one shared implementation drives the web visualizer and an offline runner, validated bit-exact against the app.
 3. Verification loop: the offline runner replays all 63 episodes per change; every corpus-wide diff is enumerated before a change is kept; video verdicts arbitrate.
 4. Recording policy: the visualizer displays every sensor-true marker; the saved annotation set keeps only real events.
 
 ## 2. Demo script
 
-Launch: `cd visualizer`, then `bun --bun run dev --port 3005`, open `http://localhost:3005`, pick the episode, press Auto-label. Six episodes, each making one point. For each: what to show, what to say, and what on screen may look wrong — with the answer.
+Launch: `cd visualizer`, then `bun --bun run dev --port 3105`, open `http://localhost:3105` (3005 sits in a Windows excluded port range), pick the episode, press Auto-label. Six episodes, each making one point. For each: what to show, what to say, and what on screen may look wrong — with the answer.
 
 ### 2.1 `ep24` — what the annotator does on a normal episode
 
@@ -152,3 +152,14 @@ When the recorded outcome says failure but the touch data looks like a complete 
 - Jaw positions and travel are in the gripper's raw position units (about 0-60 over its range; only differences are used). Spin torque is in newton-millimeters.
 - Taxel: one sensing element of the fingertip array (52 per finger, three force axes each).
 - `ep24` style tokens are episode indices; `weak_contact@4.7-5.2s` style tokens are review flags with time spans.
+
+## Update (2026-09-01) — added after this briefing was written
+
+Everything above still demos as described. New capabilities worth showing, each with a one-episode demo:
+
+1. **Human review flow** (`ep45`): failed-attempt flags now render as adjustable span cards in the Auto-label panel — click seeks the video, ±0.1/±0.01 s nudges trim the span, "yes, add event" records a human-verified atom that survives re-runs. The timeline gained a FAILED ATT. lane: dashed spans are detector proposals, solid ones are human-verified. All 12 attempt spans in the corpus now carry video verdicts.
+2. **Sustained-slide detection** (`ep23`, `ep48`): center-of-pressure travel under a loosening jaw — `ep23` at 10.2 s (the ball slides 2.5 mm down the finger while the jaw opens 5 units, video-verified), `ep48` at 11.1 s (the cup-escape precursor, 0.9 s before the torque spike). Coincident slips carry the physics in their labels: `slide-2.5mm jaw+5.1u`. Runs causally — the reflex-loop candidate.
+3. **Artifact screen** (`ep25`): every terminal event's raw window is voted against a 971-window reference corpus; artifact-like events get `scr5/7`-style suffixes and a `residual_suspect` review flag. It independently corroborated every video-adjudicated phantom and residual, and caught a long-standing mislabeled "release" at 1.83 s. Advisory only — it never renames or deletes.
+4. **Behavior flags**: `hesitation` (`ep50` — every stage slower than the corpus p90 with nothing failing), `short_transport` (`ep39` — the wrong-location failure whose transport is half the corpus minimum; renders as a review card proposing a failed attempt).
+5. **Attempt combine rule** (`ep54`): adjacent failed-attempt spans merge when the jaw never re-opened between them — one grab-and-miss cycle is one attempt. This moved `ep54` into agreement with the hand-recorded metadata.
+6. **Raw-stream ground truth** (talking point, not a demo): the sidecar CSVs tick at 90.88 Hz — the logger's clock. The device emits change-gated (≤83 Hz per its manual, ~6 Hz when idle), so ~84% of rows are duplicates. Labels are axis-stable (stages 63/63, artifacts identical) except slip's texture statistics. Two recorder requests follow from this: per-episode re-zero (unchanged, now with five independent proofs) and arrival-driven logging. Full record: `analysis/duplicate-investigation.md`.

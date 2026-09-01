@@ -59,6 +59,32 @@ margin, then video-verify the members nearest the line.
 | D5 post-anchor | 1.5 s | corpus gap | ok |
 | merge/pairing gaps | 0.5-1.0 s | bout structure | conventional |
 
+Added since the original audit (2026-08-31 rounds, all census-derived with
+provenance comments at the constants):
+
+| Constant | Value (sotac) | Derivation basis | Margin quality |
+|---|---|---|---|
+| sustained_slide: CoP travel / jaw open | 2 mm in 1 s / +1 u | 69-event census; survivors +5.1/+2.55 vs 62 closing events | ok / jaw gate moderate |
+| slide squeeze-rebound veto | -5 u in prior 1.5 s | kills -26/-39/-15 preludes; survivors -0.3/0/+7.8 | wide |
+| slide terminal veto | 1.0 s ahead (success eps only) | kills ep53 0.46 s vs keeps ep23 1.48 s | THIN |
+| screen reference corpus + vote | 971 windows, 4/7 background | LOO: bg 88.6% self-ID, terminals 2.5-4.5% FA | per-rig artifact, regenerate |
+| hesitation p90s + strong gate | 6.32/2.20/4.56/1.26 s, 1.2x | 62-ep census; fires 1.23x+ (verified), silent 1.16x ("not obvious") | strong gate THIN (1.16 vs 1.23) |
+| short_transport | < 1.0 s | ep39 0.78 vs next 1.46, p5 1.55 | wide |
+| attempt-merge reopen | < 5 u between spans | merge 0.1 u vs keep 17.2/17.4 u | wide |
+
+## Step ZERO (2026-08-31): measure the axis before anything else
+
+The sotac sidecars are logger-clocked (90.88 Hz fixed loop) over a
+change-gated device (≤83 Hz, ~84% duplicate rows). Every derivative-based
+statistic — hf above all — is calibrated ON that axis and shifts up to 8x on
+an arrival-driven axis; stage anchors and the artifact classes are
+axis-stable (verified: full detector on a corrected 83.33 Hz grid matches
+stages 63/63 and preserves phantoms/residuals; only slip churns ~13%).
+Porting to any rig therefore starts with: measure the duplicate rate and
+logging discipline of the new recorder; if it logs on arrival, every hf/rate
+constant must be re-derived, not scaled. Details:
+`analysis/duplicate-investigation.md`.
+
 ## Tier 3 — structural assumptions (preconditions to CHECK, not rules)
 
 1. **Single-cycle, single-object episodes.** Breaks: post-task gate,

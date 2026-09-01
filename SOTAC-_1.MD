@@ -1,5 +1,15 @@
 # SoTac Annotation Pipeline — Teardown and Work Plan
 
+> **Status (2026-09-01):** historical document — the plan below was executed
+> and substantially extended across the sessions that followed. Current
+> repo map and capabilities: [README.md](README.md). Two facts stated below
+> are now known to be wrong in a specific way: the "raw ~91 Hz" sidecar
+> rate is the LOGGER's clock (device is change-gated, ≤83 Hz, ~84%
+> duplicate rows — `analysis/duplicate-investigation.md`), and the T1.3
+> "30 Hz vs 91 Hz threshold shift" question is answered there (hf is
+> axis-bound; the logger axis is canonical by calibration). The body is
+> preserved unedited as the record of what was believed on 2026-08-26.
+
 Working notes on Jingyi Zou's tactile auto-labeler, written to support code work on it.
 Read from public artifacts on 2026-08-26. Nothing here came from her directly.
 

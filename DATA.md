@@ -28,8 +28,15 @@ Downloaded via `huggingface_hub.snapshot_download` with an explicit `revision`
 (HTTP, no git). Sizes: sotac ≈ 1.0 GB (867 MB video), sotac_raw ≈ 1.3 GB.
 
 Contents per dataset: `data/` (30 Hz parquet main tables), `sensors/` (raw
-~91 Hz CSV sidecars + alignment.json per episode), `annotations/` (per-episode
+CSV sidecars + alignment.json per episode), `annotations/` (per-episode
 JSON), `videos/` (chunked mp4), `meta/`, and in sotac a `curation_map.json`.
+
+Rate caveat (2026-08-31, measured): the sidecar rows tick at **90.88 Hz —
+the logger's fixed 11 ms loop**, not the device rate. ~84% of rows are
+byte-identical duplicates; the device emits change-gated (~6 Hz unloaded to
+~67 Hz loaded, ≤ the Paxini manual's 83 Hz). Labels are axis-stable except
+slip's hf statistics. See `analysis/duplicate-investigation.md` before doing
+any rate- or derivative-based work on these files.
 
 ### Re-sync policy
 
@@ -71,9 +78,11 @@ task, result, attempts).
 ### Known upstream facts to keep in mind
 
 - Annotations at the pinned sotac revision: episodes 0–49 and 51–59 (no 50),
-  plus `annotations/episode_annotations.json`. Only episodes 0–5 are known
-  human-corrected (per SOTAC-_1.MD); the status of 6–59 (auto vs corrected) is
-  under investigation.
+  plus `annotations/episode_annotations.json`. RESOLVED: only episodes 0–5
+  are human-corrected; 6–59 are pure detector output saved in one sweep (see
+  the annotation-history section above) — treat published stage boundaries
+  and events for 6–59 as old-detector snapshots, not ground truth. Ground
+  truth is the video-verdict record (project memory + analysis docs).
 - The Space writes annotations back to the Hub (`hubCommit.ts`). Our local
   visualizer copy must not be pointed at her datasets with write credentials;
   test the write path only against a dataset under our own namespace.

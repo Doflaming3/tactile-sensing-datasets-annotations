@@ -20,7 +20,7 @@ Fork of [lerobot/visualize_dataset](https://huggingface.co/spaces/lerobot/visual
 extended for tactile robot datasets (Paxini PX-6AX GEN3 and beyond):
 
 - PXSR-style per-taxel 3D force arrows, contact timeline, tactile statistics
-- raw high-frequency tactile stream viewer (~91 Hz)
+- raw high-frequency tactile stream viewer (sidecar CSVs; logged at ~91 Hz — the recorder's clock, device emits change-gated ≤83 Hz, see `analysis/duplicate-investigation.md` in the workspace root)
 - RGBD color + 16-bit depth panels (server-side ffmpeg decode, timestamp-corrected)
 - per-episode-folder datasets (e.g. `summer-dong/lerobot-ball-pickplace-0813`):
   episode auto-discovery at any nesting depth, task.json cards, cross-episode statistics
