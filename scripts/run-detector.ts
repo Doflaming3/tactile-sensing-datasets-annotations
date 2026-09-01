@@ -40,6 +40,7 @@ interface Args {
   json: string | null;
   report: string | null;
   dedup: boolean;
+  deviceGrid: boolean;
   thresholds: Partial<DetectionThresholds>;
 }
 
@@ -53,6 +54,7 @@ function parseArgs(argv: string[]): Args {
     json: null,
     report: null,
     dedup: false,
+    deviceGrid: false,
     thresholds: {},
   };
   for (let i = 0; i < argv.length; i++) {
@@ -65,6 +67,7 @@ function parseArgs(argv: string[]): Args {
     else if (k === "--json") a.json = argv[++i];
     else if (k === "--report") a.report = argv[++i];
     else if (k === "--dedup") a.dedup = true;
+    else if (k === "--device-grid") a.deviceGrid = true;
     else if (k === "--th") {
       const [key, val] = argv[++i].split("=");
       (a.thresholds as Record<string, number>)[key] = Number(val);
@@ -274,6 +277,8 @@ async function runEpisode(
     const raw = texts
       ? buildSeriesFromRawCsvs(texts, layout, gripper, {
           dedupFrames: args.dedup,
+          // Zheng's beat-model plan step 2: uniform 83.33 Hz (12 ms) axis
+          deviceGridHz: args.deviceGrid ? 1000 / 12 : undefined,
         })
       : null;
     if (raw && texts) {

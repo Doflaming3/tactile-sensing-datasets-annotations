@@ -708,8 +708,18 @@ export function buildSeriesFromRawCsvs(
      * of rows are byte-identical re-reads. This drops a time sample only
      * when EVERY finger's frame equals its predecessor (per-finger dedup
      * would desync the shared time base). Default OFF: every threshold is
-     * calibrated on the logger-rate stream. */
+     * calibrated on the logger-rate stream.
+     * CAUTION (CP5 finding): this COMPRESSES real time — held stretches
+     * collapse — and scrambles time-based rules. Superseded by
+     * deviceGridHz for axis-honest work; kept as the CP5 probe. */
     dedupFrames?: boolean;
+    /** Zheng's beat-model correction (step 2 of his plan): assume the
+     * device emits on a REGULAR grid (83.33 Hz = 12 ms) under the ~91 Hz
+     * poller, so ~8.3% of rows are beat re-reads. Partition time into
+     * 1/deviceGridHz slots from the first sample, keep the FIRST row of
+     * each slot, stamp it at the slot boundary — beat re-reads drop,
+     * real time is PRESERVED on a uniform device-rate axis. */
+    deviceGridHz?: number;
   },
 ): TactileSeries | null {
   const parsed = csvTexts.map(parseRawCsv).filter((p) => p !== null) as Array<{
@@ -719,7 +729,35 @@ export function buildSeriesFromRawCsvs(
   }>;
   if (!parsed.length) return null;
   let n = Math.min(...parsed.map((p) => p.t.length));
-  if (opts?.dedupFrames) {
+  if (opts?.deviceGridHz && opts.deviceGridHz > 0) {
+    const T = 1 / opts.deviceGridHz;
+    const t0 = parsed[0].t[0];
+    const keep: number[] = [];
+    const slotT: number[] = [];
+    let lastSlot = -1;
+    for (let i = 0; i < n; i++) {
+      const slot = Math.floor((parsed[0].t[i] - t0) / T);
+      if (slot !== lastSlot) {
+        keep.push(i);
+        slotT.push(t0 + slot * T);
+        lastSlot = slot;
+      }
+    }
+    if (keep.length < n) {
+      for (const p of parsed) {
+        const w = p.nTaxels * 3;
+        const t2 = new Float64Array(keep.length);
+        const x2 = new Float64Array(keep.length * w);
+        keep.forEach((src, dst) => {
+          t2[dst] = slotT[dst];
+          x2.set(p.taxels.subarray(src * w, (src + 1) * w), dst * w);
+        });
+        p.t = t2;
+        p.taxels = x2;
+      }
+      n = keep.length;
+    }
+  } else if (opts?.dedupFrames) {
     const keep: number[] = [0];
     for (let i = 1; i < n; i++) {
       let fresh = false;
