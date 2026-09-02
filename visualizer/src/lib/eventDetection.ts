@@ -80,8 +80,10 @@ export interface FingerSeries {
   slipDiv: Float64Array; // edge/center shear-direction divergence, 0..1
   edgeRateRatio: Float64Array; // edge vs center shear-rate ratio
   hf: Float64Array; // high-frequency shear energy (N/s RMS)
-  /** fz-weighted center of pressure along the finger long axis (mm, +Y
-   * of the taxel layout); NaN when unloaded (< 0.2 N) or without layout.
+  /** Positive-mass center of pressure along the finger long axis (mm, +Y
+   * of the taxel layout): fz-weighted average over taxels with fz > 0.05,
+   * numerator and denominator over that same set (fixed per Jingyi's PR #1
+   * review). NaN when positive mass < 0.2 N or without layout.
    * Motion of this point is object motion RELATIVE TO THE PAD — the
    * signal grip force cannot carry (ep23: force decays 2.6→1.2 N while
    * CoP slides 4 mm down the finger; a static hold decays force too,
@@ -554,6 +556,20 @@ export function buildSeriesFromSensorFrames(
   const corrected = applyAdaptiveBaseline(frames, timestamps, gripper);
   const src: unknown[] = corrected ?? frames;
 
+  // Layout bounds for the CoP invariant check (Jingyi's PR #1 review): a
+  // positive-weight average of taxel positions is a convex combination and
+  // cannot leave the pad — if it does, the math upstream is wrong again.
+  let copYMin = -Infinity;
+  let copYMax = Infinity;
+  if (layout) {
+    copYMin = Infinity;
+    copYMax = -Infinity;
+    for (const p of layout) {
+      if (p[1] < copYMin) copYMin = p[1];
+      if (p[1] > copYMax) copYMax = p[1];
+    }
+  }
+
   const fingers: FingerSeries[] = [];
   for (let f = 0; f < nFingers; f++) {
     const fn = new Float64Array(n);
@@ -575,6 +591,7 @@ export function buildSeriesFromSensorFrames(
       let sfz = 0;
       let cx = 0;
       let cy = 0;
+      let szPos = 0;
       for (let k = 0; k < nTaxels; k++) {
         const fx = taxels[k]?.[0] ?? 0;
         const fy = taxels[k]?.[1] ?? 0;
@@ -588,14 +605,25 @@ export function buildSeriesFromSensorFrames(
         if (layout && fz > 0.05) {
           cx += fz * layout[k][0];
           cy += fz * layout[k][1];
+          szPos += fz;
         }
       }
       fn[i] = sfz;
       fs[i] = Math.hypot(sfx, sfy);
-      const copValid = layout && sfz > 0.2;
-      const copX = copValid ? cx / sfz : 0;
-      const copY = copValid ? cy / sfz : 0;
-      if (copValid) copYSeries[i] = copY;
+      // CoP = positive-mass weighted average: numerator AND denominator
+      // over the SAME taxel set (fz > 0.05). The previous denominator was
+      // the all-taxel sum, which the adaptive baseline routinely drives
+      // partly negative — the ratio became force-dependent and a static
+      // contact "traveled" as grip decayed (Jingyi's PR #1 review: static
+      // contact at 15 mm read 17→29 mm as force fell 5→1.2 N, past the
+      // 19.3 mm pad end; ~5.7 mm fake travel vs SLIDE_MIN_MM 2.0).
+      const copValid = layout && szPos > 0.2;
+      const copX = copValid ? cx / szPos : 0;
+      const copY = copValid ? cy / szPos : 0;
+      // invariant: convex combination stays on the pad (small numeric slack)
+      if (copValid && copY >= copYMin - 0.01 && copY <= copYMax + 0.01) {
+        copYSeries[i] = copY;
+      }
 
       // torque proxy + edge/center split need layout
       if (layout) {

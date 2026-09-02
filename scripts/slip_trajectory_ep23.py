@@ -34,6 +34,22 @@ EPS = [23, 30]
 HALF = 0.35
 
 
+def cop_y(fz, ty, valid_mask=None):
+    """Positive-mass CoP along the finger (mm): fz-weighted average with
+    numerator AND denominator over the same fz>0.05 taxel set. Fixed per
+    Jingyi's PR #1 review — the old all-taxel denominator (negatives
+    included, post-baseline) made CoP force-dependent: a static contact
+    'traveled' as grip decayed."""
+    pos = fz > 0.05
+    den = (fz * pos).sum(axis=1)
+    cop = np.where(den > 0.2,
+                   (fz * ty * pos).sum(axis=1) / np.maximum(den, 1e-9),
+                   np.nan)
+    if valid_mask is not None:
+        cop = np.where(valid_mask, cop, np.nan)
+    return cop
+
+
 def taxel_layout_y(n=52):
     # parse [x, y, z] triples for the n-taxel layout out of taxel-layouts.ts
     src = (ROOT / "visualizer/src/lib/taxel-layouts.ts").read_text(encoding="utf-8")
@@ -118,7 +134,7 @@ def main():
             normal = fz[w].sum(axis=1)
             sfx, sfy = fx[w].sum(axis=1), fy[w].sum(axis=1)
             loaded = normal > 0.5
-            cop = np.where(loaded, (fz[w] * ty).sum(axis=1) / np.maximum(fz[w].sum(axis=1), 1e-9), np.nan)
+            cop = cop_y(fz[w], ty, valid_mask=loaded)
             rows.append({"t": t_ev, "finger": fg,
                          "grip": normal.mean(),
                          "shear_ang": np.degrees(np.arctan2(np.mean(sfy), np.mean(sfx))),
@@ -150,7 +166,7 @@ def main():
         fg_main = s["finger"].mode()[0]
         t, fx, fy, fz = streams[fg_main]
         normal = fz.sum(axis=1)
-        cop = np.where(normal > 0.5, (fz * ty).sum(axis=1) / np.maximum(fz.sum(axis=1), 1e-9), np.nan)
+        cop = cop_y(fz, ty, valid_mask=normal > 0.5)
         ax = axes[row, 0]
         ax.plot(t, normal, "C0-", lw=0.8, label=f"grip {fg_main} (N)")
         ax2 = ax.twinx()

@@ -112,13 +112,13 @@ d = dump(51)
 for a in d["atoms"]:
     if a.get("style") == "interjection" and 5.6 <= a["timestamp"] <= 7.6:
         print("   atom @%.3f  %s" % (a["timestamp"], a["content"]))
-from slip_trajectory_ep23 import taxel_layout_y  # noqa: E402
+from slip_trajectory_ep23 import cop_y, taxel_layout_y  # noqa: E402
 
 ty = taxel_layout_y()
 for fg, fname in (("f0", "sensor_1.csv"), ("f1", "sensor_2.csv")):
     t, fx, fy, fz = load_taxels(51, fname)
     normal = fz.sum(axis=1)
-    copn = np.where(normal > 1.0, (fz * ty).sum(axis=1) / np.maximum(fz.sum(axis=1), 1e-9), np.nan)
+    copn = cop_y(fz, ty, valid_mask=normal > 1.0)
     for tc in (6.0, 6.3, 6.6, 6.9, 7.2):
         m2 = (t >= tc - 0.15) & (t <= tc + 0.15)
         v = copn[m2]

@@ -22,7 +22,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from raw_event_knn import ANN, SENS
-from slip_trajectory_ep23 import load_taxels, taxel_layout_y
+from slip_trajectory_ep23 import cop_y, load_taxels, taxel_layout_y
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data/sotac"
@@ -74,9 +74,7 @@ def main():
             t, fx, fy, fz = load_taxels(ep, fname)
             t0, t1 = anchors["grasp"], anchors.get("place_release", t[-1])
             normal = fz.sum(axis=1)
-            copn = np.where(normal > 1.0,
-                            (fz * ty).sum(axis=1) / np.maximum(fz.sum(axis=1), 1e-9),
-                            np.nan)
+            copn = cop_y(fz, ty, valid_mask=normal > 1.0)
 
             def med(tc):
                 m = (t >= tc - 0.15) & (t <= tc + 0.15)
