@@ -12,7 +12,7 @@
 //   clearly visible needle; magnitude is also encoded in the color ramp.
 // * Playback-synced via TimeContext; the timeline seeks through it too.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Segments, Segment } from "@react-three/drei";
 import * as THREE from "three";
@@ -123,34 +123,100 @@ function expandChannels(
   return [];
 }
 
+// ---- display mode: RAW by default (Jingyi's PR #1 review, blocker 2) -------
+// The tactile displays are the audit surface for vendor zero points and
+// drift, so they must show what the sensor reported. The auto-labeler's
+// adaptive drift correction is available for the DISPLAY as an explicit,
+// labelled, session-only opt-in: one shared switch flips every tactile view
+// (arrows, timeline, stats, tiles) at once. Deliberately NOT persisted —
+// a reload always returns to raw, so the audit default can never silently
+// become the corrected view. The detector itself keeps using the correction
+// internally (approved in review); stored data is never modified either way.
+let driftCorrectedView = false;
+const driftViewSubs = new Set<() => void>();
+
+function setDriftCorrectedView(v: boolean) {
+  driftCorrectedView = v;
+  driftViewSubs.forEach((cb) => cb());
+}
+
+function useDriftCorrectedView(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      driftViewSubs.add(cb);
+      return () => driftViewSubs.delete(cb);
+    },
+    () => driftCorrectedView,
+    () => false,
+  );
+}
+
+const DRIFT_TOGGLE_TITLE =
+  "Default is RAW sensor output (for auditing vendor zero points and " +
+  "drift). Turning this on applies the auto-labeler's adaptive baseline " +
+  "to the DISPLAY only — one switch flips every tactile view; saved data " +
+  "is never modified; resets to raw on reload.";
+
+function DriftViewToggle({ compact = false }: { compact?: boolean }) {
+  const corrected = useDriftCorrectedView();
+  if (compact) {
+    return (
+      <button
+        type="button"
+        title={DRIFT_TOGGLE_TITLE}
+        onClick={() => setDriftCorrectedView(!corrected)}
+        className={`px-1.5 rounded border text-[10px] ${
+          corrected
+            ? "border-amber-500/50 text-amber-300 bg-amber-500/10"
+            : "border-slate-600/60 text-slate-400"
+        }`}
+      >
+        {corrected ? "drift-corrected" : "raw"}
+      </button>
+    );
+  }
+  return (
+    <label
+      className="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer"
+      title={DRIFT_TOGGLE_TITLE}
+    >
+      <input
+        type="checkbox"
+        checked={corrected}
+        onChange={(e) => setDriftCorrectedView(e.target.checked)}
+      />
+      drift-corrected view (display only)
+    </label>
+  );
+}
+
 function channelsFrom(
   sensorFrames: SensorFramesMap,
   gripper?: GripperSeries | null,
+  corrected = false,
 ): Channel[] {
   const out: Channel[] = [];
   for (const [name, sf] of Object.entries(sensorFrames)) {
-    // Show the DRIFT-CORRECTED signal everywhere (3D arrows, timeline,
-    // stats) — the same correction the auto-labeler judges, so the panels
-    // never display force when the pad demonstrably touches nothing
-    // (sotac ep43/47: phantom baseline flicker, video-verified). Buffered
-    // (N,P,3) history shapes are left raw; sotac's (F,P,3) and single
-    // (P,3) shapes are corrected.
     let frames = sf.frames;
-    try {
-      if (sf.shape.length === 3 && sf.shape[0] <= 4) {
-        frames =
-          (applyAdaptiveBaseline(
-            sf.frames,
-            sf.timestamps,
-            gripper,
-          ) as unknown[]) ?? sf.frames;
-      } else if (sf.shape.length === 2) {
-        const wrapped = sf.frames.map((fr) => [fr]);
-        const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper);
-        if (corr) frames = corr.map((fr) => fr[0]);
+    if (corrected) {
+      // opt-in only — see the display-mode note above. Buffered (N,P,3)
+      // history shapes are left raw; (F,P,3) and (P,3) are corrected.
+      try {
+        if (sf.shape.length === 3 && sf.shape[0] <= 4) {
+          frames =
+            (applyAdaptiveBaseline(
+              sf.frames,
+              sf.timestamps,
+              gripper,
+            ) as unknown[]) ?? sf.frames;
+        } else if (sf.shape.length === 2) {
+          const wrapped = sf.frames.map((fr) => [fr]);
+          const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper);
+          if (corr) frames = corr.map((fr) => fr[0]);
+        }
+      } catch {
+        frames = sf.frames; // raw beats a crashed panel
       }
-    } catch {
-      frames = sf.frames; // raw beats a crashed panel
     }
     out.push(...expandChannels(name, sf.shape, frames, sf.timestamps));
   }
@@ -441,9 +507,10 @@ export function TactileStats({
   sensorFrames: SensorFramesMap;
   gripper?: GripperSeries | null;
 }) {
+  const corrected = useDriftCorrectedView();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper),
-    [sensorFrames, gripper],
+    () => channelsFrom(sensorFrames, gripper, corrected),
+    [sensorFrames, gripper, corrected],
   );
   const rows = useMemo(() => {
     return channels.map((ch) => {
@@ -487,9 +554,12 @@ export function TactileStats({
   return (
     <div className="max-w-4xl mx-auto w-full pt-6">
       <div className="bg-[var(--surface-1)]/60 rounded-lg p-4 border border-white/10">
-        <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">
-          Tactile Sensors, current episode
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-slate-400 uppercase tracking-wide">
+            Tactile Sensors, current episode
+          </p>
+          <DriftViewToggle compact />
+        </div>
         <table className="w-full text-sm text-slate-300">
           <thead>
             <tr className="text-[11px] text-slate-500 text-left">
@@ -629,10 +699,11 @@ export default function TactilePanel({
   const { currentTime } = useTime();
   const [maxLen, setMaxLen] = useState(14);
   const [forceMax, setForceMax] = useState(5.0);
+  const corrected = useDriftCorrectedView();
 
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper),
-    [sensorFrames, gripper],
+    () => channelsFrom(sensorFrames, gripper, corrected),
+    [sensorFrames, gripper, corrected],
   );
   if (channels.length === 0) return null;
 
@@ -655,6 +726,7 @@ export default function TactilePanel({
           Tactile Sensors
         </p>
         <div className="flex items-center gap-4 text-[11px] text-slate-400">
+          <DriftViewToggle />
           <label className="flex items-center gap-2">
             arrow {maxLen.toFixed(0)} mm
             <input
@@ -743,18 +815,20 @@ export function TactileFingerView({
   gripper?: GripperSeries | null;
 }) {
   const { currentTime } = useTime();
+  const corrected = useDriftCorrectedView();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper),
-    [sensorFrames, gripper],
+    () => channelsFrom(sensorFrames, gripper, corrected),
+    [sensorFrames, gripper, corrected],
   );
   const ch = channels[fingerIndex];
   if (!ch) return null;
   const fi = frameIndexFor(ch.timestamps, currentTime, fps);
   return (
     <div className="panel p-2 h-full min-h-0 flex flex-col">
-      <p className="px-1 pb-1 text-[11px] text-slate-400 shrink-0 truncate">
-        {ch.label}
-      </p>
+      <div className="px-1 pb-1 shrink-0 flex items-center justify-between gap-1">
+        <p className="text-[11px] text-slate-400 truncate">{ch.label}</p>
+        <DriftViewToggle compact />
+      </div>
       <div className="flex-1 min-h-0 rounded bg-[#0b0e15]">
         <Canvas camera={{ position: [0, 11, 34], up: [0, 1, 0], fov: 38 }}>
           <color attach="background" args={["#0b0e15"]} />
@@ -780,16 +854,20 @@ export function TactileSummary({
   sensorFrames: SensorFramesMap;
   gripper?: GripperSeries | null;
 }) {
+  const corrected = useDriftCorrectedView();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper),
-    [sensorFrames, gripper],
+    () => channelsFrom(sensorFrames, gripper, corrected),
+    [sensorFrames, gripper, corrected],
   );
   if (channels.length === 0) return null;
   return (
     <div className="panel p-2 h-full min-h-0 flex flex-col">
-      <p className="px-1 pb-1 text-[10px] uppercase tracking-wide text-slate-500 shrink-0">
-        Contact force
-      </p>
+      <div className="px-1 pb-1 shrink-0 flex items-center justify-between gap-1">
+        <p className="text-[10px] uppercase tracking-wide text-slate-500">
+          Contact force
+        </p>
+        <DriftViewToggle compact />
+      </div>
       <div className="flex-1 min-h-0">
         <ContactTimeline channels={channels} fill />
       </div>
