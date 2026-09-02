@@ -171,7 +171,7 @@ function DriftViewToggle({ compact = false }: { compact?: boolean }) {
             : "border-slate-600/60 text-slate-400"
         }`}
       >
-        {corrected ? "drift-corrected" : "raw"}
+        {corrected ? "view: corrected" : "view: raw"}
       </button>
     );
   }
