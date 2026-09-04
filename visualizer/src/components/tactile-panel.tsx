@@ -201,31 +201,21 @@ function channelsFrom(
     if (corrected) {
       // opt-in only — see the display-mode note above. Buffered (N,P,3)
       // history shapes are left raw; (F,P,3) and (P,3) are corrected.
-      // After correction, taxels whose fz went NEGATIVE (signal decayed
-      // below the captured baseline — routine on drift fingers) claim no
-      // contact and are zeroed for display: rendering the negative
-      // residual as an arrow fabricates force the sensor never reported
-      // (Zheng's catch, ep47 @16s: corrected view showed a cluster where
-      // raw showed nothing).
-      const clampNeg = (fr: unknown[]): unknown[] =>
-        fr.map((frame) =>
-          (frame as number[][][]).map((finger) =>
-            finger.map((p) => (Number(p[2]) <= 0 ? [0, 0, 0] : p)),
-          ),
-        );
+      // applyAdaptiveBaseline clamps at the SOURCE (Zheng's ruling): its
+      // output never contains negative fz or ghost shear, so the display
+      // needs no defensive clamping of its own.
       try {
         if (sf.shape.length === 3 && sf.shape[0] <= 4) {
-          const corr = applyAdaptiveBaseline(
-            sf.frames,
-            sf.timestamps,
-            gripper,
-          ) as unknown[] | null;
-          if (corr) frames = clampNeg(corr);
+          frames =
+            (applyAdaptiveBaseline(
+              sf.frames,
+              sf.timestamps,
+              gripper,
+            ) as unknown[]) ?? sf.frames;
         } else if (sf.shape.length === 2) {
           const wrapped = sf.frames.map((fr) => [fr]);
           const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper);
-          if (corr)
-            frames = clampNeg(corr).map((fr) => (fr as number[][][])[0]);
+          if (corr) frames = corr.map((fr) => fr[0]);
         }
       } catch {
         frames = sf.frames; // raw beats a crashed panel

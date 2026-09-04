@@ -4,8 +4,30 @@
     {
       "name": "visualizer",
       "runtimeExecutable": "C:\\Users\\Ryan Xu\\.bun\\bin\\bun.exe",
-      "runtimeArgs": ["--bun", "run", "--cwd", "E:\\tactile-sensing-datasets-annotations\\visualizer", "dev", "--port", "3105"],
+      "runtimeArgs": [
+        "--bun",
+        "run",
+        "--cwd",
+        "E:\\tactile-sensing-datasets-annotations\\visualizer",
+        "dev",
+        "--port",
+        "3105"
+      ],
       "port": 3105
+    },
+    {
+      "name": "visualizer-alt",
+      "runtimeExecutable": "C:\\Users\\Ryan Xu\\.bun\\bin\\bun.exe",
+      "runtimeArgs": [
+        "--bun",
+        "run",
+        "--cwd",
+        "E:\\tactile-sensing-datasets-annotations\\visualizer",
+        "dev",
+        "--port",
+        "3106"
+      ],
+      "port": 3106
     }
   ]
 }
