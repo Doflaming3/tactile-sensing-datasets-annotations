@@ -14,6 +14,7 @@
  *   video overlay component share a single source of truth.
  */
 
+import type { DetectedSpan } from "@/lib/eventDetection";
 import React, {
   createContext,
   useCallback,
@@ -114,11 +115,12 @@ interface AnnotationsContextType {
   deleteAtom: (atom: LanguageAtom) => void;
   resetAtoms: () => void;
 
-  /** Flags from the latest auto-label run (episode-scoped, NOT persisted,
+  /** Spans from the latest auto-label run (episode-scoped, NOT persisted,
    * not atoms) — lets the timeline show detector-proposed spans that have
-   * no atom yet, e.g. unverified failed_attempt@A-Bs. */
-  detectorFlags: string[];
-  setDetectorFlags: (flags: string[]) => void;
+   * no atom yet, e.g. an unverified failed_attempt. Structured, with the
+   * finger they belong to; nothing here is parsed out of a string. */
+  detectorSpans: DetectedSpan[];
+  setDetectorSpans: (spans: DetectedSpan[]) => void;
 
   setPendingDraw: (draw: PendingDraw) => void;
   clearPendingDraw: () => void;
@@ -150,7 +152,7 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [episodeId, setEpisodeId] = useState<number | null>(null);
   const [ident, setIdent] = useState<DatasetIdent>({});
   const [atoms, setAtoms] = useState<LanguageAtom[]>([]);
-  const [detectorFlags, setDetectorFlags] = useState<string[]>([]);
+  const [detectorSpans, setDetectorSpans] = useState<DetectedSpan[]>([]);
   const [frameTimestamps, setFrameTimestamps] = useState<number[]>([]);
   const [pendingDraw, setPendingDrawState] = useState<PendingDraw>(null);
   const [activeCamera, setActiveCameraState] = useState<string | null>(null);
@@ -385,8 +387,8 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       updateAtom,
       deleteAtom,
       resetAtoms,
-      detectorFlags,
-      setDetectorFlags,
+      detectorSpans,
+      setDetectorSpans,
       setPendingDraw,
       clearPendingDraw,
       save,
@@ -417,8 +419,8 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       updateAtom,
       deleteAtom,
       resetAtoms,
-      detectorFlags,
-      setDetectorFlags,
+      detectorSpans,
+      setDetectorSpans,
       setPendingDraw,
       clearPendingDraw,
       save,

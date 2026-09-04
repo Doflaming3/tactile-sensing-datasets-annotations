@@ -136,7 +136,7 @@ interface PendingCreate {
 }
 
 export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
-  const { atoms, addAtom, updateAtom, snap, selectAtom, detectorFlags } =
+  const { atoms, addAtom, updateAtom, snap, selectAtom, detectorSpans } =
     useAnnotations();
   const { currentTime, seek, setIsPlaying } = useTime();
   const trackBandRef = useRef<HTMLDivElement | null>(null);
@@ -321,26 +321,25 @@ export const AnnotationsTimeline: React.FC<Props> = ({ duration }) => {
     };
   }, [atoms, duration]);
 
-  // Detector-proposed failed-attempt spans (flags from the latest auto-label
+  // Detector-proposed failed-attempt spans (from the latest auto-label
   // run — no atom exists yet). Shown dashed on the failed lane; suppressed
   // once a verified atom span covers the same stretch.
   const autoFailed = useMemo(() => {
     const out: Array<{ start: number; end: number }> = [];
-    for (const f of detectorFlags) {
+    for (const sp of detectorSpans) {
       // short_transport = ep39-class possible failed task, same review flow
-      const m = /^(?:failed_attempt|short_transport)@([\d.]+)-([\d.]+)s$/.exec(
-        f,
-      );
-      if (!m) continue;
-      const start = Number(m[1]);
-      const end = Number(m[2]);
+      if (sp.kind !== "failed_attempt" && sp.kind !== "short_transport") {
+        continue;
+      }
+      const start = Number(sp.startS.toFixed(1));
+      const end = Number(sp.endS.toFixed(1));
       const covered = lanes.failed.some(
         (s) => s.start < end + 0.25 && s.end > start - 0.25,
       );
       if (!covered) out.push({ start, end });
     }
     return out;
-  }, [detectorFlags, lanes.failed]);
+  }, [detectorSpans, lanes.failed]);
 
   // ============ Pixel <-> time mapping ============
   // The full-width track band (no label margin) is `trackBandRef`. Convert

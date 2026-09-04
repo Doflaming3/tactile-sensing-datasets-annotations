@@ -46,7 +46,8 @@ margin, then video-verify the members nearest the line.
 | Constant | Value (sotac) | Derivation basis | Margin quality |
 |---|---|---|---|
 | contactEnterN / ExitN | 0.15 / 0.10 N | sensor noise floor | good |
-| weak-attempt line | 2.3 N | 7 video verdicts (false <=2.2, real >=2.4); ep35 phantom later hit 3.8 — WEAKENED | thin, known-violated above |
+| weak-attempt line (`WEAK_ATTEMPT_MAX_N`) | 2.3 N | 7 video verdicts (false <=2.2, real >=2.4); ep35 phantom later hit 3.8 — WEAKENED | thin, known-violated above |
+| brief-contact reporting bar (`BRIEF_CONTACT_STRONG_N`) | line − 0.3 N = 2.0 N, DERIVED | reconciled 2026-09-04 (Jingyi's blocker 3): the band [2.0, 2.3) is "reported but not counted", where ep9's/ep23's verified 2.2 N grazes live; kept on the 1 mN grid because a ten-quanta graze sums to 1.9999999999999998 (ep27 @4.5 s sits exactly on the bar) | wide; on-the-bar values are a float question |
 | pads-meet position | 2.0 units | ep0 dwell 0.5 vs foam-crush 2.8 | thin (0.8 u), rig-specific |
 | release travel / windows | 2 u over [-0.5,+1.0 s] | churn max +0.7 vs release min +2.8 | ok |
 | closing veto | -1 u / 0.5 s | ep47 split -5.7/+22.8 | good |

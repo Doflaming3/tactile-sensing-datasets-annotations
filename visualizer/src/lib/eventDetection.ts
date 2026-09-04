@@ -64,10 +64,39 @@ export interface DetectedSubtask {
   endS: number;
 }
 
+/** Time-span findings (Jingyi's PR #1 review, blocker 3: structured, and
+ * each carrying the finger it belongs to). `flags` still carries their
+ * string form (`kind@A-Bs`) for display and logs; consumers that need the
+ * span itself — the review cards, the timeline lane, the recording filter
+ * — read `spans` and never parse strings. */
+export type SpanKind =
+  | "failed_attempt"
+  | "weak_contact"
+  | "air_grasp"
+  | "post_task_contact"
+  | "short_transport";
+
+export interface DetectedSpan {
+  kind: SpanKind;
+  startS: number;
+  endS: number;
+  /** finger the span belongs to; null = hand-level (a bout both fingers
+   * took part in, or a jaw-only finding such as an air miss) */
+  finger: number | null;
+  /** peak raw normal force inside the span (N), where measured */
+  peakN?: number;
+}
+
+/** The flag string a span renders as (0.1 s resolution, as always). */
+export function spanFlag(s: DetectedSpan): string {
+  return `${s.kind}@${s.startS.toFixed(1)}-${s.endS.toFixed(1)}s`;
+}
+
 export interface AutoLabelResult {
   subtasks: DetectedSubtask[];
   events: DetectedEvent[];
   flags: string[]; // e.g. "no_contact", "unlabeled_transition@7.2s"
+  spans: DetectedSpan[];
 }
 
 /** Per-finger derived signals, one value per sample. */
@@ -243,8 +272,28 @@ const ENTER_MIN_S = 0.2;
  * 3 raw frames: sotac ep54's second failed grab is 2.4 N over 12 taxels
  * for 0.044 s (video-verified), and start-up artifacts stay excluded by
  * the strength bar, not the duration. */
+/** Weak-attempt line (Tier 2): a pre-grasp bout peaking below this is a
+ * phantom/graze (`weak_contact`), at or above it a failed grab. Calibrated
+ * on 7 video verdicts — every false bout peaks <= 2.2 N, every real grab
+ * >= 2.4 N (eps 25/42/9 pads-in-air); ep35's 3.8 N motion phantom later
+ * broke the margin from above. Re-derive as verdicts grow. */
+export const WEAK_ATTEMPT_MAX_N = 2.3;
+/** Brief touches are REPORTED from this far below the weak line
+ * (reconciles the former independent 2.0 N bar with the 2.3 N line —
+ * Jingyi's blocker 3): the band [line - margin, line) is "visible but not
+ * counted", where ep9's and ep23's 2.2 N grazes live, video-verified as
+ * weak contacts; everything reported at or above the line is an attempt
+ * candidate. Raising the bar to the line would erase those two. */
+export const BRIEF_REPORT_MARGIN_N = 0.3;
 const BRIEF_CONTACT_MIN_S = 0.03;
-const BRIEF_CONTACT_STRONG_N = 2.0;
+// on the 1 mN grid: the raw difference is 1.9999999999999998 in floating
+// point, and a graze of exactly ten 0.2 N quanta sums to the same value, so
+// the derived bar would silently admit what the literal 2.0 rejected
+// (ep27 @4.5 s). Values sitting ON the bar are a float question the quantum
+// grid should settle deliberately, not by accident.
+export const BRIEF_CONTACT_STRONG_N = Number(
+  (WEAK_ATTEMPT_MAX_N - BRIEF_REPORT_MARGIN_N).toFixed(3),
+);
 /** Ignore brief contacts this close to t=0 — the sensor settles and the
  * arm is still parked; sotac ep58 has a 2.2 N start-up spike at 0.25 s. */
 const BRIEF_CONTACT_SKIP_START_S = 0.5;
@@ -1404,6 +1453,7 @@ export function detectEvents(
   const { t, rateHz, fingers } = series;
   const n = t.length;
   const flags: string[] = [];
+  const spans: DetectedSpan[] = [];
   const events: RawEvent[] = [];
   const dur = n ? t[n - 1] : 0;
 
@@ -1452,6 +1502,7 @@ export function detectEvents(
       subtasks: dur > 0 ? [{ label: "approach", startS: 0, endS: dur }] : [],
       events: [],
       flags: ["no_contact"],
+      spans: [],
     };
   }
 
@@ -1983,9 +2034,12 @@ export function detectEvents(
         }
       }
       if (spanStart !== null) {
-        flags.push(
-          `post_task_contact@${spanStart.toFixed(1)}-${spanEnd.toFixed(1)}s`,
-        );
+        spans.push({
+          kind: "post_task_contact",
+          startS: spanStart,
+          endS: spanEnd,
+          finger: fi,
+        });
       }
     }
   }
@@ -2000,36 +2054,43 @@ export function detectEvents(
   // surface) for the grasp and starts transport mid-failure — sotac ep56,
   // video-verified: trial 1 holds 5.1-6.8 s and is lost, the real grasp
   // only begins at 9.0 s.
-  const fingerSpans: { startS: number; endS: number }[] = [];
+  const fingerSpans: { startS: number; endS: number; finger: number }[] = [];
   {
     const byFinger = new Map<number, DetectedEvent[]>();
     for (const e of cleaned) {
       if (!byFinger.has(e.finger)) byFinger.set(e.finger, []);
       byFinger.get(e.finger)!.push(e);
     }
-    for (const list of byFinger.values()) {
+    for (const [fi, list] of byFinger) {
       let open = -1;
       for (const e of list) {
         if (e.label === "contact_onset") {
           if (open < 0) open = e.startS;
         } else if (e.label === "release" || e.label === "drop") {
           if (open >= 0) {
-            fingerSpans.push({ startS: open, endS: e.startS });
+            fingerSpans.push({ startS: open, endS: e.startS, finger: fi });
             open = -1;
           }
         }
       }
-      if (open >= 0) fingerSpans.push({ startS: open, endS: dur });
+      if (open >= 0) fingerSpans.push({ startS: open, endS: dur, finger: fi });
     }
   }
   fingerSpans.sort((a, b) => a.startS - b.startS);
-  const bouts: { startS: number; endS: number }[] = [];
+  // a bout remembers which fingers took part: a single-finger bout yields a
+  // finger-scoped span, a two-finger bout a hand-level one
+  const bouts: { startS: number; endS: number; fingers: Set<number> }[] = [];
   for (const s of fingerSpans) {
     const cur = bouts[bouts.length - 1];
     if (cur && s.startS <= cur.endS + 0.5) {
       cur.endS = Math.max(cur.endS, s.endS);
+      cur.fingers.add(s.finger);
     } else {
-      bouts.push({ ...s });
+      bouts.push({
+        startS: s.startS,
+        endS: s.endS,
+        fingers: new Set([s.finger]),
+      });
     }
   }
   const lastStable = [...cleaned]
@@ -2316,7 +2377,8 @@ export function detectEvents(
     // Calibration from 7 video verdicts: every false bout peaks <= 2.2 N,
     // every real grab >= 2.4 N. The 2.3 N cut sits in that thin gap —
     // re-derive as verdicts grow.
-    const WEAK_ATTEMPT_MAX_N = 2.3;
+    // (WEAK_ATTEMPT_MAX_N is module-level: the brief-contact reporting bar
+    // is derived from it)
     // Pads touching EACH OTHER, no object: the jaw bottoms out at its
     // mechanical minimum, which an object between the pads never allows
     // (Zheng's ep0 verdict + corpus survey: the air-close dwells at jaw
@@ -2335,19 +2397,29 @@ export function detectEvents(
       }
       return mn;
     };
-    const attemptFlag = (
+    const attemptSpan = (
       startS: number,
       endS: number,
       peakN: number,
-    ): string => {
-      const span = `${startS.toFixed(1)}-${endS.toFixed(1)}s`;
-      if (jawMinIn(startS - 0.3, endS + 0.3) < AIR_CLOSE_POS) {
-        return `air_grasp@${span}`;
-      }
-      return peakN < WEAK_ATTEMPT_MAX_N
-        ? `weak_contact@${span}`
-        : `failed_attempt@${span}`;
+      finger: number | null,
+    ): DetectedSpan => {
+      const kind: SpanKind =
+        jawMinIn(startS - 0.3, endS + 0.3) < AIR_CLOSE_POS
+          ? "air_grasp"
+          : peakN < WEAK_ATTEMPT_MAX_N
+            ? "weak_contact"
+            : "failed_attempt";
+      return { kind, startS, endS, finger, peakN };
     };
+    const boutFinger = (b: { fingers: Set<number> }): number | null =>
+      b.fingers.size === 1 ? [...b.fingers][0] : null;
+    // identity at the 0.1 s resolution the flags always had
+    const sameSpan = (a: number, b: number): boolean =>
+      spans.some(
+        (s) =>
+          s.startS.toFixed(1) === a.toFixed(1) &&
+          s.endS.toFixed(1) === b.toFixed(1),
+      );
     const boutPeakN = (b: { startS: number; endS: number }): number => {
       let pk = 0;
       for (const f of fingers) {
@@ -2361,7 +2433,7 @@ export function detectEvents(
     };
     for (const b of bouts) {
       if (b === graspBout) break;
-      flags.push(attemptFlag(b.startS, b.endS, boutPeakN(b)));
+      spans.push(attemptSpan(b.startS, b.endS, boutPeakN(b), boutFinger(b)));
     }
 
     // finger-level attempts hidden INSIDE the grasp bout. Zheng's ruling
@@ -2492,9 +2564,8 @@ export function detectEvents(
             if (t[i] > e.startS + 0.05) break;
             if (f.fnRaw[i] > pk) pk = f.fnRaw[i];
           }
-          const span = `${spanStart.toFixed(1)}-${e.startS.toFixed(1)}s`;
-          if (flags.some((fl) => fl.endsWith(`@${span}`))) continue;
-          flags.push(attemptFlag(spanStart, e.startS, pk));
+          if (sameSpan(spanStart, e.startS)) continue;
+          spans.push(attemptSpan(spanStart, e.startS, pk, fi));
         }
       }
     }
@@ -2550,22 +2621,21 @@ export function detectEvents(
           // (<=0.5 s) with a touch-attempt span is the SAME attempt
           // whiffing on: merge into one span instead of double-flagging
           // (ep16: graze 2.6-2.8 + whiff 3.0-4.1 = one attempt).
-          const mIdx = flags.findIndex((fl) => {
-            const m = /^(failed_attempt|weak_contact)@([\d.]+)-([\d.]+)s$/.exec(
-              fl,
-            );
-            return m !== null && Math.abs(peakT - Number(m[3])) <= 0.5;
-          });
-          if (mIdx >= 0) {
-            const m = /@([\d.]+)-/.exec(flags[mIdx]);
-            if (m) {
-              flags[mIdx] = `failed_attempt@${m[1]}-${reopenT.toFixed(1)}s`;
-            }
-          } else {
-            const span = `${peakT.toFixed(1)}-${reopenT.toFixed(1)}s`;
-            if (!flags.some((fl) => fl.endsWith(`@${span}`))) {
-              flags.push(`failed_attempt@${span}`);
-            }
+          const prior = spans.find(
+            (s) =>
+              (s.kind === "failed_attempt" || s.kind === "weak_contact") &&
+              Math.abs(peakT - Number(s.endS.toFixed(1))) <= 0.5,
+          );
+          if (prior) {
+            prior.kind = "failed_attempt";
+            prior.endS = reopenT;
+          } else if (!sameSpan(peakT, reopenT)) {
+            spans.push({
+              kind: "failed_attempt",
+              startS: peakT,
+              endS: reopenT,
+              finger: null,
+            });
           }
         }
         peak = gp[j];
@@ -2587,14 +2657,12 @@ export function detectEvents(
     const lastTerminal = [...cleaned].reverse().find((e) => e.label === "drop");
     const lossFlagged =
       lastTerminal !== undefined &&
-      flags.some((fl) => {
-        const m = /^failed_attempt@([\d.]+)-([\d.]+)s$/.exec(fl);
-        return (
-          m !== null &&
-          lastTerminal.startS >= Number(m[1]) - 0.05 &&
-          lastTerminal.startS <= Number(m[2]) + 0.05
-        );
-      });
+      spans.some(
+        (s) =>
+          s.kind === "failed_attempt" &&
+          lastTerminal.startS >= Number(s.startS.toFixed(1)) - 0.05 &&
+          lastTerminal.startS <= Number(s.endS.toFixed(1)) + 0.05,
+      );
     if (lossFlagged) {
       subtasks.length = 0;
       subtasks.push({ label: "approach", startS: 0, endS: dur });
@@ -2631,11 +2699,12 @@ export function detectEvents(
   const deletedPlaces = new Set<DetectedEvent>();
   {
     const placeRelSub = subtasks.find((s) => s.label === "place_release");
-    const airSpans2: Array<[number, number]> = [];
-    for (const fl of flags) {
-      const m = /^air_grasp@([\d.]+)-([\d.]+)s$/.exec(fl);
-      if (m) airSpans2.push([Number(m[1]) - 0.1, Number(m[2]) + 0.1]);
-    }
+    const airSpans2: Array<[number, number]> = spans
+      .filter((s) => s.kind === "air_grasp")
+      .map((s) => [
+        Number(s.startS.toFixed(1)) - 0.1,
+        Number(s.endS.toFixed(1)) + 0.1,
+      ]);
     const idxAt = (tq: number): number => {
       let lo = 0;
       let hi = n - 1;
@@ -2742,11 +2811,12 @@ export function detectEvents(
   if (handRelease) {
     // pads-meet closes are their own context: "hand still holding" is
     // false there (the pads held each other, ep0) — no renames inside
-    const airSpans: Array<[number, number]> = [];
-    for (const fl of flags) {
-      const m = /^air_grasp@([\d.]+)-([\d.]+)s$/.exec(fl);
-      if (m) airSpans.push([Number(m[1]) - 0.1, Number(m[2]) + 0.1]);
-    }
+    const airSpans: Array<[number, number]> = spans
+      .filter((s) => s.kind === "air_grasp")
+      .map((s) => [
+        Number(s.startS.toFixed(1)) - 0.1,
+        Number(s.endS.toFixed(1)) + 0.1,
+      ]);
     const inAir = (tq: number): boolean =>
       airSpans.some(([s, e]) => tq >= s && tq <= e);
     // the partner holds at tq if its latest engagement-opening precedes
@@ -2944,33 +3014,49 @@ export function detectEvents(
   // Combine chained failed_attempt spans (see mergeAttemptSpans
   // provenance): no jaw reopen between two spans = still the same grab.
   {
-    const spanRe = /^failed_attempt@([\d.]+)-([\d.]+)s$/;
-    const spans: Array<[number, number]> = [];
-    for (const f of flags) {
-      const m = spanRe.exec(f);
-      if (m) spans.push([Number(m[1]), Number(m[2])]);
-    }
-    if (spans.length > 1 && gripper) {
-      spans.sort((a, b) => a[0] - b[0]);
+    const failed = spans
+      .filter((s) => s.kind === "failed_attempt")
+      .sort((a, b) => a.startS - b.startS);
+    const ivals: Array<[number, number]> = failed.map((s) => [
+      Number(s.startS.toFixed(1)),
+      Number(s.endS.toFixed(1)),
+    ]);
+    if (ivals.length > 1 && gripper) {
       const reopen: number[] = [];
-      for (let k = 0; k < spans.length - 1; k++) {
+      for (let k = 0; k < ivals.length - 1; k++) {
         let runMin = Infinity;
         let maxRise = 0;
         for (let j = 0; j < gripper.t.length; j++) {
-          if (gripper.t[j] < spans[k][1]) continue;
-          if (gripper.t[j] > spans[k + 1][0]) break;
+          if (gripper.t[j] < ivals[k][1]) continue;
+          if (gripper.t[j] > ivals[k + 1][0]) break;
           runMin = Math.min(runMin, gripper.pos[j]);
           maxRise = Math.max(maxRise, gripper.pos[j] - runMin);
         }
         reopen.push(maxRise);
       }
-      const merged = mergeAttemptSpans(spans, reopen);
-      if (merged.length < spans.length) {
-        for (let i = flags.length - 1; i >= 0; i--) {
-          if (spanRe.test(flags[i])) flags.splice(i, 1);
+      const merged = mergeAttemptSpans(ivals, reopen);
+      if (merged.length < ivals.length) {
+        for (let i = spans.length - 1; i >= 0; i--) {
+          if (spans[i].kind === "failed_attempt") spans.splice(i, 1);
         }
         for (const [a, b] of merged) {
-          flags.push(`failed_attempt@${a.toFixed(1)}-${b.toFixed(1)}s`);
+          // a merged span keeps a finger only when every part agrees
+          const parts = failed.filter(
+            (s) =>
+              Number(s.startS.toFixed(1)) >= a - 1e-6 &&
+              Number(s.endS.toFixed(1)) <= b + 1e-6,
+          );
+          const fingers = new Set(parts.map((s) => s.finger));
+          const peaks = parts
+            .map((s) => s.peakN)
+            .filter((v): v is number => v !== undefined);
+          spans.push({
+            kind: "failed_attempt",
+            startS: a,
+            endS: b,
+            finger: fingers.size === 1 ? parts[0].finger : null,
+            peakN: peaks.length ? Math.max(...peaks) : undefined,
+          });
         }
       }
     }
@@ -2986,7 +3072,12 @@ export function detectEvents(
       tB !== undefined &&
       tB - tA < SHORT_TRANSPORT_MIN_S
     ) {
-      flags.push(`short_transport@${tA.toFixed(1)}-${tB.toFixed(1)}s`);
+      spans.push({
+        kind: "short_transport",
+        startS: tA,
+        endS: tB,
+        finger: null,
+      });
     }
   }
 
@@ -3033,9 +3124,9 @@ export function detectEvents(
           : lastS;
       return b === undefined ? null : b - a;
     });
-    const excused = flags.some(
-      (f) => f.startsWith("failed_attempt") || f.startsWith("result_"),
-    );
+    const excused =
+      spans.some((s) => s.kind === "failed_attempt") ||
+      flags.some((f) => f.startsWith("result_"));
     if (computeHesitation(stageDurs, excused)) flags.push("hesitation");
   }
 
@@ -3045,12 +3136,15 @@ export function detectEvents(
     const m = /@([\d.]+)/.exec(fl);
     return m ? Number(m[1]) : Infinity;
   };
-  flags.sort((a, b) => flagTime(a) - flagTime(b));
+  spans.sort((a, b) => a.startS - b.startS);
+  const allFlags = [...flags, ...spans.map(spanFlag)];
+  allFlags.sort((a, b) => flagTime(a) - flagTime(b));
 
   return {
     subtasks,
     events: cleaned.filter((e) => !deletedPlaces.has(e)),
-    flags,
+    flags: allFlags,
+    spans,
   };
 }
 
@@ -3116,30 +3210,35 @@ export function resultToAtoms(result: AutoLabelResult): LanguageAtom[] {
  * resultToAtoms: analysis wants the full record.
  */
 export function resultToRecordedAtoms(result: AutoLabelResult): LanguageAtom[] {
-  // post-task spans can contain the OTHER finger's genuine terminal
-  // (ep25: f0's real release at 14.18 inside f1's phantom span), so only
-  // the gate-downgraded LOW events are dropped there. weak_contact spans
-  // are phantom by calibration (every video-verified false bout peaks
-  // <= 2.2 N) and their events are NOT downgraded (ep25's graze exits as
-  // a medium "release" at 1.83 s), so everything inside them is dropped.
-  const lowSpans: Array<[number, number]> = [];
-  const allSpans: Array<[number, number]> = [];
-  for (const fl of result.flags) {
-    const m = /^(post_task_contact|weak_contact)@([\d.]+)-([\d.]+)s$/.exec(fl);
-    if (!m) continue;
-    const span: [number, number] = [Number(m[2]) - 0.05, Number(m[3]) + 0.05];
-    (m[1] === "post_task_contact" ? lowSpans : allSpans).push(span);
-  }
-  const atoms = resultToAtoms(result);
-  const inside = (a: LanguageAtom, spans: Array<[number, number]>) =>
-    spans.some(([s, e]) => a.timestamp >= s && a.timestamp <= e);
-  return atoms.filter((a) => {
-    if (a.style !== "interjection") return true;
-    if (!a.content?.startsWith("[auto:")) return true;
+  // Decided on the EVENTS (which carry their finger), then serialized —
+  // never by parsing atom text. A span deletes only its own finger's
+  // events (Jingyi's blocker 3: a one-finger span must not swallow the
+  // partner's real atoms by timestamp); a hand-level span (finger null)
+  // covers both. post_task_contact spans drop only the gate-downgraded
+  // LOW events (ep25: f0's real release at 14.18 sits inside f1's
+  // phantom span and survives). weak_contact spans are phantom by
+  // calibration (every video-verified false bout peaks <= 2.2 N) and
+  // their events are NOT downgraded (ep25's graze exits as a medium
+  // "release" at 1.83 s), so everything of that finger inside them goes.
+  const covers = (s: DetectedSpan, e: DetectedEvent): boolean =>
+    (s.finger === null || s.finger === e.finger) &&
+    e.startS >= Number(s.startS.toFixed(1)) - 0.05 &&
+    e.startS <= Number(s.endS.toFixed(1)) + 0.05;
+  const kept = result.events.filter((e) => {
     // real-name pass: phantom and sensor_residual are not real contact
     // (finger_unload IS real signal and stays)
-    if (/\] (phantom|sensor_residual)\b/.test(a.content)) return false;
-    if (inside(a, allSpans)) return false;
-    return !(a.content.startsWith("[auto:low]") && inside(a, lowSpans));
+    if (e.label === "phantom" || e.label === "sensor_residual") return false;
+    for (const s of result.spans) {
+      if (s.kind === "weak_contact" && covers(s, e)) return false;
+      if (
+        s.kind === "post_task_contact" &&
+        e.confidence === "low" &&
+        covers(s, e)
+      ) {
+        return false;
+      }
+    }
+    return true;
   });
+  return resultToAtoms({ ...result, events: kept });
 }

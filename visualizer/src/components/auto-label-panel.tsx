@@ -23,6 +23,7 @@ import {
   type DetectionThresholds,
   type TactileSeries,
   type AutoLabelResult,
+  spanFlag,
 } from "@/lib/eventDetection";
 import { resolveTaxelLayout } from "@/lib/taxel-layouts";
 import type { SensorFramesMap } from "@/app/[org]/[dataset]/[episode]/fetch-data";
@@ -143,7 +144,7 @@ export default function AutoLabelPanel({
   root?: string | null;
   episodeId: number;
 }) {
-  const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms, setDetectorFlags } =
+  const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms, setDetectorSpans } =
     useAnnotations();
   const { seek } = useTime();
   const [open, setOpen] = useState(false);
@@ -299,7 +300,7 @@ export default function AutoLabelPanel({
         );
         setLastResult(result);
         setReview({});
-        setDetectorFlags(result.flags);
+        setDetectorSpans(result.spans);
         const subStr = result.subtasks
           .map(
             (s) =>
@@ -326,7 +327,7 @@ export default function AutoLabelPanel({
       deleteAtom,
       addAtoms,
       episodeId,
-      setDetectorFlags,
+      setDetectorSpans,
     ],
   );
 
@@ -359,9 +360,9 @@ export default function AutoLabelPanel({
     setRawState("none");
     setLastResult(null);
     setReview({});
-    setDetectorFlags([]);
+    setDetectorSpans([]);
     setStatus("");
-  }, [repoId, episodeId, setDetectorFlags]);
+  }, [repoId, episodeId, setDetectorSpans]);
 
   if (!series30) return null;
 
@@ -493,14 +494,12 @@ export default function AutoLabelPanel({
           // human verifies them here. Click the span to seek the video,
           // nudge the boundaries, confirm to add the atom. Verified atoms
           // carry no [auto:] prefix, so re-running auto-label keeps them.
-          const spans = lastResult.flags
-            .map((f) => ({
-              flag: f,
-              m: /^(failed_attempt|short_transport)@([\d.]+)-([\d.]+)s$/.exec(
-                f,
-              ),
-            }))
-            .filter((s) => s.m !== null);
+          const spans = lastResult.spans
+            .filter(
+              (sp) =>
+                sp.kind === "failed_attempt" || sp.kind === "short_transport",
+            )
+            .map((sp) => ({ flag: spanFlag(sp), span: sp }));
           if (spans.length === 0) return null;
           const nudge = (
             key: string,
@@ -548,16 +547,17 @@ export default function AutoLabelPanel({
                 review — click a span to seek the video there, adjust, then
                 verify:
               </p>
-              {spans.map(({ flag, m }) => {
+              {spans.map(({ flag, span }) => {
                 // short_transport (ep39-class wrong-location failure) is a
                 // possible failed task — the card proposes a failed_attempt
                 // for the human to confirm, same flow
                 const label =
-                  m![1] === "short_transport"
+                  span.kind === "short_transport"
                     ? "short transport → failed?"
                     : "failed_attempt";
-                const s0 = Number(m![2]);
-                const e0 = Number(m![3]);
+                // card times at the 0.1 s resolution the flag shows
+                const s0 = Number(span.startS.toFixed(1));
+                const e0 = Number(span.endS.toFixed(1));
                 const st = review[flag]?.start ?? s0;
                 const en = review[flag]?.end ?? e0;
                 const done = review[flag]?.done;
