@@ -340,7 +340,10 @@ const RELEASE_CLOSING_VETO = -1.0;
  *    >= 5-unit close within 1.5 s; real slides: ep48 -0.3, ep23 +7.8).
  *  - terminal mechanics: unloading at a place/release is not an in-grip
  *    slide (ep53 @9.7, place 0.46 s ahead; ep23's own place is 1.48 s
- *    ahead — THIN margin, re-derive on new rigs).
+ *    ahead — THIN margin, re-derive on new rigs). Since 2026-09-04 the
+ *    veto also requires the hand's load to be leaving (see
+ *    SLIDE_VETO_RETENTION): ep48's escape has a template place ahead
+ *    but its load rises, so it stays.
  * Survivors: ep23 @10.2 (ball slides 2.5 mm as jaw opens +5.1 — Zheng's
  * verified loosening slide) and ep48 @11.3 (cup rotating out of the
  * jaws 0.7 s before its tauZ spike — verified escape precursor). */
@@ -350,6 +353,27 @@ const SLIDE_JAW_OPEN_MIN = 1.0;
 const SLIDE_SQUEEZE_LOOKBACK_S = 1.5;
 const SLIDE_SQUEEZE_VETO_U = -5.0;
 const SLIDE_TERMINAL_VETO_S = 1.0;
+/** Load-retention condition on the terminal veto (Zheng's ruling,
+ * 2026-09-04, replacing the outcome switch). The veto exists because
+ * unloading at a placement is not an in-grip slide; but a placement-type
+ * exit ahead is not enough on its own — ep48's escape (the cup rotating
+ * out) is followed by template "place"/"release" markers too. The general
+ * fact is load transfer: a placement takes the hand's load AWAY while the
+ * object moves; an in-grip slide moves the object while the hand KEEPS its
+ * load. Retention = the hand's total normal force over the last
+ * SLIDE_RETENTION_EDGE_S of the slide window / over its first, window
+ * [tc - SLIDE_RETENTION_PRE_S, tc + SLIDE_RETENTION_POST_S]. Corpus
+ * (scripts/load_transfer_stats.py, analysis/exit-signature/report.md §7):
+ * 118 in-grip micro-slips retain median 1.03 (p5 0.53, min 0.33); 106
+ * placements retain median 0.00 (p95 0.18, max 0.60, a failure episode's
+ * dubious place); AUC 0.999. The four sustained slides: ep23 0.88 (keep),
+ * ep48 2.88 (the load RISES while the cup moves — keep), ep50 0.12 and
+ * ep53 0.38 (veto). The condition can only rescue slides, never add a
+ * veto; exposure = the 0.9% of placements above the line. */
+const SLIDE_VETO_RETENTION = 0.5;
+const SLIDE_RETENTION_PRE_S = 0.5;
+const SLIDE_RETENTION_POST_S = 1.0;
+const SLIDE_RETENTION_EDGE_S = 0.2;
 const SLIDE_LOAD_MIN_N = 1.0;
 const SLIDE_MED_HALF_S = 0.15;
 const SLIDE_MERGE_GAP_S = 1.0;
@@ -1447,7 +1471,13 @@ export function detectEvents(
   gripper: GripperSeries | null,
   thresholds?: Partial<DetectionThresholds>,
   arm?: ArmMotionSeries | null,
-  context?: { result?: string; episodeIndex?: number },
+  /** Detection context. `episodeIndex` keeps the signal screen from
+   * letting a corpus episode's own reference windows vote for it. The
+   * recorded OUTCOME is deliberately NOT accepted here (Jingyi's PR #1
+   * review): the detector must tell the same story on an unlabeled
+   * dataset as on a labeled one, and outcome-vs-story tension is an
+   * evaluation question that lives in the offline runner. */
+  context?: { episodeIndex?: number },
 ): AutoLabelResult {
   const th: DetectionThresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
   const { t, rateHz, fingers } = series;
@@ -2908,15 +2938,7 @@ export function detectEvents(
           vals.sort((a, b) => a - b);
           return vals[vals.length >> 1];
         };
-        // On a known non-success episode the veto is DISABLED: failure
-        // episodes get success-template place/release markers that are
-        // really the failure exit itself (Zheng's ep48 ruling; the
-        // 45/48-extra-place result-aware segmentation gap), and vetoing
-        // on those hides the slide that PRECEDES the loss — ep48's cup
-        // rotates out at 11.3 s, "place" 11.875 is the cup escaping.
-        const terminalVeto = !context?.result || context.result === "success";
         const terminalNear = (tc: number): boolean =>
-          terminalVeto &&
           cleaned.some(
             (e) =>
               e.finger === f &&
@@ -2926,6 +2948,39 @@ export function detectEvents(
               e.startS >= tc - 0.25 &&
               e.startS <= tc + SLIDE_TERMINAL_VETO_S,
           );
+        // hand load retained across the slide window (see
+        // SLIDE_VETO_RETENTION); NaN when the hand carried < 1 N at the
+        // window start, which the slide gate itself excludes
+        const loadRetention = (tc: number): number => {
+          const a = tc - SLIDE_RETENTION_PRE_S;
+          const b = tc + SLIDE_RETENTION_POST_S;
+          let s0 = 0;
+          let n0 = 0;
+          let s1 = 0;
+          let n1 = 0;
+          for (let i = 0; i < n; i++) {
+            if (t[i] < a) continue;
+            if (t[i] > b) break;
+            let hand = 0;
+            for (const g of fingers) hand += g.fn[i];
+            if (t[i] <= a + SLIDE_RETENTION_EDGE_S) {
+              s0 += hand;
+              n0++;
+            } else if (t[i] >= b - SLIDE_RETENTION_EDGE_S) {
+              s1 += hand;
+              n1++;
+            }
+          }
+          if (n0 < 3 || n1 < 3 || s0 / n0 <= 1.0) return NaN;
+          return s1 / n1 / (s0 / n0);
+        };
+        // the placement veto needs both facts: a placement-type exit
+        // ahead AND the load actually leaving the hand
+        const placingVeto = (tc: number): boolean => {
+          if (!terminalNear(tc)) return false;
+          const r = loadRetention(tc);
+          return !(r >= SLIDE_VETO_RETENTION); // NaN keeps today's veto
+        };
         let best: { tc: number; dcop: number; djaw: number } | null = null;
         let lastHitS = -Infinity;
         const emitBest = () => {
@@ -2961,7 +3016,7 @@ export function detectEvents(
           ) {
             continue;
           }
-          if (terminalNear(tc)) continue;
+          if (placingVeto(tc)) continue;
           if (tc - lastHitS > SLIDE_MERGE_GAP_S) emitBest();
           if (!best || Math.abs(dcop) > Math.abs(best.dcop)) {
             best = { tc, dcop, djaw };
@@ -3081,19 +3136,6 @@ export function detectEvents(
     }
   }
 
-  // Recorded outcome (when metadata supplies it) vs our story: a full
-  // success template with a non-success outcome is tactilely
-  // indistinguishable from success (ep39/ep48: the object was released
-  // at the WRONG PLACE — Zheng's ruling: vision-model or human-labeler
-  // territory). Flag the tension for review instead of guessing.
-  if (
-    context?.result &&
-    context.result !== "success" &&
-    subtasks.some((s2) => s2.label === "place_release")
-  ) {
-    flags.push(`result_${context.result}`);
-  }
-
   // Hesitation (Zheng's ep50 video ruling, 2026-08-31: "every step took
   // longer than expected, but no single step failed" — hesitation is NOT
   // an attempt). Detectable from stage durations alone: >= 2 stages above
@@ -3124,9 +3166,9 @@ export function detectEvents(
           : lastS;
       return b === undefined ? null : b - a;
     });
-    const excused =
-      spans.some((s) => s.kind === "failed_attempt") ||
-      flags.some((f) => f.startsWith("result_"));
+    // excused only by signal-side evidence of a retry; the recorded
+    // outcome no longer reaches the detector (it excuses in the runner)
+    const excused = spans.some((s) => s.kind === "failed_attempt");
     if (computeHesitation(stageDurs, excused)) flags.push("hesitation");
   }
 

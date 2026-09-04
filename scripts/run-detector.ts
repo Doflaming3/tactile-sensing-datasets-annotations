@@ -322,10 +322,28 @@ async function runEpisode(
       epResult = undefined;
     }
   }
-  const result = detectEvents(series, gripper, args.thresholds, inputs.arm, {
-    result: epResult,
+  const detected = detectEvents(series, gripper, args.thresholds, inputs.arm, {
     episodeIndex: ep,
   });
+  // Evaluation-only flags (Jingyi's PR #1 review: outcome-vs-story tension
+  // is not the detector's business): a full success template with a
+  // recorded non-success outcome is tactilely indistinguishable from
+  // success (ep39/ep48: released at the WRONG place — vision/human
+  // territory), so it is flagged for review here, where the metadata
+  // lives; and a recorded failure excuses the detector's hesitation call
+  // (slow because something went wrong is not hesitating). The detector's
+  // own output is untouched.
+  const evalFlags = [...detected.flags];
+  if (
+    epResult &&
+    epResult !== "success" &&
+    detected.subtasks.some((s2) => s2.label === "place_release")
+  ) {
+    evalFlags.push(`result_${epResult}`);
+    const h = evalFlags.indexOf("hesitation");
+    if (h >= 0) evalFlags.splice(h, 1);
+  }
+  const result = { ...detected, flags: evalFlags };
   const atoms = resultToAtoms(result) as unknown as Atom[];
 
   if (!args.all) {
@@ -347,7 +365,8 @@ async function runEpisode(
       source,
       rateHz: series.rateHz,
       thresholds: args.thresholds,
-      flags: result.flags,
+      flags: result.flags, // evaluation flags (outcome tension applied)
+      detectorFlags: detected.flags, // what the app shows: no metadata
       atoms,
     };
     await Bun.write(args.json, JSON.stringify(out, null, 1));

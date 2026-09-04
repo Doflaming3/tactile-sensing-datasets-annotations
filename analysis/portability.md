@@ -67,7 +67,7 @@ provenance comments at the constants):
 |---|---|---|---|
 | sustained_slide: CoP travel / jaw open | 2 mm in 1 s / +1 u | 69-event census; survivors +5.1/+2.55 vs 62 closing events | ok / jaw gate moderate |
 | slide squeeze-rebound veto | -5 u in prior 1.5 s | kills -26/-39/-15 preludes; survivors -0.3/0/+7.8 | wide |
-| slide terminal veto | 1.0 s ahead (success eps only) | kills ep53 0.46 s vs keeps ep23 1.48 s | THIN |
+| slide terminal veto | 1.0 s ahead AND load retention < 0.5 | window: kills ep53 0.11 s / ep50 0.50 s vs keeps ep23 1.51 s; retention (2026-09-04, replaces the outcome switch): 118 in-grip slips median 1.03 (p5 0.53, min 0.33) vs 106 placements median 0.00 (p95 0.18, max 0.60), AUC 0.999; slides ep23 0.88 / ep48 2.88 keep, ep50 0.12 / ep53 0.38 veto | window THIN; retention wide (0.9% placements above) |
 | screen reference corpus + vote | 971 windows, 4/7 background | LOO: bg 88.6% self-ID, terminals 2.5-4.5% FA | per-rig artifact, regenerate |
 | hesitation p90s + strong gate | 6.32/2.20/4.56/1.26 s, 1.2x | 62-ep census; fires 1.23x+ (verified), silent 1.16x ("not obvious") | strong gate THIN (1.16 vs 1.23) |
 | short_transport | < 1.0 s | ep39 0.78 vs next 1.46, p5 1.55 | wide |
@@ -119,7 +119,18 @@ constant must be re-derived, not scaled. Details:
 4. **Raw sidecar and table clocks agree** (~2 ms verified on sotac;
    company data needs the content-matching check before trusting).
 5. **Success-template default with signal-side failure override** —
-   result metadata, when available, should replace the override.
+   the detector never reads the recorded outcome (cycle 4, 2026-09-04,
+   Jingyi's PR #1 precondition): an unlabeled dataset must get the same
+   story as a labeled one. Outcome-vs-story tension (`result_failure` /
+   `result_partial` on a full success template) and the outcome's excuse
+   for a `hesitation` call are evaluation flags the offline runner adds
+   from metadata after detection. The one rule that used the outcome —
+   the slide's terminal veto, switched off on ep48 so its escape slide
+   survived — now keys on load retention instead (Tier 2 table above,
+   `SLIDE_VETO_RETENTION`): a placement takes the hand's load away while
+   the object moves, an in-grip slide keeps it, and the escape's load
+   rose. Measured on 118 in-grip slips vs 106 placements, AUC 0.999
+   (`scripts/load_transfer_stats.py`, `analysis/exit-signature/`).
 
 ## Verdict on Zheng's challenge
 
