@@ -101,7 +101,9 @@ gripper's units, arm speed, CoP travel in mm, the stage-duration
 percentiles, the screen reference corpus, plus the signal-level
 `DetectionThresholds`) lives in `visualizer/src/lib/rigProfile.ts` as
 `RigCalibration`, grouped per rule, and the detector, the series builders
-and the corrected display REQUIRE a profile — there is no default anywhere.
+and the corrected display REQUIRE a profile — there is no default anywhere
+(cycle 6 removed the last one: the screen module's own fallback to the
+sotac corpus; the reference now reaches the screen only as an argument).
 `profileForDataset(ref)` resolves a dataset id (revision stripped) through
 a registry (`Jingyi-Z/sotac*` → `sotac-paxini-so101`) after the dataset's
 own `meta/annotator_profile.json`; an unknown dataset gets the TEMPLATE

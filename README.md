@@ -97,7 +97,11 @@ Video verdicts (Zheng's) arbitrate anything the signal cannot.
 
 **Python studies** need `numpy pandas scikit-learn scipy matplotlib
 pyarrow`. To rebuild the artifact screen's reference corpus (per-rig
-calibration artifact): `bun scripts/build-screen-reference.ts`.
+calibration artifact): `bun scripts/build-screen-reference.ts`. The builder
+lives in this workspace, not in the Space: it reads the local mirror through
+the runner's loaders. The Space ships only the corpus itself, attached to the
+sotac profile; the screen module holds no reference of its own. Shipping the
+builder with the Space is a PR-B item (Jingyi's review).
 
 ## What the annotator produces
 

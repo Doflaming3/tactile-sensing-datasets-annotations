@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import type { TactileSeries } from "../eventDetection";
 import {
@@ -116,5 +118,15 @@ describe("screenBackgroundVotes", () => {
     expect(
       screenBackgroundVotes(makeSeries(), 0, 5, undefined, empty),
     ).toBeNull();
+  });
+});
+
+describe("reference provenance", () => {
+  test("the screen module holds no reference of its own (the profile is the only source)", () => {
+    // Jingyi's precondition: never a silent sotac default. The reference
+    // reaches the screen only as an argument, from the rig profile.
+    const src = readFileSync(join(__dirname, "..", "signalScreen.ts"), "utf-8");
+    // the header comment may name the file; an import of it may not
+    expect(src).not.toMatch(/import\s[^;]*screen-reference\.json/);
   });
 });

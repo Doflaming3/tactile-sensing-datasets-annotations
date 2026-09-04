@@ -16,6 +16,12 @@ below.
 To merge back later: clone her Space fresh, check out the base revision, apply
 our diff (`git diff` of base snapshot vs our tree), review, and hand it over —
 or open the diff with her directly. Do not add her Space as a git remote here.
+Staging rule for a PR clone: run the gates first, then read `git status`
+before any `git add`. Her `tsconfig.json` has `incremental: true`, so every
+type-check writes a ~320 KB `tsconfig.tsbuildinfo` cache; it rode into PR #1
+through `git add -A` (Jingyi's review, 2026-09-02). `visualizer/.gitignore`
+now lists `*.tsbuildinfo` (create-next-app's own line), so a clone that
+carries our tree cannot stage it again.
 
 ## Local data mirrors (`data/`, gitignored)
 

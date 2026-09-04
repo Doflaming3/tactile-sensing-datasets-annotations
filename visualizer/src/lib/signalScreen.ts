@@ -13,12 +13,18 @@
 // invisible to any signal-level screen BY CONSTRUCTION and stays the context
 // rules' job — this screen is the second layer, not a replacement).
 //
-// The reference corpus (screen-reference.json) is built by
-// scripts/build-screen-reference.ts IN THIS FEATURE SPACE from the local
-// sotac mirror — regenerating it per rig is the portability protocol (the
-// reference is a Tier-2 calibration artifact, like every threshold).
-// Same-episode reference vectors are excluded at query time when the caller
-// knows the episode index, so corpus replays don't vote for themselves.
+// The reference corpus is a PROFILE artifact (rigProfile.ts): the sotac
+// registry profile carries screen-reference.json, a dataset-side profile
+// names its own file (screenReferencePath), the template has none — and
+// without a reference the detector does not call the screen. This module
+// holds no reference of its own: the caller must pass one (there is no
+// silent sotac default). The corpus is built by
+// scripts/build-screen-reference.ts (workspace, not the Space) IN THIS
+// FEATURE SPACE from the local sotac mirror — regenerating it per rig is
+// the portability protocol (a Tier-2 calibration artifact, like every
+// threshold). Same-episode reference vectors are excluded at query time
+// when the caller knows the episode index, so corpus replays don't vote
+// for themselves.
 //
 // Feature recipe (must match build-screen-reference.ts — both call
 // terminalWindowFeatures): channels fnRaw / fsRaw / active / hfProxy, each
@@ -29,7 +35,6 @@
 // ~91 Hz raw path (rateHz > 60); 30 Hz table windows would distort it.
 
 import type { TactileSeries } from "./eventDetection";
-import referenceJson from "./screen-reference.json";
 
 export interface ScreenReference {
   scaler: { mean: number[]; std: number[] };
@@ -115,15 +120,15 @@ export function terminalWindowFeatures(
 }
 
 /** Background votes among the SCREEN_K nearest reference windows, or null
- * when the window can't be featurized or the reference is unusable. */
+ * when the window can't be featurized or the reference is unusable. The
+ * reference is required: it comes from the rig profile, never from here. */
 export function screenBackgroundVotes(
   series: TactileSeries,
   finger: number,
   tEv: number,
-  excludeEpisode?: number,
-  reference?: ScreenReference,
+  excludeEpisode: number | undefined,
+  ref: ScreenReference,
 ): number | null {
-  const ref = reference ?? (referenceJson as ScreenReference);
   if (!ref.vectors || ref.vectors.length < MIN_REFERENCE) return null;
   const feat = terminalWindowFeatures(series, finger, tEv);
   if (!feat) return null;
