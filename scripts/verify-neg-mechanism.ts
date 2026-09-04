@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import { applyAdaptiveBaseline } from "../visualizer/src/lib/eventDetection";
 import { loadEpisodeInputs, loadEpisodesMeta, type Info } from "./run-detector";
+import { SOTAC_PROFILE } from "../visualizer/src/lib/rigProfile";
 
 const root = "data/sotac";
 const info = JSON.parse(
@@ -24,8 +25,7 @@ const ts = inputs.timestamps;
 const corr = applyAdaptiveBaseline(
   frames as unknown[],
   ts,
-  inputs.gripper,
-) as number[][][][] | null;
+  inputs.gripper, { profile: SOTAC_PROFILE }) as number[][][][] | null;
 if (!corr) throw new Error("applyAdaptiveBaseline returned null");
 
 function stats(fr: number[][][], f: number) {

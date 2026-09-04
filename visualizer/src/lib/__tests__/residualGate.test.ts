@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { applyAdaptiveBaseline, type GripperSeries } from "../eventDetection";
+import { SOTAC_PROFILE } from "../rigProfile";
 
 // Rule 1 (post-release residual gate), shaped like sotac ep37 finger 1:
 // a 12-taxel hold at one quantum each, the ball leaves at tDrop (11
@@ -80,7 +81,9 @@ function gripper(sc: Scenario): GripperSeries {
 
 function fingerSum(sc: Scenario): (t: number) => number {
   const { frames: fr, ts } = frames(sc);
-  const corr = applyAdaptiveBaseline(fr, ts, gripper(sc));
+  const corr = applyAdaptiveBaseline(fr, ts, gripper(sc), {
+    profile: SOTAC_PROFILE,
+  });
   expect(corr).not.toBeNull();
   return (tq: number) => {
     let i = 0;

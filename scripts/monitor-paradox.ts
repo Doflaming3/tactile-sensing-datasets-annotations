@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 import { applyAdaptiveBaseline } from "../visualizer/src/lib/eventDetection";
 import { loadEpisodeInputs, loadEpisodesMeta, type Info } from "./run-detector";
+import { SOTAC_PROFILE } from "../visualizer/src/lib/rigProfile";
 
 const root = "data/sotac";
 const info = JSON.parse(
@@ -34,8 +35,7 @@ for (const meta of metas) {
   const corr = applyAdaptiveBaseline(
     frames as unknown[],
     ts,
-    inputs.gripper,
-  ) as number[][][][] | null;
+    inputs.gripper, { profile: SOTAC_PROFILE }) as number[][][][] | null;
   if (!corr) {
     badRows.push(`ep${ep}: correction returned null`);
     continue;

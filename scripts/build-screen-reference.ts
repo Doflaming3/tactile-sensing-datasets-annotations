@@ -37,6 +37,7 @@ import {
   loadRawCsvTexts,
   type Info,
 } from "./run-detector";
+import { SOTAC_PROFILE } from "../visualizer/src/lib/rigProfile";
 
 const ROOT = "data/sotac";
 const OUT = "visualizer/src/lib/screen-reference.json";
@@ -73,7 +74,7 @@ for (const meta of episodesMeta) {
   const layout = resolveTaxelLayout(inputs.nTaxels)?.points ?? null;
   const texts = loadRawCsvTexts(ROOT, ep, inputs.sensorName);
   if (!texts) continue;
-  const raw = buildSeriesFromRawCsvs(texts, layout, inputs.gripper);
+  const raw = buildSeriesFromRawCsvs(texts, layout, inputs.gripper, { profile: SOTAC_PROFILE });
   if (!raw) continue;
   const tEnd = inputs.timestamps.length
     ? inputs.timestamps[inputs.timestamps.length - 1] + 0.1

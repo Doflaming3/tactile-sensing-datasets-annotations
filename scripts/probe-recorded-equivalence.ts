@@ -20,6 +20,7 @@ import {
   loadRawCsvTexts,
   type Info,
 } from "./run-detector";
+import { SOTAC_PROFILE } from "../visualizer/src/lib/rigProfile";
 
 // the pre-cycle-3 filter, verbatim in behaviour (flag strings + atom text)
 function oldRecorded(result: AutoLabelResult): LanguageAtom[] {
@@ -56,10 +57,10 @@ for (const meta of metas) {
   const layout = resolveTaxelLayout(inputs.nTaxels)?.points ?? null;
   const texts = loadRawCsvTexts(root, ep, inputs.sensorName);
   if (!texts) continue;
-  const raw = buildSeriesFromRawCsvs(texts, layout, inputs.gripper);
+  const raw = buildSeriesFromRawCsvs(texts, layout, inputs.gripper, { profile: SOTAC_PROFILE });
   if (!raw) continue;
   const s = clipSeries(raw, inputs.timestamps[inputs.timestamps.length - 1] + 0.1);
-  const res = detectEvents(s, inputs.gripper, {}, inputs.arm, { episodeIndex: ep });
+  const res = detectEvents(s, inputs.gripper, {}, inputs.arm, { profile: SOTAC_PROFILE, episodeIndex: ep });
   checked++;
   spansTotal += res.spans.length;
   fingerScoped += res.spans.filter((x) => x.finger !== null).length;

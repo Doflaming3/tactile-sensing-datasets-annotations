@@ -12,6 +12,7 @@ import {
 } from "../../visualizer/src/lib/eventDetection";
 import { resolveTaxelLayout } from "../../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../../visualizer/node_modules/hyparquet";
+import { SOTAC_PROFILE } from "../../visualizer/src/lib/rigProfile";
 
 const ROOT = "data/sotac";
 const EPS = Array.from({ length: 63 }, (_, i) => i);
@@ -85,9 +86,9 @@ async function main() {
     if (!existsSync(dir)) continue;
     const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
     const raw = buildSeriesFromRawCsvs(
-      files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, { t: gt, pos: gp });
+      files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, { t: gt, pos: gp }, { profile: SOTAC_PROFILE });
     const series = clipSeries(raw!, timestamps[timestamps.length - 1] + 0.1);
-    const result = detectEvents(series, { t: gt, pos: gp }, {}, { t: armT, joints: armJ });
+    const result = detectEvents(series, { t: gt, pos: gp }, {}, { t: armT, joints: armJ }, { profile: SOTAC_PROFILE });
 
     const placeRel = result.subtasks.find((s) => s.label === "place_release");
     const airSpans = [];

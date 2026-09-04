@@ -1,0 +1,366 @@
+/**
+ * Rig / dataset calibration profiles (Jingyi's PR #1 precondition for the
+ * interpretation layer, cycle 5, 2026-09-04).
+ *
+ * The annotator's rules are physics, but many of its NUMBERS were measured
+ * on one rig — Paxini DP-S2015-Elite fingertips on an SO-101 gripper, the
+ * sotac objects, Zheng's video verdicts. Forces in newtons, jaw travel in
+ * the gripper's units, arm speed in its units, stage durations for one
+ * task family, and a 971-window screen reference corpus. Applying them
+ * silently to another dataset produces confident nonsense, so:
+ *
+ *  - every rig-calibrated number lives here, grouped per rule, with its
+ *    provenance (the census or verdict that set it) in the audit
+ *    `analysis/portability.md`;
+ *  - the detector and the series builders REQUIRE a profile — there is no
+ *    default anywhere; the app refuses to run the interpretation layer on
+ *    a dataset that matches no profile (`profileForDataset`), and the
+ *    display's corrected view falls back to raw;
+ *  - a dataset recorded on a known rig but under another name can be
+ *    opened with an explicit `?profile=<id>` override — explicit, never
+ *    implicit.
+ *
+ * What is NOT here: seconds-based debounces and windows (contact exit
+ * 0.3 s, brief contact 0.03 s, release windows, slide window, retry
+ * confirm) and quanta-based floors (single-taxel floor, stuck-taxel
+ * count) — those are structure and physics, tied to the measured sensor
+ * quantum, and stay in eventDetection.ts.
+ */
+import { DEFAULT_THRESHOLDS, type DetectionThresholds } from "./eventDetection";
+import type { ScreenReference } from "./signalScreen";
+import sotacScreenReference from "./screen-reference.json";
+
+export interface RigCalibration {
+  /** signal-level thresholds (N, hf units …) — the user-tunable set */
+  thresholds: DetectionThresholds;
+  // ---- forces (N)
+  /** pre-grasp bout peaking below this is weak_contact, not an attempt */
+  weakAttemptMaxN: number;
+  /** brief touches are reported from this far below the weak line */
+  briefReportMarginN: number;
+  /** "hand quiet" after a drop: total force below this */
+  handLossN: number;
+  /** idle margin of the baseline tracker and of the residual gate */
+  quietMarginN: number;
+  /** a finger carries this much before its CoP is trusted for slides */
+  slideLoadMinN: number;
+  // ---- jaw travel (gripper units)
+  /** jaw at or below this = pads meet, nothing between them (air_grasp) */
+  airClosePos: number;
+  /** re-open after a loss that counts as a retry */
+  jawRetryRiseU: number;
+  /** close below the own hold width that reads as squeeze-through */
+  squeezeThroughBelowU: number;
+  /** close-and-reopen travel of an air miss */
+  airMissTravelU: number;
+  /** net opening around a force exit that makes it a release */
+  releaseTravelMinU: number;
+  /** jaw closing right at the exit vetoes release (squeeze-out) */
+  releaseClosingVetoU: number;
+  /** jaw net-open over the slide window (loosening) */
+  slideJawOpenMinU: number;
+  /** a prior close this deep marks a squeeze rebound, not a slide */
+  slideSqueezeVetoU: number;
+  /** chained attempt spans merge when the jaw never re-opened this much */
+  attemptMergeReopenU: number;
+  /** re-close from the running max that the residual gate reads as a grab */
+  jawRecloseU: number;
+  /** jaw close that counts as a re-grip squeeze for the transport anchor */
+  squeezeMinTravelU: number;
+  // ---- arm (joint units per second)
+  /** summed joint speed above which the arm is moving (transport anchor) */
+  armMoveEpsUps: number;
+  // ---- geometry (mm, from the taxel layout)
+  /** CoP travel along the finger that makes a sustained slide */
+  slideMinMm: number;
+  // ---- task timing (s)
+  /** corpus p90 stage durations: approach, grasp, transport, place_release */
+  hesitationP90S: number[];
+  /** transports shorter than this raise the wrong-location card */
+  shortTransportMinS: number;
+  // ---- artifact screen
+  /** per-rig reference corpus; null disables the screen */
+  screenReference: ScreenReference | null;
+}
+
+export interface RigProfile {
+  id: string;
+  label: string;
+  sensor: string;
+  gripper: string;
+  /** dataset ids (org/name, revision stripped) this profile is valid for */
+  datasets: RegExp[];
+  /** false = the numbers were not verified on this rig (the shipped
+   * template, or a dataset file that says so): every result carries
+   * `profile_unverified` and the app reminds the user */
+  verified: boolean;
+  calibration: RigCalibration;
+}
+
+export const SOTAC_PROFILE: RigProfile = {
+  id: "sotac-paxini-so101",
+  label: "sotac: Paxini DP-S2015-Elite fingertips on SO-101",
+  sensor: "Paxini DP-S2015-Elite, 2 x 52 taxels, 0.2 N quantum",
+  gripper: "SO-101 jaw, position units, opening = increasing",
+  datasets: [/^Jingyi-Z\/sotac(_raw)?$/],
+  verified: true,
+  calibration: {
+    thresholds: DEFAULT_THRESHOLDS,
+    weakAttemptMaxN: 2.3,
+    briefReportMarginN: 0.3,
+    handLossN: 1.0,
+    quietMarginN: 1.0,
+    slideLoadMinN: 1.0,
+    airClosePos: 2.0,
+    jawRetryRiseU: 5.0,
+    squeezeThroughBelowU: 8.0,
+    airMissTravelU: 8.0,
+    releaseTravelMinU: 2.0,
+    releaseClosingVetoU: -1.0,
+    slideJawOpenMinU: 1.0,
+    slideSqueezeVetoU: -5.0,
+    attemptMergeReopenU: 5.0,
+    jawRecloseU: 5.0,
+    squeezeMinTravelU: 8,
+    armMoveEpsUps: 12,
+    slideMinMm: 2.0,
+    hesitationP90S: [6.32, 2.2, 4.56, 1.26],
+    shortTransportMinS: 1.0,
+    screenReference: sotacScreenReference as ScreenReference,
+  },
+};
+
+export const RIG_PROFILES: RigProfile[] = [SOTAC_PROFILE];
+
+export function profileById(id: string | null | undefined): RigProfile | null {
+  if (!id) return null;
+  return RIG_PROFILES.find((p) => p.id === id) ?? null;
+}
+
+/** The profile a dataset reference resolves to: an explicit `override`
+ * (the `?profile=` search param) wins, else the registry by dataset id
+ * with any `@revision` stripped; null = refuse to run the interpretation
+ * layer. */
+export function profileForDataset(
+  ref: string | null | undefined,
+  override?: string | null,
+): RigProfile | null {
+  const explicit = profileById(override);
+  if (explicit) return explicit;
+  if (!ref) return null;
+  const repoId = ref.split("@")[0];
+  return (
+    RIG_PROFILES.find((p) => p.datasets.some((re) => re.test(repoId))) ?? null
+  );
+}
+
+/** One-line reason shown when no profile matches. */
+export function noProfileMessage(ref: string): string {
+  return (
+    `No calibration profile for ${ref.split("@")[0]}. The annotator's rig ` +
+    "constants (forces, jaw travel, arm speed, stage durations, screen " +
+    "reference) were calibrated on " +
+    RIG_PROFILES.map((p) => `${p.id} (${p.label})`).join("; ") +
+    ". Add a profile in rigProfiles, or open the dataset with " +
+    "?profile=<id> if it was recorded on a known rig."
+  );
+}
+
+// ---------------------------------------------------------------- dataset-side profiles
+//
+// Zheng's ruling (2026-09-04): someone with a different dataset must know
+// where to put a profile, and must be able to start from OUR numbers. So:
+//  - a dataset carries `meta/annotator_profile.json` (ANNOTATOR_PROFILE_PATH),
+//    the JSON form below, read before the registry;
+//  - the app ships a TEMPLATE = the sotac numbers with `verified: false`;
+//    when a dataset has neither a file nor a registry match, the template is
+//    used and the user is reminded, in the panel and in every result
+//    (`profile_unverified` flag), that these numbers come from another rig
+//    and how to calibrate them (README "Using the annotator on another
+//    dataset"; the census scripts under scripts/calibration/).
+// Note for Jingyi's review: her precondition asked for a hard refusal; the
+// template-plus-reminder is Zheng's deliberate choice so the tool is usable
+// on day one, with the unverified state impossible to miss.
+
+/** where a dataset declares its own profile (repo-relative) */
+export const ANNOTATOR_PROFILE_PATH = "meta/annotator_profile.json";
+export const ANNOTATOR_PROFILE_SCHEMA = "annotator-profile/1";
+
+/** JSON form of a profile as stored in a dataset (the screen reference is
+ * a separate repo-relative file, optional; without it the artifact screen
+ * is off). `provenance` says per field where a number came from. */
+export interface AnnotatorProfileFile {
+  schema: typeof ANNOTATOR_PROFILE_SCHEMA;
+  id: string;
+  label: string;
+  sensor: string;
+  gripper: string;
+  verified: boolean;
+  calibration: Omit<RigCalibration, "screenReference">;
+  screenReferencePath?: string | null;
+  provenance?: Record<string, string>;
+  notes?: string;
+}
+
+const NUMERIC_FIELDS: Array<
+  keyof Omit<
+    RigCalibration,
+    "screenReference" | "thresholds" | "hesitationP90S"
+  >
+> = [
+  "weakAttemptMaxN",
+  "briefReportMarginN",
+  "handLossN",
+  "quietMarginN",
+  "slideLoadMinN",
+  "airClosePos",
+  "jawRetryRiseU",
+  "squeezeThroughBelowU",
+  "airMissTravelU",
+  "releaseTravelMinU",
+  "releaseClosingVetoU",
+  "slideJawOpenMinU",
+  "slideSqueezeVetoU",
+  "attemptMergeReopenU",
+  "jawRecloseU",
+  "squeezeMinTravelU",
+  "armMoveEpsUps",
+  "slideMinMm",
+  "shortTransportMinS",
+];
+
+/** Parse a dataset's profile file; null when it is not a valid profile
+ * (the caller then falls back). Unknown fields are ignored; every known
+ * numeric field must be a finite number. */
+export function profileFromFile(
+  json: unknown,
+  screenReference: ScreenReference | null = null,
+): RigProfile | null {
+  if (!json || typeof json !== "object") return null;
+  const f = json as Partial<AnnotatorProfileFile>;
+  if (f.schema !== ANNOTATOR_PROFILE_SCHEMA || !f.id || !f.calibration)
+    return null;
+  const c = f.calibration as Record<string, unknown>;
+  for (const k of NUMERIC_FIELDS) {
+    if (typeof c[k] !== "number" || !Number.isFinite(c[k] as number))
+      return null;
+  }
+  const p90 = c.hesitationP90S;
+  if (
+    !Array.isArray(p90) ||
+    p90.length !== 4 ||
+    !p90.every((v) => typeof v === "number")
+  )
+    return null;
+  const th = {
+    ...DEFAULT_THRESHOLDS,
+    ...((c.thresholds as Partial<DetectionThresholds>) ?? {}),
+  };
+  return {
+    id: String(f.id),
+    label: String(f.label ?? f.id),
+    sensor: String(f.sensor ?? "unknown sensor"),
+    gripper: String(f.gripper ?? "unknown gripper"),
+    datasets: [],
+    verified: f.verified === true,
+    calibration: {
+      ...(c as unknown as RigCalibration),
+      thresholds: th,
+      hesitationP90S: p90 as number[],
+      screenReference,
+    },
+  };
+}
+
+/** The shipped template: the sotac numbers, marked unverified. */
+export const TEMPLATE_PROFILE: RigProfile = {
+  ...SOTAC_PROFILE,
+  id: "template-from-sotac",
+  label: "TEMPLATE — sotac numbers, NOT verified on this rig",
+  datasets: [],
+  verified: false,
+  calibration: { ...SOTAC_PROFILE.calibration, screenReference: null },
+};
+
+/** The template as the JSON a user copies into their dataset. Generated
+ * from the same object the code uses; a test keeps the shipped file in
+ * sync. */
+export function templateProfileFile(): AnnotatorProfileFile {
+  const { screenReference: _sr, ...calibration } = SOTAC_PROFILE.calibration;
+  void _sr;
+  const verdict =
+    "copied from sotac (video-verdict calibration) — verify on this rig";
+  const measured = "copied from sotac (measured) — re-measure on this rig";
+  return {
+    schema: ANNOTATOR_PROFILE_SCHEMA,
+    id: "my-rig",
+    label: "EDIT ME: sensor + gripper + task family",
+    sensor: "EDIT ME (e.g. Paxini DP-S2015-Elite, 2 x 52 taxels)",
+    gripper: "EDIT ME (e.g. SO-101 jaw, position units, opening = increasing)",
+    verified: false,
+    calibration,
+    screenReferencePath: null,
+    provenance: {
+      thresholds: measured,
+      weakAttemptMaxN: verdict,
+      briefReportMarginN: verdict,
+      handLossN: verdict,
+      quietMarginN: measured,
+      slideLoadMinN: measured,
+      airClosePos: verdict,
+      jawRetryRiseU: measured,
+      squeezeThroughBelowU: verdict,
+      airMissTravelU: measured,
+      releaseTravelMinU: measured,
+      releaseClosingVetoU: verdict,
+      slideJawOpenMinU: measured,
+      slideSqueezeVetoU: verdict,
+      attemptMergeReopenU: verdict,
+      jawRecloseU: measured,
+      squeezeMinTravelU: measured,
+      armMoveEpsUps: measured,
+      slideMinMm: verdict,
+      hesitationP90S:
+        "copied from sotac (task-family census) — re-derive from this dataset",
+      shortTransportMinS: measured,
+    },
+    notes:
+      "Copy this file to <dataset>/meta/annotator_profile.json, edit the header, " +
+      "set verified: true only after the numbers were checked on this rig " +
+      "(protocol: analysis/portability.md, scripts/calibration/). Until then every " +
+      "result carries profile_unverified.",
+  };
+}
+
+export type ProfileSource =
+  | "dataset-file"
+  | "override"
+  | "registry"
+  | "template";
+
+/** Resolution order: the dataset's own file, an explicit ?profile= override,
+ * the registry by dataset id, then the template (unverified). */
+export function resolveProfile(
+  ref: string | null | undefined,
+  override: string | null | undefined,
+  datasetFile: RigProfile | null,
+): { profile: RigProfile; source: ProfileSource } {
+  if (datasetFile) return { profile: datasetFile, source: "dataset-file" };
+  const explicit = profileById(override);
+  if (explicit) return { profile: explicit, source: "override" };
+  const known = profileForDataset(ref);
+  if (known) return { profile: known, source: "registry" };
+  return { profile: TEMPLATE_PROFILE, source: "template" };
+}
+
+/** The reminder shown whenever the template is in use. */
+export function templateReminder(ref: string): string {
+  return (
+    `${ref.split("@")[0]} has no calibration profile, so the annotator is running ` +
+    "with the TEMPLATE: numbers measured on sotac's rig (Paxini fingertips on an " +
+    "SO-101). Forces, jaw units, arm speed and stage durations may not apply here; " +
+    "every result is flagged profile_unverified. To calibrate: copy the template to " +
+    `${ANNOTATOR_PROFILE_PATH} in the dataset, edit it, and set verified after checking ` +
+    "the numbers (README: Using the annotator on another dataset)."
+  );
+}

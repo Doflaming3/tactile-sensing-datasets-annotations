@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { postParentMessageWithParams } from "@/utils/postParentMessage";
 import { hubRepoPageUrl } from "@/utils/repoRef";
+import { useRigProfile } from "@/lib/useRigProfile";
+import { setDisplayProfile } from "@/components/tactile-panel";
 import { SimpleVideosPlayer } from "@/components/simple-videos-player";
 import PlaybackBar from "@/components/playback-bar";
 import { TimeProvider, useTime } from "@/context/time-context";
@@ -554,6 +556,17 @@ function EpisodeViewerInner({
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  // rig calibration profile for the corrected tactile display — resolved
+  // once per dataset here so every tab's tiles see it (dataset file >
+  // ?profile= > registry > template)
+  const profileOverride = searchParams?.get("profile") ?? null;
+  const { profile: rigProfile } = useRigProfile(
+    org && dataset ? `${org}/${dataset}` : null,
+    profileOverride,
+  );
+  useEffect(() => {
+    setDisplayProfile(rigProfile);
+  }, [rigProfile]);
 
   // `?root=<subdir>` points the loaders at a dataset rooted in a repo
   // sub-folder (per-episode-folder tactile datasets). Set during render so

@@ -5,6 +5,7 @@ import {
   detectEvents,
   type GripperSeries,
 } from "../eventDetection";
+import { SOTAC_PROFILE } from "../rigProfile";
 
 // Rule 2 (single-taxel exit floor), shaped like sotac ep37 finger 1: a
 // 12-taxel hold at one force quantum each; at tDrop all but `stuck`
@@ -76,10 +77,18 @@ function firstExit(stuck: number): number {
   const tDrop = 5.0;
   const { frames, ts } = makeFrames(durS, tOn, tDrop, stuck);
   const gripper = makeGripper(durS, tOn, tDrop);
-  const series = buildSeriesFromSensorFrames(frames, ts, null, gripper);
+  const series = buildSeriesFromSensorFrames(
+    frames,
+    ts,
+    null,
+    gripper,
+    SOTAC_PROFILE,
+  );
   expect(series).not.toBeNull();
   expect(series!.quantumN).toBeCloseTo(Q, 6);
-  const res = detectEvents(series!, gripper);
+  const res = detectEvents(series!, gripper, undefined, undefined, {
+    profile: SOTAC_PROFILE,
+  });
   const exits = res.events.filter(
     (e) => e.finger === 0 && (e.label === "release" || e.label === "drop"),
   );

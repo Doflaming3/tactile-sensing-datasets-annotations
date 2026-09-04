@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { mergeAttemptSpans } from "../eventDetection";
+import { SOTAC_PROFILE } from "../rigProfile";
 
 // Calibration cases = the census behind the rule (2026-08-31): jaw reopen
 // between spans — ep54 0.1u (one grab, merge), ep31 17.4u / ep45 17.2u
@@ -14,6 +15,7 @@ describe("mergeAttemptSpans", () => {
           [3.4, 3.4],
         ],
         [0.1],
+        SOTAC_PROFILE.calibration.attemptMergeReopenU,
       ),
     ).toEqual([[2.4, 3.4]]);
   });
@@ -26,6 +28,7 @@ describe("mergeAttemptSpans", () => {
           [6.6, 7.1],
         ],
         [17.4],
+        SOTAC_PROFILE.calibration.attemptMergeReopenU,
       ),
     ).toEqual([
       [4.3, 5.0],
@@ -42,6 +45,7 @@ describe("mergeAttemptSpans", () => {
           [5, 6],
         ],
         [0.5, 0.2],
+        SOTAC_PROFILE.calibration.attemptMergeReopenU,
       ),
     ).toEqual([[1, 6]]);
   });
@@ -55,6 +59,7 @@ describe("mergeAttemptSpans", () => {
           [8, 9],
         ],
         [0.5, 12],
+        SOTAC_PROFILE.calibration.attemptMergeReopenU,
       ),
     ).toEqual([
       [1, 4],

@@ -15,6 +15,7 @@
 // Works at 30 Hz (main-table sensorFrames) or ~91 Hz (raw sidecar CSVs);
 // builders for both input shapes are provided.
 
+import type { RigProfile } from "./rigProfile";
 import type { LanguageAtom } from "@/types/language.types";
 
 import { screenBackgroundVotes, SCREEN_VOTE_MIN } from "./signalScreen";
@@ -139,6 +140,8 @@ export interface TactileSeries {
    * files, twice the 0.1 N/LSB the datasheet suggests). Undefined when no
    * taxel ever reported force. Used by the single-taxel exit floor. */
   quantumN?: number;
+  /** true when a taxel layout was available (CoP-based rules possible) */
+  hasLayout?: boolean;
 }
 
 export interface GripperSeries {
@@ -239,9 +242,9 @@ const SINGLE_TAXEL_QUANTA = 1.5;
  * can be 1-3 taxels). Grazes (>= 4 taxels or > 3 quanta) pass untouched.
  * Non-causal (run lookahead), like the plateau median. Not a
  * subtraction: a refuse-to-believe rule. */
-const RESIDUAL_GATE_QUIET_N = 1.0; // = QUIET_MARGIN_N in applyAdaptiveBaseline
+// RESIDUAL_GATE_QUIET_N -> RigCalibration.quietMarginN (rigProfile.ts)
 const RESIDUAL_GATE_SUSTAIN_S = 0.3; // = EXIT_MIN_S
-const RESIDUAL_GATE_JAW_RECLOSE_U = 5.0; // jaw-reopen vocabulary
+// RESIDUAL_GATE_JAW_RECLOSE_U -> RigCalibration.jawRecloseU (rigProfile.ts)
 /** Exit criterion for ARMING the gate. Jaw-free forms: force under the
  * exit level, or rule 2's single-taxel floor (drops leave residue too).
  * Multi-taxel form: at most this many raw-loaded taxels carrying at most
@@ -277,23 +280,21 @@ const ENTER_MIN_S = 0.2;
  * on 7 video verdicts — every false bout peaks <= 2.2 N, every real grab
  * >= 2.4 N (eps 25/42/9 pads-in-air); ep35's 3.8 N motion phantom later
  * broke the margin from above. Re-derive as verdicts grow. */
-export const WEAK_ATTEMPT_MAX_N = 2.3;
+// WEAK_ATTEMPT_MAX_N -> RigCalibration.weakAttemptMaxN (rigProfile.ts)
 /** Brief touches are REPORTED from this far below the weak line
  * (reconciles the former independent 2.0 N bar with the 2.3 N line —
  * Jingyi's blocker 3): the band [line - margin, line) is "visible but not
  * counted", where ep9's and ep23's 2.2 N grazes live, video-verified as
  * weak contacts; everything reported at or above the line is an attempt
  * candidate. Raising the bar to the line would erase those two. */
-export const BRIEF_REPORT_MARGIN_N = 0.3;
+// BRIEF_REPORT_MARGIN_N -> RigCalibration.briefReportMarginN (rigProfile.ts)
 const BRIEF_CONTACT_MIN_S = 0.03;
 // on the 1 mN grid: the raw difference is 1.9999999999999998 in floating
 // point, and a graze of exactly ten 0.2 N quanta sums to the same value, so
 // the derived bar would silently admit what the literal 2.0 rejected
 // (ep27 @4.5 s). Values sitting ON the bar are a float question the quantum
 // grid should settle deliberately, not by accident.
-export const BRIEF_CONTACT_STRONG_N = Number(
-  (WEAK_ATTEMPT_MAX_N - BRIEF_REPORT_MARGIN_N).toFixed(3),
-);
+// BRIEF_CONTACT_STRONG_N -> derived per profile in detectEvents (weak line - margin, on the 1 mN grid)
 /** Ignore brief contacts this close to t=0 — the sensor settles and the
  * arm is still parked; sotac ep58 has a 2.2 N start-up spike at 0.25 s. */
 const BRIEF_CONTACT_SKIP_START_S = 0.5;
@@ -320,10 +321,10 @@ const BRIEF_CONTACT_SKIP_START_S = 0.5;
  * the retry's pre-open, which the forward window would otherwise read
  * as a release (ep47 @4.575, video-verified: ball escapes with the jaw
  * 5.7 units into a closing motion, retry opens +22.8 right after). */
-const RELEASE_TRAVEL_MIN = 2.0;
+// RELEASE_TRAVEL_MIN -> RigCalibration.releaseTravelMinU (rigProfile.ts)
 const RELEASE_WIN_BEFORE_S = 0.5;
 const RELEASE_WIN_AFTER_S = 1.0;
-const RELEASE_CLOSING_VETO = -1.0;
+// RELEASE_CLOSING_VETO -> RigCalibration.releaseClosingVetoU (rigProfile.ts)
 
 /** Sustained loosening slide (Zheng's ep23 video finding, 2026-08-31):
  * the object sliding through an ESTABLISHED grip while the jaw loosens —
@@ -348,10 +349,10 @@ const RELEASE_CLOSING_VETO = -1.0;
  * verified loosening slide) and ep48 @11.3 (cup rotating out of the
  * jaws 0.7 s before its tauZ spike — verified escape precursor). */
 const SLIDE_WIN_S = 1.0;
-const SLIDE_MIN_MM = 2.0;
-const SLIDE_JAW_OPEN_MIN = 1.0;
+// SLIDE_MIN_MM -> RigCalibration.slideMinMm (rigProfile.ts)
+// SLIDE_JAW_OPEN_MIN -> RigCalibration.slideJawOpenMinU (rigProfile.ts)
 const SLIDE_SQUEEZE_LOOKBACK_S = 1.5;
-const SLIDE_SQUEEZE_VETO_U = -5.0;
+// SLIDE_SQUEEZE_VETO_U -> RigCalibration.slideSqueezeVetoU (rigProfile.ts)
 const SLIDE_TERMINAL_VETO_S = 1.0;
 /** Load-retention condition on the terminal veto (Zheng's ruling,
  * 2026-09-04, replacing the outcome switch). The veto exists because
@@ -374,7 +375,7 @@ const SLIDE_VETO_RETENTION = 0.5;
 const SLIDE_RETENTION_PRE_S = 0.5;
 const SLIDE_RETENTION_POST_S = 1.0;
 const SLIDE_RETENTION_EDGE_S = 0.2;
-const SLIDE_LOAD_MIN_N = 1.0;
+// SLIDE_LOAD_MIN_N -> RigCalibration.slideLoadMinN (rigProfile.ts)
 const SLIDE_MED_HALF_S = 0.15;
 const SLIDE_MERGE_GAP_S = 1.0;
 
@@ -388,7 +389,7 @@ const SLIDE_MERGE_GAP_S = 1.0;
  * that obvious": ep50 fires at 1.23x/1.28x p90 and ep25's place runs 2.2x;
  * ep28 peaks at 1.16x across three marginal stages and stays silent —
  * 1.16 vs 1.23 is a THIN margin, re-derive as verdicts accumulate. */
-export const HESITATION_P90_S = [6.32, 2.2, 4.56, 1.26];
+// HESITATION_P90_S -> RigCalibration.hesitationP90S (rigProfile.ts)
 
 /** Short transport: a wrong-location failure can be tactilely complete
  * (ep39: grasp, carry, real release — but the arm never went to the bowl;
@@ -397,7 +398,7 @@ export const HESITATION_P90_S = [6.32, 2.2, 4.56, 1.26];
  * minimum by nearly 2x (next ep16 1.46 s, p5 1.55 s) — 1.0 s splits the
  * gap with wide margins. Fires a review flag; the panel renders it as a
  * human-check card (never auto-counts as an attempt). */
-const SHORT_TRANSPORT_MIN_S = 1.0;
+// SHORT_TRANSPORT_MIN_S -> RigCalibration.shortTransportMinS (rigProfile.ts)
 
 /** Combine function for failed_attempt spans (Zheng's ep54 verdict: one
  * finger nudges the cup onto the other finger, still graspable, one grab
@@ -407,7 +408,7 @@ const SHORT_TRANSPORT_MIN_S = 1.0;
  * ep54's gap reopens 0.1 units (merge); ep31's 17.4 and ep45's 17.2
  * (real retry cycles — keep separate). Threshold 5 units = the existing
  * jaw-reopen vocabulary; margins are wide on both sides. */
-const ATTEMPT_MERGE_REOPEN_U = 5.0;
+// ATTEMPT_MERGE_REOPEN_U -> RigCalibration.attemptMergeReopenU (rigProfile.ts)
 
 /** Pure merge decision over chronologically sorted attempt spans —
  * exported for tests. `reopenBetween[k]` = max jaw reopen (units) between
@@ -415,11 +416,12 @@ const ATTEMPT_MERGE_REOPEN_U = 5.0;
 export function mergeAttemptSpans(
   spans: Array<[number, number]>,
   reopenBetween: number[],
+  reopenU: number,
 ): Array<[number, number]> {
   const out: Array<[number, number]> = [];
   for (let k = 0; k < spans.length; k++) {
     const prev = out[out.length - 1];
-    if (k > 0 && prev && reopenBetween[k - 1] < ATTEMPT_MERGE_REOPEN_U) {
+    if (k > 0 && prev && reopenBetween[k - 1] < reopenU) {
       prev[1] = Math.max(prev[1], spans[k][1]);
     } else {
       out.push([spans[k][0], spans[k][1]]);
@@ -435,15 +437,16 @@ const HESITATION_STRONG = 1.2;
 export function computeHesitation(
   stageDurs: Array<number | null>,
   excused: boolean,
+  p90S: number[],
 ): boolean {
   if (excused) return false;
   let over = 0;
   let strong = false;
-  for (let i = 0; i < HESITATION_P90_S.length; i++) {
+  for (let i = 0; i < p90S.length; i++) {
     const d = stageDurs[i];
     if (d === null || d === undefined) continue;
-    if (d > HESITATION_P90_S[i]) over++;
-    if (d >= HESITATION_STRONG * HESITATION_P90_S[i]) strong = true;
+    if (d > p90S[i]) over++;
+    if (d >= HESITATION_STRONG * p90S[i]) strong = true;
   }
   return over >= HESITATION_MIN_SLOW_STAGES && strong;
 }
@@ -565,8 +568,10 @@ function relStd(x: Float64Array, i0: number, i1: number): number {
 export function applyAdaptiveBaseline(
   frames: unknown[],
   timestamps: number[],
-  gripper?: GripperSeries | null,
-  opts?: {
+  gripper: GripperSeries | null | undefined,
+  opts: {
+    /** rig calibration: idle margin and jaw re-close vocabulary */
+    profile: RigProfile;
     /** Rule 1 (post-release residual gate) on by default; off for A/B
      * probes of the gate itself. */
     residualGate?: boolean;
@@ -581,7 +586,7 @@ export function applyAdaptiveBaseline(
   const t = timestamps;
   const dur = t[n - 1] - t[0];
   const rateHz = dur > 0 ? (n - 1) / dur : 30;
-  const QUIET_MARGIN_N = 1.0;
+  const QUIET_MARGIN_N = opts.profile.calibration.quietMarginN;
   const BASELINE_TAU_S = 1.5;
 
   // Context-gated re-zero (Zheng): while the jaw still sits at its
@@ -695,7 +700,9 @@ export function applyAdaptiveBaseline(
   }
 
   // ---- Rule 1: post-release residual gate (see RESIDUAL_GATE_*)
-  if (opts?.residualGate !== false) {
+  if (opts.residualGate !== false) {
+    const RESIDUAL_GATE_QUIET_N = opts.profile.calibration.quietMarginN;
+    const RESIDUAL_GATE_JAW_RECLOSE_U = opts.profile.calibration.jawRecloseU;
     const jawPosAt = (tq: number): number => {
       if (!gripper || gripper.t.length === 0) return 0;
       if (tq <= gripper.t[0]) return gripper.pos[0];
@@ -889,7 +896,8 @@ export function buildSeriesFromSensorFrames(
   frames: unknown[],
   timestamps: number[],
   layout: [number, number, number][] | null,
-  gripper?: GripperSeries | null,
+  gripper: GripperSeries | null | undefined,
+  profile: RigProfile,
 ): TactileSeries | null {
   if (!frames.length || !timestamps.length) return null;
   const first = frames[0] as number[][][];
@@ -902,7 +910,9 @@ export function buildSeriesFromSensorFrames(
   const rateHz = dur > 0 ? (n - 1) / dur : 30;
 
   // one implementation of the drift correction, shared with the display
-  const corrected = applyAdaptiveBaseline(frames, timestamps, gripper);
+  const corrected = applyAdaptiveBaseline(frames, timestamps, gripper, {
+    profile,
+  });
   const src: unknown[] = corrected ?? frames;
 
   // force resolution, measured on the UNcorrected frames (correction shifts
@@ -1089,7 +1099,7 @@ export function buildSeriesFromSensorFrames(
       rawLoaded,
     });
   }
-  return { t, rateHz, fingers, quantumN };
+  return { t, rateHz, fingers, quantumN, hasLayout: layout !== null };
 }
 
 /**
@@ -1099,8 +1109,10 @@ export function buildSeriesFromSensorFrames(
 export function buildSeriesFromRawCsvs(
   csvTexts: string[],
   layout: [number, number, number][] | null,
-  gripper?: GripperSeries | null,
-  opts?: {
+  gripper: GripperSeries | null | undefined,
+  opts: {
+    /** rig calibration (required — see rigProfile.ts) */
+    profile: RigProfile;
     /** CP5 of analysis/duplicate-investigation.md: the sidecar rows are a
      * fixed 90.88 Hz LOGGER loop over a latest-frame buffer while the
      * device tops out at ~83 Hz (Paxini manual; Zheng's catch) — 10-30%
@@ -1208,6 +1220,7 @@ export function buildSeriesFromRawCsvs(
     Array.from(base.t.subarray(0, n)),
     layout,
     gripper,
+    opts.profile,
   );
 }
 
@@ -1222,6 +1235,7 @@ export function clipSeries(s: TactileSeries, tMax: number): TactileSeries {
     t: s.t.slice(0, n),
     rateHz: s.rateHz,
     quantumN: s.quantumN,
+    hasLayout: s.hasLayout,
     fingers: s.fingers.map((f) => ({
       fn: f.fn.slice(0, n),
       fnRaw: f.fnRaw.slice(0, n),
@@ -1469,21 +1483,49 @@ interface RawEvent extends DetectedEvent {
 export function detectEvents(
   series: TactileSeries,
   gripper: GripperSeries | null,
-  thresholds?: Partial<DetectionThresholds>,
-  arm?: ArmMotionSeries | null,
+  thresholds: Partial<DetectionThresholds> | undefined,
+  arm: ArmMotionSeries | null | undefined,
   /** Detection context. `episodeIndex` keeps the signal screen from
    * letting a corpus episode's own reference windows vote for it. The
    * recorded OUTCOME is deliberately NOT accepted here (Jingyi's PR #1
    * review): the detector must tell the same story on an unlabeled
    * dataset as on a labeled one, and outcome-vs-story tension is an
    * evaluation question that lives in the offline runner. */
-  context?: { episodeIndex?: number },
+  context: {
+    /** rig calibration — required, no default (rigProfile.ts) */
+    profile: RigProfile;
+    episodeIndex?: number;
+  },
 ): AutoLabelResult {
-  const th: DetectionThresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
+  const P = context.profile.calibration;
+  const th: DetectionThresholds = { ...P.thresholds, ...thresholds };
+  // rig-calibrated numbers, by their historical names (provenance in the
+  // comments above and in analysis/portability.md)
+  const WEAK_ATTEMPT_MAX_N = P.weakAttemptMaxN;
+  // on the 1 mN grid: the raw difference of two decimals is not a decimal
+  // (2.3 - 0.3 = 1.9999999999999998) and a ten-quanta graze sums to the same
+  const BRIEF_CONTACT_STRONG_N = Number(
+    (P.weakAttemptMaxN - P.briefReportMarginN).toFixed(3),
+  );
+  const RELEASE_TRAVEL_MIN = P.releaseTravelMinU;
+  const RELEASE_CLOSING_VETO = P.releaseClosingVetoU;
+  const SLIDE_MIN_MM = P.slideMinMm;
+  const SLIDE_JAW_OPEN_MIN = P.slideJawOpenMinU;
+  const SLIDE_SQUEEZE_VETO_U = P.slideSqueezeVetoU;
+  const SLIDE_LOAD_MIN_N = P.slideLoadMinN;
+  const SHORT_TRANSPORT_MIN_S = P.shortTransportMinS;
   const { t, rateHz, fingers } = series;
   const n = t.length;
   const flags: string[] = [];
   const spans: DetectedSpan[] = [];
+  // capability flags: what this dataset could NOT support, stated instead
+  // of silently degraded (Jingyi's PR #1 review)
+  if (!series.hasLayout) flags.push("no_layout");
+  if (!gripper || gripper.t.length < 3) flags.push("no_gripper");
+  if (!arm || arm.t.length < 3) flags.push("no_arm");
+  // the numbers behind this run were not verified on this rig (template,
+  // or a dataset file that says so): say it in every result
+  if (!context.profile.verified) flags.push("profile_unverified");
   const events: RawEvent[] = [];
   const dur = n ? t[n - 1] : 0;
 
@@ -1531,7 +1573,7 @@ export function detectEvents(
     return {
       subtasks: dur > 0 ? [{ label: "approach", startS: 0, endS: dur }] : [],
       events: [],
-      flags: ["no_contact"],
+      flags: [...flags, "no_contact"],
       spans: [],
     };
   }
@@ -2317,7 +2359,7 @@ export function detectEvents(
     const firstStableS = stableAfterClose ? stableAfterClose.startS : null;
     let tStableRaw = firstStableS ?? tClose + 1;
     if (arm && arm.t.length > 2 && firstStableS !== null) {
-      const ARM_MOVE_EPS = 12; // summed units/s; jitter ~1-2, slow drift ~5-10
+      const ARM_MOVE_EPS = P.armMoveEpsUps; // summed units/s; jitter ~1-2, slow drift ~5-10
       const moveSustainS = 0.15;
       const nJoints = arm.joints[0]?.length ?? 0;
       const speedAt: number[] = new Array(arm.t.length).fill(0);
@@ -2341,7 +2383,7 @@ export function detectEvents(
       // separating them needs SIGNED lift-direction motion, which needs a
       // per-robot sign convention.
       const SQUEEZE_LOOKAHEAD_S = 1.0;
-      const SQUEEZE_MIN_TRAVEL = 8; // jaw units; real squeezes are 30-50
+      const SQUEEZE_MIN_TRAVEL = P.squeezeMinTravelU; // jaw units; real squeezes are 30-50
       const jawCloseAhead = (fromS: number): number => {
         if (!gripper) return 0;
         let start: number | null = null;
@@ -2407,8 +2449,8 @@ export function detectEvents(
     // Calibration from 7 video verdicts: every false bout peaks <= 2.2 N,
     // every real grab >= 2.4 N. The 2.3 N cut sits in that thin gap —
     // re-derive as verdicts grow.
-    // (WEAK_ATTEMPT_MAX_N is module-level: the brief-contact reporting bar
-    // is derived from it)
+    // (WEAK_ATTEMPT_MAX_N comes from the rig profile; the brief-contact
+    // reporting bar is derived from it at the top of detectEvents)
     // Pads touching EACH OTHER, no object: the jaw bottoms out at its
     // mechanical minimum, which an object between the pads never allows
     // (Zheng's ep0 verdict + corpus survey: the air-close dwells at jaw
@@ -2416,7 +2458,7 @@ export function detectEvents(
     // hold crushes the foam ball to 2.8, ep37 — thin margin, re-derive
     // for harder objects). Such a span is a distinct outcome, not an
     // object attempt, and is excluded from attempt counting.
-    const AIR_CLOSE_POS = 2.0;
+    const AIR_CLOSE_POS = P.airClosePos;
     const jawMinIn = (a: number, b: number): number => {
       if (!gripper) return Infinity;
       let mn = Infinity;
@@ -2492,11 +2534,11 @@ export function detectEvents(
     //      video-verified terminal loss the retry test alone missed;
     //      ep40's residual drop is safe: its jaw sits at 62, far ABOVE
     //      its 26-unit hold).
-    const HAND_LOSS_N = 1.0;
+    const HAND_LOSS_N = P.handLossN;
     const HAND_LOSS_MIN_S = 0.35;
-    const JAW_RETRY_RISE = 5.0;
+    const JAW_RETRY_RISE = P.jawRetryRiseU;
     const JAW_RETRY_WIN_S = 2.5;
-    const SQUEEZE_THROUGH_BELOW = 8.0;
+    const SQUEEZE_THROUGH_BELOW = P.squeezeThroughBelowU;
     {
       const lastRelease = [...cleaned]
         .reverse()
@@ -2607,7 +2649,7 @@ export function detectEvents(
     // air_grasp which bottoms out below 2). Gripper-only detection,
     // before the grasp bout; suppressed while ANY finger span overlaps
     // the cycle (a standing phantom span otherwise reads as "contact").
-    const AIR_MISS_TRAVEL = 8.0;
+    const AIR_MISS_TRAVEL = P.airMissTravelU;
     if (gripper && gripper.t.length > 2) {
       const gt = gripper.t;
       const gp = gripper.pos;
@@ -3052,11 +3094,13 @@ export function detectEvents(
       ) {
         continue;
       }
+      if (!P.screenReference) break; // no per-rig reference: screen off
       const votes = screenBackgroundVotes(
         series,
         e.finger,
         e.startS,
-        context?.episodeIndex,
+        context.episodeIndex,
+        P.screenReference,
       );
       if (votes === null || votes < SCREEN_VOTE_MIN) continue;
       e.data = { ...e.data, scr: votes };
@@ -3089,7 +3133,7 @@ export function detectEvents(
         }
         reopen.push(maxRise);
       }
-      const merged = mergeAttemptSpans(ivals, reopen);
+      const merged = mergeAttemptSpans(ivals, reopen, P.attemptMergeReopenU);
       if (merged.length < ivals.length) {
         for (let i = spans.length - 1; i >= 0; i--) {
           if (spans[i].kind === "failed_attempt") spans.splice(i, 1);
@@ -3169,7 +3213,9 @@ export function detectEvents(
     // excused only by signal-side evidence of a retry; the recorded
     // outcome no longer reaches the detector (it excuses in the runner)
     const excused = spans.some((s) => s.kind === "failed_attempt");
-    if (computeHesitation(stageDurs, excused)) flags.push("hesitation");
+    if (computeHesitation(stageDurs, excused, P.hesitationP90S)) {
+      flags.push("hesitation");
+    }
   }
 
   // flags in chronological order — they are appended in pipeline-pass

@@ -28,6 +28,12 @@ import {
 } from "../visualizer/src/lib/eventDetection";
 import { resolveTaxelLayout } from "../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../visualizer/node_modules/hyparquet";
+import {
+  ANNOTATOR_PROFILE_PATH,
+  profileFromFile,
+  resolveProfile,
+  type RigProfile,
+} from "../visualizer/src/lib/rigProfile";
 
 // ---------------------------------------------------------------- args
 
@@ -42,6 +48,11 @@ interface Args {
   dedup: boolean;
   deviceGrid: boolean;
   thresholds: Partial<DetectionThresholds>;
+  /** explicit registry profile id (--profile) */
+  profileId: string | null;
+  /** dataset name for the registry lookup (--dataset-ref); the local
+   * mirror is sotac unless told otherwise */
+  profileRef: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -56,6 +67,8 @@ function parseArgs(argv: string[]): Args {
     dedup: false,
     deviceGrid: false,
     thresholds: {},
+    profileId: null,
+    profileRef: "Jingyi-Z/sotac",
   };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
@@ -68,6 +81,8 @@ function parseArgs(argv: string[]): Args {
     else if (k === "--report") a.report = argv[++i];
     else if (k === "--dedup") a.dedup = true;
     else if (k === "--device-grid") a.deviceGrid = true;
+    else if (k === "--profile") a.profileId = argv[++i];
+    else if (k === "--dataset-ref") a.profileRef = argv[++i];
     else if (k === "--th") {
       const [key, val] = argv[++i].split("=");
       (a.thresholds as Record<string, number>)[key] = Number(val);
@@ -269,13 +284,36 @@ async function runEpisode(
   const inputs = await loadEpisodeInputs(root, info, meta);
   const layout = resolveTaxelLayout(inputs.nTaxels)?.points ?? null;
 
+  // calibration profile: the mirror's own meta/annotator_profile.json,
+  // else --profile <id>, else the registry by dataset name, else the
+  // TEMPLATE (unverified: every result then carries profile_unverified)
+  let fileProfile: RigProfile | null = null;
+  const profilePath = join(root, ANNOTATOR_PROFILE_PATH);
+  if (existsSync(profilePath)) {
+    try {
+      fileProfile = profileFromFile(JSON.parse(readFileSync(profilePath, "utf-8")));
+    } catch {
+      fileProfile = null;
+    }
+  }
+  const { profile, source: profileSource } = resolveProfile(
+    args.profileRef,
+    args.profileId,
+    fileProfile,
+  );
+  if (profileSource === "template" && !args.all) {
+    console.log(
+      "NOTE: no calibration profile for this dataset — running with the TEMPLATE (sotac numbers, unverified).",
+    );
+  }
+
   let series: TactileSeries | null = null;
   let gripper = inputs.gripper;
   let source = args.source;
   if (args.source === "raw") {
     const texts = loadRawCsvTexts(root, ep, inputs.sensorName);
     const raw = texts
-      ? buildSeriesFromRawCsvs(texts, layout, gripper, {
+      ? buildSeriesFromRawCsvs(texts, layout, gripper, { profile,
           dedupFrames: args.dedup,
           // Zheng's beat-model plan step 2: uniform 83.33 Hz (12 ms) axis
           deviceGridHz: args.deviceGrid ? 1000 / 12 : undefined,
@@ -304,8 +342,7 @@ async function runEpisode(
       inputs.frames,
       inputs.timestamps,
       layout,
-      gripper,
-    );
+      gripper, profile);
   }
   if (!series) throw new Error(`episode ${ep}: no tactile series`);
 
@@ -322,7 +359,7 @@ async function runEpisode(
       epResult = undefined;
     }
   }
-  const detected = detectEvents(series, gripper, args.thresholds, inputs.arm, {
+  const detected = detectEvents(series, gripper, args.thresholds, inputs.arm, { profile,
     episodeIndex: ep,
   });
   // Evaluation-only flags (Jingyi's PR #1 review: outcome-vs-story tension

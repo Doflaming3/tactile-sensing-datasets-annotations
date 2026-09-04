@@ -94,6 +94,30 @@ data). The census script (`scratchpad/post_release_census.py` pattern:
 post-release loaded fraction, stuck taxels, burst count per finger) is
 the diagnostic to rerun on any new rig before trusting the gate's numbers.
 
+## Profiles (cycle 5, 2026-09-04): the Tier 2 numbers now live in a rig profile
+
+Every rig/task-calibrated number above (forces in N, jaw travel in the
+gripper's units, arm speed, CoP travel in mm, the stage-duration
+percentiles, the screen reference corpus, plus the signal-level
+`DetectionThresholds`) lives in `visualizer/src/lib/rigProfile.ts` as
+`RigCalibration`, grouped per rule, and the detector, the series builders
+and the corrected display REQUIRE a profile — there is no default anywhere.
+`profileForDataset(ref)` resolves a dataset id (revision stripped) through
+a registry (`Jingyi-Z/sotac*` → `sotac-paxini-so101`) after the dataset's
+own `meta/annotator_profile.json`; an unknown dataset gets the TEMPLATE
+(sotac's numbers, `verified: false`) with a reminder in the panel and a
+`profile_unverified` flag on every result — Zheng's ruling over Jingyi's
+hard-refusal ask, so the tool works on day one and the unverified state is
+impossible to miss. A dataset recorded on a known rig
+under another name is opened with an explicit `?profile=<id>` — explicit,
+never implicit (Jingyi's PR #1 precondition: never default to sotac's
+numbers). What stays in code as physics: seconds-based debounces and
+windows, and the quanta-based floors tied to the measured sensor quantum.
+The detector also states what a dataset could NOT support instead of
+degrading silently: `no_layout` (no CoP → no slide/rotation rules),
+`no_gripper` (no jaw → no release/drop, attempts, air miss), `no_arm`
+(no transport anchor from arm motion).
+
 ## Step ZERO (2026-08-31): measure the axis before anything else
 
 The sotac sidecars are logger-clocked (90.88 Hz fixed loop) over a

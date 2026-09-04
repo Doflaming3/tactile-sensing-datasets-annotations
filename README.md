@@ -39,6 +39,45 @@ revision — `http://localhost:3105/Jingyi-Z/sotac@47d46cfb/episode_N` is the
 63-episode state our notes, dumps and video verdicts use (old numbering).
 Pinned views are read-only: saving to the Hub is refused there.
 
+## Using the annotator on another dataset
+
+The rules are physics, but the **numbers** (forces, jaw units, arm speed,
+stage durations, the artifact-screen reference) were measured on sotac's rig
+— Paxini DP-S2015-Elite fingertips on an SO-101 — and live in a *calibration
+profile* (`visualizer/src/lib/rigProfile.ts`). The app resolves a profile in
+this order:
+
+1. the dataset's own file **`meta/annotator_profile.json`** (next to
+   `info.json` in the dataset repo);
+2. an explicit `?profile=<id>` in the URL (a known profile applied to a
+   dataset recorded on that rig under another name);
+3. the built-in registry by dataset id (`Jingyi-Z/sotac*` →
+   `sotac-paxini-so101`);
+4. otherwise the **template**: sotac's numbers, marked *unverified*.
+
+With the template, a reminder appears in the Auto-label panel and every
+result carries a `profile_unverified` flag until a verified profile exists.
+To calibrate a new rig:
+
+1. copy the template — `visualizer/public/annotator_profile.template.json`
+   (served by the app at `/annotator_profile.template.json`, and linked from
+   the reminder) — to `meta/annotator_profile.json` in the dataset;
+2. edit the header (`id`, `label`, `sensor`, `gripper`); each number in
+   `calibration` carries a `provenance` note saying whether it was *measured*
+   on sotac (re-measure here) or came from a *video verdict* (verify here);
+   the protocol is `analysis/portability.md` with the census scripts under
+   `scripts/calibration/`;
+3. set `verified: true` only after the numbers were checked on this rig —
+   the flag and the reminder go away, and the artifact screen runs if a
+   `screenReferencePath` points at a reference built with
+   `scripts/build-screen-reference.ts` on this dataset.
+
+Results also carry `no_layout` / `no_gripper` / `no_arm` when a dataset
+lacks a taxel layout, a gripper channel or arm joints, instead of degrading
+silently. The offline runner follows the same order
+(`--profile <id>`, `--dataset-ref <org/name>`, the mirror's own file). A
+user manual with this walkthrough is planned; this section is its seed.
+
 **The offline runner** (drives the same detector on the local mirrors):
 
 ```bash

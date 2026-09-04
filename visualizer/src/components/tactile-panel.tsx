@@ -32,6 +32,9 @@ import {
   applyAdaptiveBaseline,
   type GripperSeries,
 } from "@/lib/eventDetection";
+import type { RigProfile } from "@/lib/rigProfile";
+import { useRigProfile } from "@/lib/useRigProfile";
+import { useSearchParams } from "next/navigation";
 import RawStreamPanel from "@/components/raw-stream-panel";
 import {
   computeFolderTactileAggregate,
@@ -133,6 +136,10 @@ function expandChannels(
 // become the corrected view. The detector itself keeps using the correction
 // internally (approved in review); stored data is never modified either way.
 let driftCorrectedView = false;
+// the rig profile the corrected view needs (baseline idle margin, jaw
+// re-close vocabulary); null = no profile for this dataset: the corrected
+// view is unavailable and raw is shown regardless of the toggle
+let displayProfile: RigProfile | null = null;
 const driftViewSubs = new Set<() => void>();
 
 function setDriftCorrectedView(v: boolean) {
@@ -151,19 +158,41 @@ function useDriftCorrectedView(): boolean {
   );
 }
 
+export function setDisplayProfile(p: RigProfile | null): void {
+  if (displayProfile === p) return;
+  displayProfile = p;
+  for (const fn of driftViewSubs) fn();
+}
+
+function useDisplayProfile(): RigProfile | null {
+  return useSyncExternalStore(
+    (cb) => {
+      driftViewSubs.add(cb);
+      return () => driftViewSubs.delete(cb);
+    },
+    () => displayProfile,
+    () => null,
+  );
+}
+
 const DRIFT_TOGGLE_TITLE =
   "Default is RAW sensor output (for auditing vendor zero points and " +
   "drift). Turning this on applies the auto-labeler's adaptive baseline " +
   "to the DISPLAY only — one switch flips every tactile view; saved data " +
   "is never modified; resets to raw on reload.";
 
+const NO_PROFILE_TITLE =
+  "No calibration profile for this dataset: the corrected view needs the rig's baseline margins (rigProfile.ts). Raw is shown.";
+
 function DriftViewToggle({ compact = false }: { compact?: boolean }) {
   const corrected = useDriftCorrectedView();
+  const profile = useDisplayProfile();
   if (compact) {
     return (
       <button
         type="button"
-        title={DRIFT_TOGGLE_TITLE}
+        disabled={!profile}
+        title={profile ? DRIFT_TOGGLE_TITLE : NO_PROFILE_TITLE}
         onClick={() => setDriftCorrectedView(!corrected)}
         className={`px-1.5 rounded border text-[10px] ${
           corrected
@@ -178,10 +207,11 @@ function DriftViewToggle({ compact = false }: { compact?: boolean }) {
   return (
     <label
       className="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer"
-      title={DRIFT_TOGGLE_TITLE}
+      title={profile ? DRIFT_TOGGLE_TITLE : NO_PROFILE_TITLE}
     >
       <input
         type="checkbox"
+        disabled={!profile}
         checked={corrected}
         onChange={(e) => setDriftCorrectedView(e.target.checked)}
       />
@@ -194,11 +224,12 @@ function channelsFrom(
   sensorFrames: SensorFramesMap,
   gripper?: GripperSeries | null,
   corrected = false,
+  profile: RigProfile | null = null,
 ): Channel[] {
   const out: Channel[] = [];
   for (const [name, sf] of Object.entries(sensorFrames)) {
     let frames = sf.frames;
-    if (corrected) {
+    if (corrected && profile) {
       // opt-in only — see the display-mode note above. Buffered (N,P,3)
       // history shapes are left raw; (F,P,3) and (P,3) are corrected.
       // applyAdaptiveBaseline clamps at the SOURCE (Zheng's ruling): its
@@ -207,14 +238,14 @@ function channelsFrom(
       try {
         if (sf.shape.length === 3 && sf.shape[0] <= 4) {
           frames =
-            (applyAdaptiveBaseline(
-              sf.frames,
-              sf.timestamps,
-              gripper,
-            ) as unknown[]) ?? sf.frames;
+            (applyAdaptiveBaseline(sf.frames, sf.timestamps, gripper, {
+              profile,
+            }) as unknown[]) ?? sf.frames;
         } else if (sf.shape.length === 2) {
           const wrapped = sf.frames.map((fr) => [fr]);
-          const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper);
+          const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper, {
+            profile,
+          });
           if (corr) frames = corr.map((fr) => fr[0]);
         }
       } catch {
@@ -511,9 +542,10 @@ export function TactileStats({
   gripper?: GripperSeries | null;
 }) {
   const corrected = useDriftCorrectedView();
+  const profile = useDisplayProfile();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected),
-    [sensorFrames, gripper, corrected],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile),
+    [sensorFrames, gripper, corrected, profile],
   );
   const rows = useMemo(() => {
     return channels.map((ch) => {
@@ -700,13 +732,22 @@ export default function TactilePanel({
   root?: string | null;
 }) {
   const { currentTime } = useTime();
+  const searchParams = useSearchParams();
+  const profileOverride = searchParams?.get("profile") ?? null;
+  const { profile: rigProfile } = useRigProfile(
+    repoId ?? null,
+    profileOverride,
+  );
+  useEffect(() => {
+    if (rigProfile) setDisplayProfile(rigProfile);
+  }, [rigProfile]);
   const [maxLen, setMaxLen] = useState(14);
   const [forceMax, setForceMax] = useState(5.0);
   const corrected = useDriftCorrectedView();
-
+  const profile = useDisplayProfile();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected),
-    [sensorFrames, gripper, corrected],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile),
+    [sensorFrames, gripper, corrected, profile],
   );
   if (channels.length === 0) return null;
 
@@ -819,9 +860,10 @@ export function TactileFingerView({
 }) {
   const { currentTime } = useTime();
   const corrected = useDriftCorrectedView();
+  const profile = useDisplayProfile();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected),
-    [sensorFrames, gripper, corrected],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile),
+    [sensorFrames, gripper, corrected, profile],
   );
   const ch = channels[fingerIndex];
   if (!ch) return null;
@@ -858,9 +900,10 @@ export function TactileSummary({
   gripper?: GripperSeries | null;
 }) {
   const corrected = useDriftCorrectedView();
+  const profile = useDisplayProfile();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected),
-    [sensorFrames, gripper, corrected],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile),
+    [sensorFrames, gripper, corrected, profile],
   );
   if (channels.length === 0) return null;
   return (

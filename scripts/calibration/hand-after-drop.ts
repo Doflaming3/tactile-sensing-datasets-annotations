@@ -11,6 +11,7 @@ import {
 } from "../../visualizer/src/lib/eventDetection";
 import { resolveTaxelLayout } from "../../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../../visualizer/node_modules/hyparquet";
+import { SOTAC_PROFILE } from "../../visualizer/src/lib/rigProfile";
 
 const ROOT = "data/sotac";
 const CASES: Array<[number, number, string]> = [
@@ -74,7 +75,7 @@ async function main() {
     const dir = join(ROOT, "sensors", sensorName, `episode_${pad6(ep)}`);
     if (!existsSync(dir)) continue;
     const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
-    const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout);
+    const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, undefined, { profile: SOTAC_PROFILE });
     const series = clipSeries(raw!, tEnd);
 
     // hand total fn over [tDrop, tDrop+1.0], reported per 0.1s step

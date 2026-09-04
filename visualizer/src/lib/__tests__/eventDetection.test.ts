@@ -1,12 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  BRIEF_CONTACT_STRONG_N,
-  WEAK_ATTEMPT_MAX_N,
   resultToAtoms,
   resultToRecordedAtoms,
   type AutoLabelResult,
 } from "../eventDetection";
+import { SOTAC_PROFILE } from "../rigProfile";
 
 // Shaped like sotac ep25: a real task, then a post-task phantom span on
 // finger 1 (14.1-16.6 s) whose events the gate downgraded to low. The
@@ -218,8 +217,10 @@ describe("finger-scoped span deletion (Jingyi's blocker 3)", () => {
 
 describe("weak line and brief-contact bar are one calibration", () => {
   it("the reporting bar sits a declared margin below the weak line", () => {
-    expect(BRIEF_CONTACT_STRONG_N).toBeLessThan(WEAK_ATTEMPT_MAX_N);
-    expect(BRIEF_CONTACT_STRONG_N).toBeCloseTo(2.0, 6);
-    expect(WEAK_ATTEMPT_MAX_N).toBeCloseTo(2.3, 6);
+    const c = SOTAC_PROFILE.calibration;
+    const bar = Number((c.weakAttemptMaxN - c.briefReportMarginN).toFixed(3));
+    expect(bar).toBeLessThan(c.weakAttemptMaxN);
+    expect(bar).toBeCloseTo(2.0, 6);
+    expect(c.weakAttemptMaxN).toBeCloseTo(2.3, 6);
   });
 });

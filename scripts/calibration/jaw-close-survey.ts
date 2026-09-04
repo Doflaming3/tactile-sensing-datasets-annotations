@@ -13,6 +13,7 @@ import {
 } from "../../visualizer/src/lib/eventDetection";
 import { resolveTaxelLayout } from "../../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../../visualizer/node_modules/hyparquet";
+import { SOTAC_PROFILE } from "../../visualizer/src/lib/rigProfile";
 
 const ROOT = "data/sotac";
 const toNum = (v: unknown): number => (typeof v === "bigint" ? Number(v) : (v as number));
@@ -91,16 +92,16 @@ async function main() {
     if (existsSync(dir)) {
       const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
       if (files.length) {
-        const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout);
+        const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, undefined, { profile: SOTAC_PROFILE });
         if (raw) series = clipSeries(raw, timestamps[timestamps.length - 1] + 0.1);
       }
     }
     if (!series) {
       series = buildSeriesFromSensorFrames(
-        rows.map((r) => r[sensorKey]), timestamps, layout);
+        rows.map((r) => r[sensorKey]), timestamps, layout, undefined, SOTAC_PROFILE);
     }
     if (!series) continue;
-    const result = detectEvents(series, gripper, {}, { t: armT, joints: armJ });
+    const result = detectEvents(series, gripper, {}, { t: armT, joints: armJ }, { profile: SOTAC_PROFILE });
 
     const minPos = (a: number, b: number): number => {
       let mn = Infinity;

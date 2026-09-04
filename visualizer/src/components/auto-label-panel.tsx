@@ -25,6 +25,9 @@ import {
   type AutoLabelResult,
   spanFlag,
 } from "@/lib/eventDetection";
+import { templateReminder } from "@/lib/rigProfile";
+import { useRigProfile } from "@/lib/useRigProfile";
+import { useSearchParams } from "next/navigation";
 import { resolveTaxelLayout } from "@/lib/taxel-layouts";
 import type { SensorFramesMap } from "@/app/[org]/[dataset]/[episode]/fetch-data";
 import type { LanguageAtom } from "@/types/language.types";
@@ -147,6 +150,17 @@ export default function AutoLabelPanel({
   const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms, setDetectorSpans } =
     useAnnotations();
   const { seek } = useTime();
+  // rig calibration profile: registry by dataset id, or the explicit
+  // ?profile= override; null = the interpretation layer refuses to run
+  const searchParams = useSearchParams();
+  const profileOverride = searchParams?.get("profile") ?? null;
+  // dataset's own meta/annotator_profile.json > ?profile= > registry >
+  // TEMPLATE (sotac numbers, unverified: reminded below, flagged in results)
+  const { profile, source: profileSource } = useRigProfile(
+    repoId,
+    profileOverride,
+  );
+  const [reminderDismissed, setReminderDismissed] = useState(false);
   const [open, setOpen] = useState(false);
   // Human-review queue (Zheng's verify-and-add flow): failed_attempt span
   // flags render as adjustable spans; a human watches the clip, nudges the
@@ -177,13 +191,15 @@ export default function AutoLabelPanel({
     if (!entry) return null;
     const nTaxels = entry.shape.length >= 3 ? entry.shape[1] : entry.shape[0];
     const layout = resolveTaxelLayout(nTaxels)?.points ?? null;
+    if (!profile) return null;
     return buildSeriesFromSensorFrames(
       entry.frames,
       entry.timestamps,
       layout,
       gripper,
+      profile,
     );
-  }, [sensorFrames, gripper]);
+  }, [sensorFrames, gripper, profile]);
 
   const loadRaw = useCallback(async () => {
     if (rawSeriesRef.current) return rawSeriesRef.current;
@@ -219,7 +235,8 @@ export default function AutoLabelPanel({
           ? Object.values(sensorFrames)[0].shape[1]
           : 52;
       const layout = resolveTaxelLayout(nTaxels)?.points ?? null;
-      const s = buildSeriesFromRawCsvs(texts, layout, gripper);
+      if (!profile) return null;
+      const s = buildSeriesFromRawCsvs(texts, layout, gripper, { profile });
       rawSeriesRef.current = s;
       setRawState(s ? "ready" : "missing");
       return s;
@@ -227,10 +244,14 @@ export default function AutoLabelPanel({
       setRawState("missing");
       return null;
     }
-  }, [repoId, episodeId, root, sensorFrames, gripper]);
+  }, [repoId, episodeId, root, sensorFrames, gripper, profile]);
 
   const run = useCallback(
     async (th: Partial<DetectionThresholds>) => {
+      if (!profile) {
+        setStatus("calibration profile still loading — try again");
+        return;
+      }
       setRunning(true);
       try {
         let series: TactileSeries | null = series30;
@@ -259,6 +280,7 @@ export default function AutoLabelPanel({
         // episodeIndex keeps the signal screen from letting a corpus
         // episode's own reference windows vote for it on replays
         const result = detectEvents(series, gripper, th, arm, {
+          profile,
           episodeIndex: episodeId,
         });
         // Diagnostics: everything needed to compare a browser run against the
@@ -328,6 +350,8 @@ export default function AutoLabelPanel({
       addAtoms,
       episodeId,
       setDetectorSpans,
+      profile,
+      repoId,
     ],
   );
 
@@ -383,7 +407,12 @@ export default function AutoLabelPanel({
         </label>
         <button
           type="button"
-          disabled={running}
+          disabled={running || !profile}
+          title={
+            profile
+              ? `rig profile: ${profile.id} (${profileSource})`
+              : "calibration profile loading"
+          }
           onClick={() => void run(thresholds)}
           className="px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sky-600"
         >
@@ -431,6 +460,26 @@ export default function AutoLabelPanel({
         >
           clear label cache
         </button>
+        {profileSource === "template" && !reminderDismissed && (
+          <div className="rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-200">
+            <span className="font-semibold">Template calibration in use.</span>{" "}
+            {templateReminder(repoId)}{" "}
+            <a
+              href="/annotator_profile.template.json"
+              target="_blank"
+              className="underline text-amber-300"
+            >
+              template file
+            </a>
+            <button
+              type="button"
+              onClick={() => setReminderDismissed(true)}
+              className="ml-2 text-amber-400/80 underline"
+            >
+              got it
+            </button>
+          </div>
+        )}
         {status && <span className="text-xs text-slate-500">{status}</span>}
       </div>
 
@@ -439,7 +488,9 @@ export default function AutoLabelPanel({
           {TUNABLE.map(([key, label, min, max, step, description]) => {
             const value =
               (thresholds[key] as number | undefined) ??
-              (DEFAULT_THRESHOLDS[key] as number);
+              ((profile?.calibration.thresholds ?? DEFAULT_THRESHOLDS)[
+                key
+              ] as number);
             return (
               <label
                 key={key}
