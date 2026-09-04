@@ -163,3 +163,41 @@ Everything above still demos as described. New capabilities worth showing, each 
 4. **Behavior flags**: `hesitation` (`ep50` — every stage slower than the corpus p90 with nothing failing), `short_transport` (`ep39` — the wrong-location failure whose transport is half the corpus minimum; renders as a review card proposing a failed attempt).
 5. **Attempt combine rule** (`ep54`): adjacent failed-attempt spans merge when the jaw never re-opened between them — one grab-and-miss cycle is one attempt. This moved `ep54` into agreement with the hand-recorded metadata.
 6. **Raw-stream ground truth** (talking point, not a demo): the sidecar CSVs tick at 90.88 Hz — the logger's clock. The device emits change-gated (≤83 Hz per its manual, ~6 Hz when idle), so ~84% of rows are duplicates. Labels are axis-stable (stages 63/63, artifacts identical) except slip's texture statistics. Two recorder requests follow from this: per-episode re-zero (unchanged, now with five independent proofs) and arrival-driven logging. Full record: `analysis/duplicate-investigation.md`.
+
+## Update (2026-09-03) — the hub was renumbered; quick-demo set in the NEW numbering
+
+On 2026-09-02 evening (Seattle) Jingyi added Jingming Zhang's 100 trimmed episodes to `Jingyi-Z/sotac` (63 → 163) and re-sorted everything by task. The app reads hub `main`, so **every `epN` token above with N ≥ 21 is now hub episode N + 50** (0–20 unchanged): ep23 → 73, ep24 → 74, ep25 → 75, ep45 → 95, ep47 → 97, ep48 → 98. The stable key is the `raw #` badge in the episode header (`source_raw_episode`; `sotac_raw` is append-only). The local mirror, the scripts and the analysis notes still use the old numbering. Hub 21–70 and 113–162 are Jingming's new episodes: unlabeled, never run through anything — do not demo them.
+
+Launch: `cd visualizer`, then `bun --bun run dev --port 3105`, open `http://localhost:3105/Jingyi-Z/sotac/episode_73`, ANNOTATIONS tab, press Auto-label. Three episodes, one point each, all live-verified on 2026-09-03 with the status lines quoted below; the toggle card is a 20-second optional fourth.
+
+### D1 `hub 73` (old ep23, raw #14, orange rubber ball) — the whole vocabulary on one success
+
+Show: press Auto-label. Status line: `19 events … approach 0.0–6.1 | grasp 6.1–8.2 | transport 8.2–11.7 | place 11.7–14.3 flags: weak_contact@5.0-5.1s, residual_suspect@5.1s, sustained_slide@10.2s`. Scrub to 10.8–11.2 s: the slip markers read `slide-2.5mm jaw+5.1u`.
+
+Say: "One episode, every layer. The four stages. A brief two-newton touch at 5.0 s that the annotator files as a weak contact instead of a grasp — and the artifact screen, which votes each event's raw window against 971 reference windows, independently flags the same instant for review. Then at 10.2 s the ball slides 2.5 mm down the finger while the jaw opens five units: a sustained slide, video-verified, computed from trailing windows only, so the same rule could drive a reflex."
+
+Heads-up: "2 low-confidence events need review: contact_onset, drop" is that weak-contact pair — visible on the timeline, excluded from saved annotations.
+
+### D2 `hub 95` (old ep45, raw #29, red cup) — what happens when the task fails
+
+Show: Auto-label → `7 events … approach 0.0–9.8 flags: failed_attempt@3.4-4.1s, failed_attempt@6.5-7.6s`; no grasp/transport/place segment; two amber review cards; two dashed "auto" spans on the FAILED ATT. lane. Click a span (video seeks there), nudge ±0.1/±0.01 s, press "yes, add event": the span turns solid and survives a re-run.
+
+Say: as in 2.2 above — the empty-air close at 3.4–4.1 and the grab-lose-squeeze-through at 6.5–7.6, both matching the video.
+
+Heads-up: contact and stable-grip markers inside the spans are sensor truth; "drop ×2 need review" are the attempt terminals. Do not press Save episode / Save dataset (the backend is offline; edits stay in sessionStorage — and nothing is ever written to her repo from a demo).
+
+### D3 `hub 75` (old ep25, raw #16, orange rubber ball) — markers that say what they mean, plus behavior flags
+
+Show: Auto-label → `23 events … flags: weak_contact@1.3-1.8s, residual_suspect@1.8s, post_task_contact@14.1-16.9s, hesitation`; the marker at 11.681 s `finger_unload f1 3.8N jaw+0.0u (hand still holding)`; "3 low-confidence events need review: phantom ×3".
+
+Say: as in 2.3 above, plus: "the 1.3–1.8 s span is a residual the sensor carried in from the previous episode — the screen flags it; `hesitation` means every stage ran slower than the corpus 90th percentile with nothing failing — the grasp only starts at 8.4 s."
+
+Heads-up: the phantom chain at 14.1–16.9 s is visible on the timeline and in the status line, excluded from saved annotations — displays show sensor truth, recordings keep real events.
+
+### D4 (optional, 20 s) `hub 93` (old ep43, raw #27, red cup) — raw by default, correction behind a toggle
+
+Show: at t = 0 the gripper is empty and finger 0 already shows a green arrow cluster (its standing 1.8 N offset). Click the tile's `view: raw` badge → all three badges flip to `view: corrected` (one shared switch): the cluster collapses to at most one faint taxel, finger 1 unchanged. Pause the player first — a click on the tile can resume playback, and at 7 s the cup is being held, so both fingers show real contact in either view. Reload → back to raw.
+
+Say: "Raw is the default everywhere — the audit view, everything the sensor said. Corrected subtracts each taxel's per-episode zero; it is a session-only display convenience and is never stored."
+
+Heads-up: on hub 97 (old ep47) the correction cannot clean the *wandering* phantom — that is the recorder-fix exhibit from 2.4, not a bug. Avoid hub 87 (old ep37) in a demo: its release timing is under active discussion.
