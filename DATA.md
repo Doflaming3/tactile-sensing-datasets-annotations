@@ -86,3 +86,28 @@ task, result, attempts).
 - The Space writes annotations back to the Hub (`hubCommit.ts`). Our local
   visualizer copy must not be pointed at her datasets with write credentials;
   test the write path only against a dataset under our own namespace.
+- **The hub was renumbered on 2026-09-03** (commits `28c7b329` + `7d1afea9`):
+  100 trimmed episodes contributed by Jingming Zhang (sotac_raw 77–176) were
+  added and everything re-sorted by task. `Jingyi-Z/sotac` main now has 163
+  episodes; old pinned indices 0–20 are unchanged, **old 21–62 are hub 71–112
+  (exactly +50)**. Per-episode annotation files travelled with them. The app
+  always reads hub `main` (`buildVersionedUrl` ignores its revision argument),
+  so hub `episode_23` is now a new recording (raw #79) while our scripts,
+  dumps, docs and memory keep the OLD numbering. The stable key is
+  `source_raw_episode` in `annotations/episode_annotations.json` (sotac_raw
+  is append-only). The new episodes (hub 21–70 red foam ball, 113–162 green
+  rubber ball) are unreviewed, with no result/attempt metadata: a candidate
+  blind test set. sotac_raw also grew (commits `dfc974e1`..`326fe149`).
+- **Sensor quantum is 0.2 N.** fz is stored in newtons and every non-zero
+  value in all 124 sidecar files is a multiple of 0.2 N, not the 0.1 N/LSB
+  the datasheet suggests. Under a ~5 N grip each loaded taxel reads exactly
+  one quantum, so amplitude cannot separate residual from contact on such a
+  finger; only structure can.
+- **Post-release residual class (finger 1).** After the object leaves, finger
+  1 keeps 1–3 taxels stuck at one quantum (always taxels #1/#3) plus sub-0.3 s
+  bursts of 6–12 taxels on the just-released set; 15/124 post-release
+  finger-windows, all finger 1, old episodes 22–42 (+25/28/33), carried over
+  into the next episode's start. Finger 0 is clean after every release. No
+  baseline can subtract it (a blinking taxel's mean, bursts too short); the
+  detector and the corrected display refuse it structurally instead (commit
+  `76ec368`); the raw display keeps it as the audit view.

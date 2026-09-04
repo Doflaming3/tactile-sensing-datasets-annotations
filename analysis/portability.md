@@ -72,6 +72,27 @@ provenance comments at the constants):
 | short_transport | < 1.0 s | ep39 0.78 vs next 1.46, p5 1.55 | wide |
 | attempt-merge reopen | < 5 u between spans | merge 0.1 u vs keep 17.2/17.4 u | wide |
 
+Added 2026-09-03 (the post-release residual class — Zheng's rulings on
+ep37; mechanism and census in the commit message of `76ec368`). The
+first two are Tier 1 physics with one measured input; the gate's numbers
+are Tier 2:
+
+| Constant | Value (sotac) | Derivation basis | Margin quality |
+|---|---|---|---|
+| force quantum (`TactileSeries.quantumN`) | 0.2 N, MEASURED per series | smallest non-zero raw fz; identical in all 124 sidecar files (the datasheet's 0.1 N/LSB is not what the firmware emits) | measured, not tuned |
+| single-taxel exit floor (`SINGLE_TAXEL_QUANTA`) | ≤1 raw-loaded taxel at ≤1.5 quanta | one stuck taxel with float/absorption margin, below any two-taxel contact (2 quanta) | physics |
+| residual gate quiet margin / sustain | 1.0 N / 0.3 s | = idle-tracker margin and exit debounce; stuck taxels never reach it, bursts (≤0.16 s) never last | inherits their margins |
+| residual gate arming: stuck taxels | ≤3 taxels at ≤3 quanta, jaw opened ≥5 u from the hold | ep25 tail 2 stuck, ep28 3 stuck; a thin 3-taxel hold with the jaw closed is a dip, not an exit (ep49) | ok, jaw-gated |
+| residual gate retry confirm | sustained load within 3 s of a re-close | attempt rule: retry cycle completes within 2.5 s; post-task jaw reset (ep22 83→43 u, ep23 74→55 u) never confirms | wide |
+| pre-grasp residual refusal | ≤3 taxels at ≤3 quanta while the jaw is not closing | start residuals (ep25/ep36, 1 taxel at 0.2 N) vs grazes (≥11 taxels, ep9/16/23/54) | wide on taxel count; ep40's 1-taxel table touch is the one known casualty |
+
+Porting note: the residual class is finger- and session-specific (15/124
+post-release windows on sotac, ALL finger 1, one block of sessions, the
+same physical taxels; 1 of 6 checked episodes of the later contributed
+data). The census script (`scratchpad/post_release_census.py` pattern:
+post-release loaded fraction, stuck taxels, burst count per finger) is
+the diagnostic to rerun on any new rig before trusting the gate's numbers.
+
 ## Step ZERO (2026-08-31): measure the axis before anything else
 
 The sotac sidecars are logger-clocked (90.88 Hz fixed loop) over a
