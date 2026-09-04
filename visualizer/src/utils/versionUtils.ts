@@ -3,6 +3,7 @@
  */
 
 import { authHeaders } from "./auth";
+import { hubResolveUrl, parseRepoRef } from "./repoRef";
 
 const DATASET_URL =
   process.env.DATASET_URL || "https://huggingface.co/datasets";
@@ -94,7 +95,11 @@ export async function getDatasetInfo(repoId: string): Promise<DatasetInfo> {
   console.log(`[perf] getDatasetInfo cache MISS for ${repoId} — fetching`);
 
   try {
-    const testUrl = `${DATASET_URL}/${repoId}/resolve/main/${datasetPathPrefix}meta/info.json`;
+    const testUrl = hubResolveUrl(
+      DATASET_URL,
+      repoId,
+      `${datasetPathPrefix}meta/info.json`,
+    );
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -132,7 +137,7 @@ export async function getDatasetInfo(repoId: string): Promise<DatasetInfo> {
     }
     throw new Error(
       `Dataset ${repoId} is not compatible with this visualizer. ` +
-        "Failed to read dataset information from the main revision.",
+        `Failed to read dataset information from revision ${parseRepoRef(repoId).revision}.`,
     );
   }
 }
@@ -155,7 +160,11 @@ export async function getDatasetStats(
 
   let data: Record<string, unknown> | null = null;
   try {
-    const url = `${DATASET_URL}/${repoId}/resolve/main/${datasetPathPrefix}meta/stats.json`;
+    const url = hubResolveUrl(
+      DATASET_URL,
+      repoId,
+      `${datasetPathPrefix}meta/stats.json`,
+    );
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(url, {
@@ -216,5 +225,5 @@ export function buildVersionedUrl(
   version: string,
   path: string,
 ): string {
-  return `${DATASET_URL}/${repoId}/resolve/main/${datasetPathPrefix}${path}`;
+  return hubResolveUrl(DATASET_URL, repoId, `${datasetPathPrefix}${path}`);
 }

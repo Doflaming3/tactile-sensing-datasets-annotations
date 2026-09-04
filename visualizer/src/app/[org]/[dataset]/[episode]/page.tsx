@@ -8,7 +8,12 @@ export async function generateMetadata({
 }: {
   params: Promise<{ org: string; dataset: string; episode: string }>;
 }) {
-  const { org, dataset, episode } = await params;
+  // Route segments arrive URL-encoded; a pinned reference (`org/name@rev`)
+  // carries an "@" that must be decoded before it reaches the URL builders.
+  const raw = await params;
+  const org = decodeURIComponent(raw.org);
+  const dataset = decodeURIComponent(raw.dataset);
+  const episode = decodeURIComponent(raw.episode);
   return {
     title: `${org}/${dataset} | episode ${episode}`,
   };
@@ -20,7 +25,12 @@ export default async function EpisodePage({
   params: Promise<{ org: string; dataset: string; episode: string }>;
 }) {
   // episode is like 'episode_1'
-  const { org, dataset, episode } = await params;
+  // Route segments arrive URL-encoded; a pinned reference (`org/name@rev`)
+  // carries an "@" that must be decoded before it reaches the URL builders.
+  const raw = await params;
+  const org = decodeURIComponent(raw.org);
+  const dataset = decodeURIComponent(raw.dataset);
+  const episode = decodeURIComponent(raw.episode);
   // fetchData should be updated if needed to support this path pattern
   const episodeNumber = Number(episode.replace(/^episode_/, ""));
   return (

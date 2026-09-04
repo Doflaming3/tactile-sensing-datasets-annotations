@@ -13,7 +13,13 @@ export default function Home() {
   );
 }
 
-const EXAMPLE_DATASETS = ["Jingyi-Z/sotac", "Jingyi-Z/sotac_raw"];
+// `org/name@rev` pins every read to a Hub revision (see utils/repoRef.ts);
+// 47d46cfb = the 63-episode state before the 2026-09-03 renumbering.
+const EXAMPLE_DATASETS = [
+  "Jingyi-Z/sotac",
+  "Jingyi-Z/sotac@47d46cfb",
+  "Jingyi-Z/sotac_raw",
+];
 
 const FEATURES = [
   "Per-taxel force arrows",

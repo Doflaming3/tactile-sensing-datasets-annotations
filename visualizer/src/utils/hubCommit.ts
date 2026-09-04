@@ -9,6 +9,7 @@
 import type { LanguageAtom } from "@/types/language.types";
 import { getAuthToken } from "./auth";
 import { getDatasetPathPrefix } from "./versionUtils";
+import { hubResolveUrl, parseRepoRef } from "./repoRef";
 
 const HUB = "https://huggingface.co";
 
@@ -24,7 +25,7 @@ export async function fetchAnnotationsFromHub(
 ): Promise<SavedAnnotations | null> {
   const path = annotationsPathFor(episodeId);
   const token = getAuthToken();
-  const res = await fetch(`${HUB}/datasets/${repoId}/resolve/main/${path}`, {
+  const res = await fetch(hubResolveUrl(`${HUB}/datasets`, repoId, path), {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: "no-store",
   });
@@ -46,11 +47,25 @@ export interface SavedAnnotations {
 
 /** Commit the episode's annotations JSON to the dataset repo. Throws with a
  * readable message on auth/permission failures. Returns the repo path. */
+/** A pinned reference is read-only: commits land on a branch, and writing
+ * one numbering's annotations into another would corrupt the dataset. */
+function writableRepoId(repoId: string): string {
+  const ref = parseRepoRef(repoId);
+  if (ref.pinned) {
+    throw new Error(
+      `This view is pinned to revision ${ref.revision}; saving to the Hub is ` +
+        "disabled. Open the dataset without @revision to save.",
+    );
+  }
+  return ref.repoId;
+}
+
 export async function commitAnnotationsToHub(
   repoId: string,
   episodeId: number,
   atoms: LanguageAtom[],
 ): Promise<string> {
+  const writeRepo = writableRepoId(repoId);
   const token = getAuthToken();
   if (!token) {
     throw new Error("Not signed in — use the sign-in button first.");
@@ -79,7 +94,7 @@ export async function commitAnnotationsToHub(
       key: "file",
       value: { path, content, encoding: "base64" },
     });
-  const res = await fetch(`${HUB}/api/datasets/${repoId}/commit/main`, {
+  const res = await fetch(`${HUB}/api/datasets/${writeRepo}/commit/main`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -117,7 +132,7 @@ export async function fetchReviewStatus(repoId: string): Promise<ReviewStatus> {
   const token = getAuthToken();
   try {
     const res = await fetch(
-      `${HUB}/datasets/${repoId}/resolve/main/${reviewStatusPath()}`,
+      hubResolveUrl(`${HUB}/datasets`, repoId, reviewStatusPath()),
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         cache: "no-store",
@@ -138,6 +153,7 @@ export async function setEpisodeReviewed(
   episodeId: number,
   reviewed: boolean,
 ): Promise<ReviewStatus> {
+  const writeRepo = writableRepoId(repoId);
   const token = getAuthToken();
   if (!token) {
     throw new Error("Not signed in — use the sign-in button first.");
@@ -167,7 +183,7 @@ export async function setEpisodeReviewed(
       key: "file",
       value: { path, content, encoding: "base64" },
     });
-  const res = await fetch(`${HUB}/api/datasets/${repoId}/commit/main`, {
+  const res = await fetch(`${HUB}/api/datasets/${writeRepo}/commit/main`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -193,7 +209,7 @@ export async function fetchSavedAnnotations(
   const token = getAuthToken();
   try {
     const res = await fetch(
-      `${HUB}/datasets/${repoId}/resolve/main/${annotationsPathFor(episodeId)}`,
+      hubResolveUrl(`${HUB}/datasets`, repoId, annotationsPathFor(episodeId)),
       { headers: token ? { Authorization: `Bearer ${token}` } : {} },
     );
     if (!res.ok) return null;

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { hubResolveUrl } from "@/utils/repoRef";
 import { spawn } from "child_process";
 import { createHash } from "crypto";
 import { createWriteStream } from "fs";
@@ -142,7 +143,7 @@ export async function GET(req: NextRequest) {
   const w = Math.min(4096, Number(sp.get("w") ?? "1280"));
   const h = Math.min(4096, Number(sp.get("h") ?? "720"));
   if (
-    !/^[\w.-]+\/[\w.-]+$/.test(repo) ||
+    !/^[\w.-]+\/[\w.-]+(@[\w.\-\/]+)?$/.test(repo) ||
     !relPath ||
     relPath.includes("..") ||
     !ALLOWED_KINDS.has(kind) ||
@@ -162,10 +163,7 @@ export async function GET(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   let local: string;
   try {
-    local = await cachedDownload(
-      `${HF}/${repo}/resolve/main/${relPath}`,
-      token,
-    );
+    local = await cachedDownload(hubResolveUrl(HF, repo, relPath), token);
   } catch (e) {
     return new Response(`download failed: ${String(e).slice(0, 200)}`, {
       status: 502,

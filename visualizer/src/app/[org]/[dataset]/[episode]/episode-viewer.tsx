@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { postParentMessageWithParams } from "@/utils/postParentMessage";
+import { hubRepoPageUrl } from "@/utils/repoRef";
 import { SimpleVideosPlayer } from "@/components/simple-videos-player";
 import PlaybackBar from "@/components/playback-bar";
 import { TimeProvider, useTime } from "@/context/time-context";
@@ -1122,7 +1123,7 @@ function EpisodeViewerInner({
               {/* slim header: repo · episode · task, one line */}
               <div className="flex items-center gap-3 shrink-0 min-w-0">
                 <a
-                  href={`https://huggingface.co/datasets/${datasetInfo.repoId}`}
+                  href={hubRepoPageUrl(datasetInfo.repoId)}
                   target="_blank"
                   className="text-sm font-medium text-slate-200 hover:text-cyan-300 transition-colors truncate shrink-0"
                 >
@@ -1321,7 +1322,7 @@ function EpisodeViewerInner({
 
                 <div className="min-w-0">
                   <a
-                    href={`https://huggingface.co/datasets/${datasetInfo.repoId}`}
+                    href={hubRepoPageUrl(datasetInfo.repoId)}
                     target="_blank"
                     className="text-slate-200 hover:text-cyan-300 transition-colors"
                   >

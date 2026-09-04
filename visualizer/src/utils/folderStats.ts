@@ -7,6 +7,7 @@
 //     it is opt-in behind a button (see TactileAggregate in tactile-panel).
 
 import { authHeaders } from "./auth";
+import { hubResolveUrl } from "./repoRef";
 import { fetchParquetFile, readParquetAsObjects } from "./parquetUtils";
 import type {
   EpisodeLengthStats,
@@ -17,7 +18,7 @@ const DATASET_URL =
   process.env.DATASET_URL || "https://huggingface.co/datasets";
 
 function folderUrl(repoId: string, folder: string, rel: string): string {
-  return `${DATASET_URL}/${repoId}/resolve/main/${folder}/${rel}`;
+  return hubResolveUrl(DATASET_URL, repoId, `${folder}/${rel}`);
 }
 
 type FolderInfo = {

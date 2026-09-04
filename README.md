@@ -32,8 +32,12 @@ bun --bun run --cwd visualizer dev --port 3105
 ```
 
 Open `http://localhost:3105/Jingyi-Z/sotac/episode_N` → Annotations tab →
-**Auto-label episode**. Note the app fetches episode data from the HF Hub at
-`main`, not from the pinned local mirrors.
+**Auto-label episode**. The app fetches episode data from the HF Hub, not
+from the local mirrors: a plain reference reads `main` (renumbered on
+2026-09-03, 163 episodes), and `org/dataset@rev` pins every read to a Hub
+revision — `http://localhost:3105/Jingyi-Z/sotac@47d46cfb/episode_N` is the
+63-episode state our notes, dumps and video verdicts use (old numbering).
+Pinned views are read-only: saving to the Hub is refused there.
 
 **The offline runner** (drives the same detector on the local mirrors):
 

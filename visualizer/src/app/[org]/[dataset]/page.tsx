@@ -5,7 +5,10 @@ export default async function DatasetRootPage({
 }: {
   params: Promise<{ org: string; dataset: string }>;
 }) {
-  const { org, dataset } = await params;
+  // segments arrive URL-encoded (a pinned `org/name@rev` carries an "@")
+  const raw = await params;
+  const org = decodeURIComponent(raw.org);
+  const dataset = decodeURIComponent(raw.dataset);
   const episodeN =
     process.env.EPISODES?.split(/\s+/)
       .map((x) => parseInt(x.trim(), 10))

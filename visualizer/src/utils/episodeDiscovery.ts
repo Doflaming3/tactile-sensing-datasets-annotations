@@ -11,6 +11,7 @@
 
 import { listFiles } from "@huggingface/hub";
 import { getAuthToken } from "./auth";
+import { parseRepoRef } from "./repoRef";
 
 const MARKER = "/meta/info.json";
 
@@ -24,8 +25,10 @@ export function listRepoFiles(repoId: string): Promise<string[]> {
   if (hit) return hit;
   const p = (async () => {
     const paths: string[] = [];
+    const ref = parseRepoRef(repoId);
     for await (const entry of listFiles({
-      repo: { type: "dataset", name: repoId },
+      repo: { type: "dataset", name: ref.repoId },
+      revision: ref.revision,
       recursive: true,
       ...(token ? { accessToken: token } : {}),
     })) {
