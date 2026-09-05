@@ -1,7 +1,10 @@
 "use client";
 // Resolve the calibration profile for a dataset in the app: fetch the
 // dataset's own meta/annotator_profile.json (404 = none), then the
-// resolution order in rigProfile.resolveProfile. One fetch per dataset.
+// resolution order in rigProfile.resolveProfile, then attach the artifact
+// screen's reference corpus from the profile's `screenReferencePath` (an
+// app path under public/ for registry profiles, a repo-relative path for
+// dataset-side profiles). One fetch per dataset, one per corpus.
 import { useEffect, useState } from "react";
 import { buildVersionedUrl } from "@/utils/versionUtils";
 import { authHeaders } from "@/utils/auth";
@@ -10,11 +13,13 @@ import {
   ANNOTATOR_PROFILE_PATH,
   profileFromFile,
   resolveProfile,
+  withScreenReference,
   type ProfileSource,
   type RigProfile,
 } from "./rigProfile";
 
 const fileCache = new Map<string, Promise<RigProfile | null>>();
+const referenceCache = new Map<string, Promise<ScreenReference | null>>();
 
 async function fetchDatasetProfile(repoId: string): Promise<RigProfile | null> {
   try {
@@ -26,22 +31,50 @@ async function fetchDatasetProfile(repoId: string): Promise<RigProfile | null> {
       },
     );
     if (!res.ok) return null;
-    const json = (await res.json()) as { screenReferencePath?: string | null };
-    let reference: ScreenReference | null = null;
-    if (json && typeof json === "object" && json.screenReferencePath) {
-      const r2 = await fetch(
-        buildVersionedUrl(repoId, "v3.0", json.screenReferencePath),
-        {
-          headers: authHeaders(),
-          cache: "no-store",
-        },
-      );
-      if (r2.ok) reference = (await r2.json()) as ScreenReference;
-    }
-    return profileFromFile(json, reference);
+    return profileFromFile(await res.json());
   } catch {
     return null;
   }
+}
+
+/** The corpus a profile names: same-origin for app paths (`/...`, served
+ * from public/), the dataset repo for repo-relative paths. null when it
+ * cannot be loaded — the detector then flags `no_screen_reference`. */
+function fetchScreenReference(
+  repoId: string,
+  path: string,
+): Promise<ScreenReference | null> {
+  const key = path.startsWith("/") ? path : `${repoId}|${path}`;
+  let p = referenceCache.get(key);
+  if (!p) {
+    p = (async () => {
+      try {
+        const res = path.startsWith("/")
+          ? await fetch(path, { cache: "force-cache" })
+          : await fetch(buildVersionedUrl(repoId, "v3.0", path), {
+              headers: authHeaders(),
+              cache: "no-store",
+            });
+        if (!res.ok) return null;
+        return (await res.json()) as ScreenReference;
+      } catch {
+        return null;
+      }
+    })();
+    referenceCache.set(key, p);
+  }
+  return p;
+}
+
+async function attachReference(
+  repoId: string,
+  profile: RigProfile,
+): Promise<RigProfile> {
+  if (profile.calibration.screenReference || !profile.screenReferencePath) {
+    return profile;
+  }
+  const ref = await fetchScreenReference(repoId, profile.screenReferencePath);
+  return ref ? withScreenReference(profile, ref) : profile;
 }
 
 export function useRigProfile(
@@ -69,11 +102,20 @@ export function useRigProfile(
       fileCache.set(repoId, p);
     }
     setState((s) => ({ ...s, loading: true }));
-    void p.then((file) => {
-      if (!alive) return;
-      const r = resolveProfile(repoId, override, file);
-      setState({ profile: r.profile, source: r.source, loading: false });
-    });
+    void p
+      .then((file) => {
+        const r = resolveProfile(repoId, override, file);
+        // the profile is published only once its corpus is attached, so a
+        // run in between can never silently skip the screen
+        return attachReference(repoId, r.profile).then((profile) => ({
+          profile,
+          source: r.source,
+        }));
+      })
+      .then((r) => {
+        if (!alive) return;
+        setState({ profile: r.profile, source: r.source, loading: false });
+      });
     return () => {
       alive = false;
     };

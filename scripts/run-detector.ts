@@ -34,6 +34,7 @@ import {
   resolveProfile,
   type RigProfile,
 } from "../visualizer/src/lib/rigProfile";
+import { loadScreenReference } from "./lib/profile-node";
 
 // ---------------------------------------------------------------- args
 
@@ -296,11 +297,13 @@ async function runEpisode(
       fileProfile = null;
     }
   }
-  const { profile, source: profileSource } = resolveProfile(
+  const { profile: resolvedProfile, source: profileSource } = resolveProfile(
     args.profileRef,
     args.profileId,
     fileProfile,
   );
+  // the corpus lives outside the profile object: attach it from disk
+  const profile = loadScreenReference(resolvedProfile, root);
   if (profileSource === "template" && !args.all) {
     console.log(
       "NOTE: no calibration profile for this dataset — running with the TEMPLATE (sotac numbers, unverified).",

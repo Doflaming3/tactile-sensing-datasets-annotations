@@ -585,6 +585,12 @@ export function detectEvents(
   // the numbers behind this run were not verified on this rig (template,
   // or a dataset file that says so): say it in every result
   if (!context.profile.verified) flags.push("profile_unverified");
+  // the profile names a reference corpus but none was attached: the screen
+  // is silently off unless we say so (the resolvers attach it; a missing or
+  // unreachable file lands here)
+  if (!P.screenReference && context.profile.screenReferencePath) {
+    flags.push("no_screen_reference");
+  }
   const events: RawEvent[] = [];
   const dur = n ? t[n - 1] : 0;
 

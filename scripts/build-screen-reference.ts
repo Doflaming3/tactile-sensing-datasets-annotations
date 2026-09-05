@@ -1,4 +1,4 @@
-// Builds visualizer/src/lib/screen-reference.json — the signal screen's
+// Builds visualizer/public/screen-reference/sotac-paxini-so101.json — the signal screen's
 // reference corpus — from the LOCAL sotac mirror, in the detector's own
 // feature space (terminalWindowFeatures on the exact series the app/runner
 // build: raw CSVs, adaptive baseline, clipped to the table window).
@@ -40,7 +40,7 @@ import {
 import { SOTAC_PROFILE } from "../visualizer/src/lib/rigProfile";
 
 const ROOT = "data/sotac";
-const OUT = "visualizer/src/lib/screen-reference.json";
+const OUT = "visualizer/public/screen-reference/sotac-paxini-so101.json";
 const CLASSES = new Set([
   "contact_onset",
   "grasp_stable",

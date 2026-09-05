@@ -13,6 +13,9 @@ import {
 import { resolveTaxelLayout } from "../../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../../visualizer/node_modules/hyparquet";
 import { SOTAC_PROFILE } from "../../visualizer/src/lib/rigProfile";
+import { loadScreenReference } from "../lib/profile-node";
+// the screen's corpus is attached from disk (profile-node.ts)
+const PROFILE = loadScreenReference(SOTAC_PROFILE);
 
 const ROOT = "data/sotac";
 const EPS = Array.from({ length: 63 }, (_, i) => i);
@@ -86,9 +89,9 @@ async function main() {
     if (!existsSync(dir)) continue;
     const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
     const raw = buildSeriesFromRawCsvs(
-      files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, { t: gt, pos: gp }, { profile: SOTAC_PROFILE });
+      files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, { t: gt, pos: gp }, { profile: PROFILE });
     const series = clipSeries(raw!, timestamps[timestamps.length - 1] + 0.1);
-    const result = detectEvents(series, { t: gt, pos: gp }, {}, { t: armT, joints: armJ }, { profile: SOTAC_PROFILE });
+    const result = detectEvents(series, { t: gt, pos: gp }, {}, { t: armT, joints: armJ }, { profile: PROFILE });
 
     const placeRel = result.subtasks.find((s) => s.label === "place_release");
     const airSpans = [];

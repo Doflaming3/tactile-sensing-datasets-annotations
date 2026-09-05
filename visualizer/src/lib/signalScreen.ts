@@ -13,10 +13,11 @@
 // invisible to any signal-level screen BY CONSTRUCTION and stays the context
 // rules' job — this screen is the second layer, not a replacement).
 //
-// The reference corpus is a PROFILE artifact (rigProfile.ts): the sotac
-// registry profile carries screen-reference.json, a dataset-side profile
-// names its own file (screenReferencePath), the template has none — and
-// without a reference the detector does not call the screen. This module
+// The reference corpus is a PROFILE artifact (rigProfile.ts): every profile
+// names its corpus by path (screenReferencePath — public/screen-reference/
+// for the sotac registry profile, a repo-relative file for a dataset-side
+// profile; the template names none), the resolvers attach it, and without
+// a reference the detector does not call the screen. This module
 // holds no reference of its own: the caller must pass one (there is no
 // silent sotac default). The corpus is built by
 // scripts/build-screen-reference.ts (workspace, not the Space) IN THIS

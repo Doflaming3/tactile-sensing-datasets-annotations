@@ -5,6 +5,7 @@ import {
   profileById,
   profileForDataset,
   SOTAC_PROFILE,
+  SOTAC_SCREEN_REFERENCE_PATH,
 } from "../rigProfile";
 
 describe("rig profile registry", () => {
@@ -38,6 +39,8 @@ describe("rig profile registry", () => {
     expect(c.handLossN).toBe(1.0);
     expect(c.jawRetryRiseU).toBe(5.0);
     expect(c.hesitationP90S).toEqual([6.32, 2.2, 4.56, 1.26]);
-    expect(c.screenReference?.vectors.length).toBeGreaterThan(50);
+    // the corpus is not embedded: the profile names it by path (B1)
+    expect(c.screenReference).toBeNull();
+    expect(SOTAC_PROFILE.screenReferencePath).toBe(SOTAC_SCREEN_REFERENCE_PATH);
   });
 });

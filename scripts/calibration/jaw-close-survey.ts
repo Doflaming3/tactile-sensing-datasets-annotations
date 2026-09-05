@@ -14,6 +14,9 @@ import {
 import { resolveTaxelLayout } from "../../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../../visualizer/node_modules/hyparquet";
 import { SOTAC_PROFILE } from "../../visualizer/src/lib/rigProfile";
+import { loadScreenReference } from "../lib/profile-node";
+// the screen's corpus is attached from disk (profile-node.ts)
+const PROFILE = loadScreenReference(SOTAC_PROFILE);
 
 const ROOT = "data/sotac";
 const toNum = (v: unknown): number => (typeof v === "bigint" ? Number(v) : (v as number));
@@ -92,16 +95,16 @@ async function main() {
     if (existsSync(dir)) {
       const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
       if (files.length) {
-        const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, undefined, { profile: SOTAC_PROFILE });
+        const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, undefined, { profile: PROFILE });
         if (raw) series = clipSeries(raw, timestamps[timestamps.length - 1] + 0.1);
       }
     }
     if (!series) {
       series = buildSeriesFromSensorFrames(
-        rows.map((r) => r[sensorKey]), timestamps, layout, undefined, SOTAC_PROFILE);
+        rows.map((r) => r[sensorKey]), timestamps, layout, undefined, PROFILE);
     }
     if (!series) continue;
-    const result = detectEvents(series, gripper, {}, { t: armT, joints: armJ }, { profile: SOTAC_PROFILE });
+    const result = detectEvents(series, gripper, {}, { t: armT, joints: armJ }, { profile: PROFILE });
 
     const minPos = (a: number, b: number): number => {
       let mn = Infinity;

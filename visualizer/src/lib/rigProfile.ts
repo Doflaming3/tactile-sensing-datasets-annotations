@@ -28,7 +28,6 @@
  */
 import { DEFAULT_THRESHOLDS, type DetectionThresholds } from "./eventDetection";
 import type { ScreenReference } from "./signalScreen";
-import sotacScreenReference from "./screen-reference.json";
 
 export interface RigCalibration {
   /** signal-level thresholds (N, hf units …) — the user-tunable set */
@@ -79,7 +78,8 @@ export interface RigCalibration {
   /** transports shorter than this raise the wrong-location card */
   shortTransportMinS: number;
   // ---- artifact screen
-  /** per-rig reference corpus; null disables the screen */
+  /** per-rig reference corpus, attached by the resolvers from
+   * `RigProfile.screenReferencePath`; null = screen off */
   screenReference: ScreenReference | null;
 }
 
@@ -94,8 +94,22 @@ export interface RigProfile {
    * template, or a dataset file that says so): every result carries
    * `profile_unverified` and the app reminds the user */
   verified: boolean;
+  /** Where the artifact screen's reference corpus is loaded from when
+   * `calibration.screenReference` is null: an app path (leading `/`,
+   * served from `public/`) for registry profiles, a repo-relative path
+   * for dataset-side profiles. The resolvers attach the corpus
+   * (useRigProfile in the app, scripts/lib/profile-node.ts offline); the
+   * profile object never embeds it, so the corpus stays out of the
+   * bundle (Jingyi's review: "move the corpus out of src and load it
+   * from the per dataset profile"). */
+  screenReferencePath?: string | null;
   calibration: RigCalibration;
 }
+
+/** sotac's reference corpus, served by the app from public/ (built by
+ * scripts/build-screen-reference.ts). */
+export const SOTAC_SCREEN_REFERENCE_PATH =
+  "/screen-reference/sotac-paxini-so101.json";
 
 export const SOTAC_PROFILE: RigProfile = {
   id: "sotac-paxini-so101",
@@ -104,6 +118,7 @@ export const SOTAC_PROFILE: RigProfile = {
   gripper: "SO-101 jaw, position units, opening = increasing",
   datasets: [/^Jingyi-Z\/sotac(_raw)?$/],
   verified: true,
+  screenReferencePath: SOTAC_SCREEN_REFERENCE_PATH,
   calibration: {
     thresholds: DEFAULT_THRESHOLDS,
     weakAttemptMaxN: 2.3,
@@ -126,7 +141,7 @@ export const SOTAC_PROFILE: RigProfile = {
     slideMinMm: 2.0,
     hesitationP90S: [6.32, 2.2, 4.56, 1.26],
     shortTransportMinS: 1.0,
-    screenReference: sotacScreenReference as ScreenReference,
+    screenReference: null, // attached by the resolvers from the path above
   },
 };
 
@@ -263,6 +278,7 @@ export function profileFromFile(
     gripper: String(f.gripper ?? "unknown gripper"),
     datasets: [],
     verified: f.verified === true,
+    screenReferencePath: f.screenReferencePath ?? null,
     calibration: {
       ...(c as unknown as RigCalibration),
       thresholds: th,
@@ -279,8 +295,21 @@ export const TEMPLATE_PROFILE: RigProfile = {
   label: "TEMPLATE — sotac numbers, NOT verified on this rig",
   datasets: [],
   verified: false,
+  screenReferencePath: null,
   calibration: { ...SOTAC_PROFILE.calibration, screenReference: null },
 };
+
+/** The profile with a loaded reference corpus attached (a new object; the
+ * input is not mutated). */
+export function withScreenReference(
+  profile: RigProfile,
+  screenReference: ScreenReference | null,
+): RigProfile {
+  return {
+    ...profile,
+    calibration: { ...profile.calibration, screenReference },
+  };
+}
 
 /** The template as the JSON a user copies into their dataset. Generated
  * from the same object the code uses; a test keeps the shipped file in

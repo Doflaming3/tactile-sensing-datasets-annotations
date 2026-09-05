@@ -22,6 +22,9 @@ import {
 import { resolveTaxelLayout } from "../../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../../visualizer/node_modules/hyparquet";
 import { SOTAC_PROFILE } from "../../visualizer/src/lib/rigProfile";
+import { loadScreenReference } from "../lib/profile-node";
+// the screen's corpus is attached from disk (profile-node.ts)
+const PROFILE = loadScreenReference(SOTAC_PROFILE);
 
 const ROOT = "data/sotac";
 const EPS = 0.5; // th.gripperVelEps default
@@ -105,14 +108,14 @@ async function main() {
     if (existsSync(dir)) {
       const files = readdirSync(dir).filter((f) => f.endsWith(".csv")).sort();
       if (files.length) {
-        const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, undefined, { profile: SOTAC_PROFILE });
+        const raw = buildSeriesFromRawCsvs(files.map((f) => readFileSync(join(dir, f), "utf-8")), layout, undefined, { profile: PROFILE });
         if (raw) series = clipSeries(raw, timestamps[timestamps.length - 1] + 0.1);
       }
     }
-    if (!series) series = buildSeriesFromSensorFrames(frames, timestamps, layout, undefined, SOTAC_PROFILE);
+    if (!series) series = buildSeriesFromSensorFrames(frames, timestamps, layout, undefined, PROFILE);
     if (!series || !gripper) continue;
 
-    const result = detectEvents(series, gripper, {}, arm, { profile: SOTAC_PROFILE });
+    const result = detectEvents(series, gripper, {}, arm, { profile: PROFILE });
 
     // gripper velocity exactly as the detector resamples it (sample-and-hold
     // finite difference between the bracketing table pair)

@@ -58,7 +58,7 @@ Batch auto annotation. Run the detector over every episode of a dataset and save
 | `no_layout` / `no_gripper` / `no_arm` flags | cycle 5 | done |
 | profile can supply a taxel layout | — | open (PR B) |
 | drop `tsconfig.tsbuildinfo` | cycle 6, 27ef038 | ignore line in the Space tree; drops out of the assembled PRs |
-| ship `build-screen-reference.ts` or move the corpus into the profile | cycles 5–6 | corpus is a profile artifact; builder still workspace-only (PR B item) |
+| ship `build-screen-reference.ts` or move the corpus into the profile | cycles 5–6, B1 | corpus out of `src`: `public/screen-reference/`, named by the profile's path, fetched by the app / read by the runner, out of the bundle; builder still workspace-only (her "or") |
 | PR B out of the default save path, behind a per-dataset opt-in | — | open (PR B) |
 | split into PR A / PR B | cycle 7 | 7a: instrument module split (this commit); 7b: PR A assembly |
 | dataset trim, batch auto-annotation | — | PR B round (ask whether trim is still needed: she trimmed Jingming's episodes herself) |
