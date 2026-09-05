@@ -28,6 +28,20 @@
         "3106"
       ],
       "port": 3106
+    },
+    {
+      "name": "pr-a",
+      "runtimeExecutable": "C:\\Users\\Ryan Xu\\.bun\\bin\\bun.exe",
+      "runtimeArgs": [
+        "--bun",
+        "run",
+        "--cwd",
+        "E:\\lerobotac-dataset-visualizer",
+        "dev",
+        "--port",
+        "3107"
+      ],
+      "port": 3107
     }
   ]
 }
