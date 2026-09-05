@@ -50,6 +50,7 @@
     "shortTransportMinS": 1
   },
   "screenReferencePath": null,
+  "layouts": {},
   "provenance": {
     "thresholds": "copied from sotac (measured) — re-measure on this rig",
     "weakAttemptMaxN": "copied from sotac (video-verdict calibration) — verify on this rig",
@@ -71,6 +72,7 @@
     "armMoveEpsUps": "copied from sotac (measured) — re-measure on this rig",
     "slideMinMm": "copied from sotac (video-verdict calibration) — verify on this rig",
     "hesitationP90S": "copied from sotac (task-family census) — re-derive from this dataset",
+    "layouts": "empty = the built-in taxel tables (Paxini models, by taxel count); add your sensor here when no table matches: { \"<taxel count>\": { model, points: [[x, y, z], ...] } } in mm, finger long axis = +Y",
     "shortTransportMinS": "copied from sotac (measured) — re-measure on this rig"
   },
   "notes": "Copy this file to <dataset>/meta/annotator_profile.json, edit the header, set verified: true only after the numbers were checked on this rig (protocol: analysis/portability.md, scripts/calibration/). Until then every result carries profile_unverified."

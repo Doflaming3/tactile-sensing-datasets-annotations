@@ -28,6 +28,7 @@
  */
 import { DEFAULT_THRESHOLDS, type DetectionThresholds } from "./eventDetection";
 import type { ScreenReference } from "./signalScreen";
+import { resolveTaxelLayout, type TaxelLayout } from "./taxel-layouts";
 
 export interface RigCalibration {
   /** signal-level thresholds (N, hf units …) — the user-tunable set */
@@ -103,6 +104,13 @@ export interface RigProfile {
    * bundle (Jingyi's review: "move the corpus out of src and load it
    * from the per dataset profile"). */
   screenReferencePath?: string | null;
+  /** Taxel layouts this profile supplies, keyed by taxel count and
+   * consulted before the built-in tables (taxel-layouts.ts): points in
+   * mm, finger long axis = +Y, one entry per sensor model the dataset
+   * carries. Jingyi's review: "the per dataset profile should be able to
+   * supply a layout the same way it supplies thresholds". Without a
+   * layout for a count the detector says `no_layout`. */
+  layouts?: Record<number, TaxelLayout>;
   calibration: RigCalibration;
 }
 
@@ -213,6 +221,12 @@ export interface AnnotatorProfileFile {
   verified: boolean;
   calibration: Omit<RigCalibration, "screenReference">;
   screenReferencePath?: string | null;
+  /** taxel layouts keyed by taxel count (as JSON keys): `{ "52": { model,
+   * points: [[x, y, z], ...] } }`, mm, finger long axis = +Y */
+  layouts?: Record<
+    string,
+    { model?: string; points: [number, number, number][] }
+  >;
   provenance?: Record<string, string>;
   notes?: string;
 }
@@ -244,6 +258,47 @@ const NUMERIC_FIELDS: Array<
   "shortTransportMinS",
 ];
 
+/** Layouts from the file form: every key must be a positive integer equal
+ * to its point count, every point a finite [x, y, z]. Returns null for
+ * "none given", undefined for "malformed" (the caller rejects the file). */
+function parseLayouts(
+  raw: unknown,
+  model: string,
+): Record<number, TaxelLayout> | null | undefined {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: Record<number, TaxelLayout> = {};
+  for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Number(key);
+    if (!Number.isInteger(n) || n <= 0) return undefined;
+    const l = val as { model?: unknown; points?: unknown };
+    if (!l || !Array.isArray(l.points) || l.points.length !== n)
+      return undefined;
+    const points: [number, number, number][] = [];
+    for (const pt of l.points as unknown[]) {
+      if (
+        !Array.isArray(pt) ||
+        pt.length !== 3 ||
+        !pt.every((v) => typeof v === "number" && Number.isFinite(v))
+      )
+        return undefined;
+      points.push([pt[0], pt[1], pt[2]] as [number, number, number]);
+    }
+    out[n] = { model: typeof l.model === "string" ? l.model : model, points };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** The taxel layout for a taxel count: the profile's own first, then the
+ * built-in tables. null = no geometry (the detector flags `no_layout`,
+ * the tiles cannot draw the pad). */
+export function layoutFor(
+  profile: RigProfile | null | undefined,
+  nTaxels: number,
+): TaxelLayout | null {
+  return profile?.layouts?.[nTaxels] ?? resolveTaxelLayout(nTaxels);
+}
+
 /** Parse a dataset's profile file; null when it is not a valid profile
  * (the caller then falls back). Unknown fields are ignored; every known
  * numeric field must be a finite number. */
@@ -271,6 +326,8 @@ export function profileFromFile(
     ...DEFAULT_THRESHOLDS,
     ...((c.thresholds as Partial<DetectionThresholds>) ?? {}),
   };
+  const layouts = parseLayouts(f.layouts, String(f.sensor ?? f.id));
+  if (layouts === undefined) return null; // malformed layout: whole file rejected
   return {
     id: String(f.id),
     label: String(f.label ?? f.id),
@@ -279,6 +336,7 @@ export function profileFromFile(
     datasets: [],
     verified: f.verified === true,
     screenReferencePath: f.screenReferencePath ?? null,
+    layouts: layouts ?? undefined,
     calibration: {
       ...(c as unknown as RigCalibration),
       thresholds: th,
@@ -329,6 +387,7 @@ export function templateProfileFile(): AnnotatorProfileFile {
     verified: false,
     calibration,
     screenReferencePath: null,
+    layouts: {},
     provenance: {
       thresholds: measured,
       weakAttemptMaxN: verdict,
@@ -351,6 +410,8 @@ export function templateProfileFile(): AnnotatorProfileFile {
       slideMinMm: verdict,
       hesitationP90S:
         "copied from sotac (task-family census) — re-derive from this dataset",
+      layouts:
+        'empty = the built-in taxel tables (Paxini models, by taxel count); add your sensor here when no table matches: { "<taxel count>": { model, points: [[x, y, z], ...] } } in mm, finger long axis = +Y',
       shortTransportMinS: measured,
     },
     notes:

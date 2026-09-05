@@ -66,7 +66,11 @@ To calibrate a new rig:
    `calibration` carries a `provenance` note saying whether it was *measured*
    on sotac (re-measure here) or came from a *video verdict* (verify here);
    the protocol is `analysis/portability.md` with the census scripts under
-   `scripts/calibration/`;
+   `scripts/calibration/`; if the sensor's taxel count has no built-in
+   table (the app then says `no_layout`), add its geometry under `layouts`,
+   keyed by taxel count: `{ "<count>": { "model": "...", "points": [[x, y, z], ...] } }`
+   in mm with the finger's long axis along +Y — the detector's CoP rules
+   and the 3-D tiles use it;
 3. set `verified: true` only after the numbers were checked on this rig —
    the flag and the reminder go away, and the artifact screen runs if a
    `screenReferencePath` points at a reference built with

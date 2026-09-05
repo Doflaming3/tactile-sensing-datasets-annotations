@@ -25,10 +25,9 @@ import {
   type AutoLabelResult,
   spanFlag,
 } from "@/lib/eventDetection";
-import { templateReminder } from "@/lib/rigProfile";
+import { layoutFor, templateReminder } from "@/lib/rigProfile";
 import { useRigProfile } from "@/lib/useRigProfile";
 import { useSearchParams } from "next/navigation";
-import { resolveTaxelLayout } from "@/lib/taxel-layouts";
 import type { SensorFramesMap } from "@/app/[org]/[dataset]/[episode]/fetch-data";
 import type { LanguageAtom } from "@/types/language.types";
 import { findRawSensorCsvs } from "@/utils/episodeDiscovery";
@@ -190,7 +189,7 @@ export default function AutoLabelPanel({
     );
     if (!entry) return null;
     const nTaxels = entry.shape.length >= 3 ? entry.shape[1] : entry.shape[0];
-    const layout = resolveTaxelLayout(nTaxels)?.points ?? null;
+    const layout = layoutFor(profile, nTaxels)?.points ?? null;
     if (!profile) return null;
     return buildSeriesFromSensorFrames(
       entry.frames,
@@ -234,7 +233,7 @@ export default function AutoLabelPanel({
         sensorFrames && Object.values(sensorFrames)[0]?.shape.length >= 3
           ? Object.values(sensorFrames)[0].shape[1]
           : 52;
-      const layout = resolveTaxelLayout(nTaxels)?.points ?? null;
+      const layout = layoutFor(profile, nTaxels)?.points ?? null;
       if (!profile) return null;
       const s = buildSeriesFromRawCsvs(texts, layout, gripper, { profile });
       rawSeriesRef.current = s;

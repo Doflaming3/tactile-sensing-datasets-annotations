@@ -27,12 +27,11 @@ import {
   Legend,
 } from "recharts";
 import { useTime } from "@/context/time-context";
-import { resolveTaxelLayout } from "@/lib/taxel-layouts";
 import {
   applyAdaptiveBaseline,
   type GripperSeries,
 } from "@/lib/eventDetection";
-import type { RigProfile } from "@/lib/rigProfile";
+import { layoutFor, type RigProfile } from "@/lib/rigProfile";
 import { useRigProfile } from "@/lib/useRigProfile";
 import { useSearchParams } from "next/navigation";
 import RawStreamPanel from "@/components/raw-stream-panel";
@@ -254,7 +253,9 @@ function channelsFrom(
     }
     out.push(...expandChannels(name, sf.shape, frames, sf.timestamps));
   }
-  return out.filter((c) => resolveTaxelLayout(c.nPoints));
+  // a channel is drawable only with a layout: the profile's own, else the
+  // built-in tables
+  return out.filter((c) => layoutFor(profile, c.nPoints));
 }
 
 function frameIndexFor(ts: number[], currentTime: number, fps: number): number {
@@ -342,7 +343,8 @@ function ChannelScene({
   maxLen: number;
   forceMax: number;
 }) {
-  const layout = resolveTaxelLayout(channel.nPoints);
+  const profile = useDisplayProfile();
+  const layout = layoutFor(profile, channel.nPoints);
 
   const anatomy = useMemo(() => {
     if (!layout) return null;
@@ -814,7 +816,7 @@ export default function TactilePanel({
                 >
                   <color attach="background" args={["#0b0e15"]} />
                   <FitCamera
-                    points={resolveTaxelLayout(ch.nPoints)?.points ?? []}
+                    points={layoutFor(profile, ch.nPoints)?.points ?? []}
                   />
                   <ChannelScene
                     channel={ch}
@@ -877,7 +879,7 @@ export function TactileFingerView({
       <div className="flex-1 min-h-0 rounded bg-[#0b0e15]">
         <Canvas camera={{ position: [0, 11, 34], up: [0, 1, 0], fov: 38 }}>
           <color attach="background" args={["#0b0e15"]} />
-          <FitCamera points={resolveTaxelLayout(ch.nPoints)?.points ?? []} />
+          <FitCamera points={layoutFor(profile, ch.nPoints)?.points ?? []} />
           <ChannelScene
             channel={ch}
             frameIdx={fi}

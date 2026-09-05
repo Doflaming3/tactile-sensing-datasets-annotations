@@ -104,6 +104,9 @@ percentiles, the screen reference corpus, plus the signal-level
 and the corrected display REQUIRE a profile — there is no default anywhere
 (cycle 6 removed the last one: the screen module's own fallback to the
 sotac corpus; the reference now reaches the screen only as an argument).
+Since B2 a profile can also carry taxel `layouts` (keyed by taxel count),
+consulted before the built-in tables by the detector, the runner and the
+tiles — geometry is calibration too.
 Cycle 7a moved the instrument layer into `tactileSeries.ts`, which takes
 its one rig number (the idle margin) as a plain option and never imports the
 profile; `DISPLAY_QUIET_MARGIN_N` (1.0 N) there is the corrected display's

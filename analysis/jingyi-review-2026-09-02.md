@@ -56,7 +56,7 @@ Batch auto annotation. Run the detector over every episode of a dataset and save
 | remove `context.result` from `detectEvents` | cycle 4, 48f84ed | done; evaluation lives in the runner |
 | rig constants into a per-dataset profile; refuse to run without one | cycle 5, 15f189b | done as a profile; Zheng's ruling: a TEMPLATE with a reminder and a `profile_unverified` flag instead of a hard refusal |
 | `no_layout` / `no_gripper` / `no_arm` flags | cycle 5 | done |
-| profile can supply a taxel layout | — | open (PR B) |
+| profile can supply a taxel layout | B2 | done: `layouts` keyed by taxel count in the profile file, used before the built-in tables by the detector, the runner and the tiles |
 | drop `tsconfig.tsbuildinfo` | cycle 6, 27ef038 | ignore line in the Space tree; drops out of the assembled PRs |
 | ship `build-screen-reference.ts` or move the corpus into the profile | cycles 5–6, B1 | corpus out of `src`: `public/screen-reference/`, named by the profile's path, fetched by the app / read by the runner, out of the bundle; builder still workspace-only (her "or") |
 | PR B out of the default save path, behind a per-dataset opt-in | — | open (PR B) |

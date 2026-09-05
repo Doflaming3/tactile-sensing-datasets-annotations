@@ -26,10 +26,10 @@ import {
   type DetectionThresholds,
   type TactileSeries,
 } from "../visualizer/src/lib/eventDetection";
-import { resolveTaxelLayout } from "../visualizer/src/lib/taxel-layouts";
 import { parquetReadObjects } from "../visualizer/node_modules/hyparquet";
 import {
   ANNOTATOR_PROFILE_PATH,
+  layoutFor,
   profileFromFile,
   resolveProfile,
   type RigProfile,
@@ -283,7 +283,6 @@ async function runEpisode(
 ): Promise<{ ok: boolean; line: string }> {
   const ep = meta.episode_index;
   const inputs = await loadEpisodeInputs(root, info, meta);
-  const layout = resolveTaxelLayout(inputs.nTaxels)?.points ?? null;
 
   // calibration profile: the mirror's own meta/annotator_profile.json,
   // else --profile <id>, else the registry by dataset name, else the
@@ -304,6 +303,8 @@ async function runEpisode(
   );
   // the corpus lives outside the profile object: attach it from disk
   const profile = loadScreenReference(resolvedProfile, root);
+  // geometry: the profile's own layouts first, then the built-in tables
+  const layout = layoutFor(profile, inputs.nTaxels)?.points ?? null;
   if (profileSource === "template" && !args.all) {
     console.log(
       "NOTE: no calibration profile for this dataset — running with the TEMPLATE (sotac numbers, unverified).",
