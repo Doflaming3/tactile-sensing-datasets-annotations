@@ -104,6 +104,11 @@ percentiles, the screen reference corpus, plus the signal-level
 and the corrected display REQUIRE a profile — there is no default anywhere
 (cycle 6 removed the last one: the screen module's own fallback to the
 sotac corpus; the reference now reaches the screen only as an argument).
+Cycle 7a moved the instrument layer into `tactileSeries.ts`, which takes
+its one rig number (the idle margin) as a plain option and never imports the
+profile; `DISPLAY_QUIET_MARGIN_N` (1.0 N) there is the corrected display's
+constant for a tree without profiles (Jingyi's PR A) — in this tree the
+display reads the profile, and the detector never reads that constant.
 `profileForDataset(ref)` resolves a dataset id (revision stripped) through
 a registry (`Jingyi-Z/sotac*` → `sotac-paxini-so101`) after the dataset's
 own `meta/annotator_profile.json`; an unknown dataset gets the TEMPLATE
