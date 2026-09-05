@@ -33,6 +33,7 @@ import {
 } from "@/lib/eventDetection";
 import { layoutFor, type RigProfile } from "@/lib/rigProfile";
 import { useRigProfile } from "@/lib/useRigProfile";
+import { useSessionInterpretation } from "@/lib/interpretationOptIn";
 import { useSearchParams } from "next/navigation";
 import RawStreamPanel from "@/components/raw-stream-panel";
 import {
@@ -224,7 +225,12 @@ function channelsFrom(
   gripper?: GripperSeries | null,
   corrected = false,
   profile: RigProfile | null = null,
+  sessionOptIn = false,
 ): Channel[] {
+  // the residual gate is interpretation: on for datasets that opted in,
+  // or for this session (lib/interpretationOptIn.ts) — the same switch
+  // the detector follows
+  const residualGate = !!profile && (profile.interpretation || sessionOptIn);
   const out: Channel[] = [];
   for (const [name, sf] of Object.entries(sensorFrames)) {
     let frames = sf.frames;
@@ -239,11 +245,13 @@ function channelsFrom(
           frames =
             (applyAdaptiveBaseline(sf.frames, sf.timestamps, gripper, {
               profile,
+              residualGate,
             }) as unknown[]) ?? sf.frames;
         } else if (sf.shape.length === 2) {
           const wrapped = sf.frames.map((fr) => [fr]);
           const corr = applyAdaptiveBaseline(wrapped, sf.timestamps, gripper, {
             profile,
+            residualGate,
           });
           if (corr) frames = corr.map((fr) => fr[0]);
         }
@@ -545,9 +553,10 @@ export function TactileStats({
 }) {
   const corrected = useDriftCorrectedView();
   const profile = useDisplayProfile();
+  const sessionOptIn = useSessionInterpretation();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected, profile),
-    [sensorFrames, gripper, corrected, profile],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile, sessionOptIn),
+    [sensorFrames, gripper, corrected, profile, sessionOptIn],
   );
   const rows = useMemo(() => {
     return channels.map((ch) => {
@@ -747,9 +756,10 @@ export default function TactilePanel({
   const [forceMax, setForceMax] = useState(5.0);
   const corrected = useDriftCorrectedView();
   const profile = useDisplayProfile();
+  const sessionOptIn = useSessionInterpretation();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected, profile),
-    [sensorFrames, gripper, corrected, profile],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile, sessionOptIn),
+    [sensorFrames, gripper, corrected, profile, sessionOptIn],
   );
   if (channels.length === 0) return null;
 
@@ -863,9 +873,10 @@ export function TactileFingerView({
   const { currentTime } = useTime();
   const corrected = useDriftCorrectedView();
   const profile = useDisplayProfile();
+  const sessionOptIn = useSessionInterpretation();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected, profile),
-    [sensorFrames, gripper, corrected, profile],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile, sessionOptIn),
+    [sensorFrames, gripper, corrected, profile, sessionOptIn],
   );
   const ch = channels[fingerIndex];
   if (!ch) return null;
@@ -903,9 +914,10 @@ export function TactileSummary({
 }) {
   const corrected = useDriftCorrectedView();
   const profile = useDisplayProfile();
+  const sessionOptIn = useSessionInterpretation();
   const channels = useMemo(
-    () => channelsFrom(sensorFrames, gripper, corrected, profile),
-    [sensorFrames, gripper, corrected, profile],
+    () => channelsFrom(sensorFrames, gripper, corrected, profile, sessionOptIn),
+    [sensorFrames, gripper, corrected, profile, sessionOptIn],
   );
   if (channels.length === 0) return null;
   return (

@@ -119,4 +119,6 @@ task, result, attempts).
   into the next episode's start. Finger 0 is clean after every release. No
   baseline can subtract it (a blinking taxel's mean, bursts too short); the
   detector and the corrected display refuse it structurally instead (commit
-  `76ec368`); the raw display keeps it as the audit view.
+  `76ec368`) for datasets that opted into the interpretation layer (sotac's
+  registry profile does; base mode runs the re-zero alone); the raw display
+  keeps it as the audit view.

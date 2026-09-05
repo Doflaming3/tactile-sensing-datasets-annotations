@@ -95,6 +95,17 @@ export interface RigProfile {
    * template, or a dataset file that says so): every result carries
    * `profile_unverified` and the app reminds the user */
   verified: boolean;
+  /** Per-dataset opt-in for the INTERPRETATION layer (Jingyi's PR B:
+   * "event taxonomy, attempts, phantom and residual logic, hesitation,
+   * signal screen. Behind a per dataset opt in and out of the default
+   * save path"). false = BASE MODE: the detector emits her Table VIII
+   * taxonomy, the subtasks and the capability flags only — no marker
+   * renames, no attempt / weak-contact / air-grasp / post-task /
+   * short-transport spans, no phantom gate, no residual gate, no
+   * hesitation, no screen — so nothing from that layer can reach the
+   * saved annotations. The sotac registry profile opts in; the template
+   * does not (the panel offers a per-session opt-in). */
+  interpretation: boolean;
   /** Where the artifact screen's reference corpus is loaded from when
    * `calibration.screenReference` is null: an app path (leading `/`,
    * served from `public/`) for registry profiles, a repo-relative path
@@ -126,6 +137,7 @@ export const SOTAC_PROFILE: RigProfile = {
   gripper: "SO-101 jaw, position units, opening = increasing",
   datasets: [/^Jingyi-Z\/sotac(_raw)?$/],
   verified: true,
+  interpretation: true,
   screenReferencePath: SOTAC_SCREEN_REFERENCE_PATH,
   calibration: {
     thresholds: DEFAULT_THRESHOLDS,
@@ -219,6 +231,9 @@ export interface AnnotatorProfileFile {
   sensor: string;
   gripper: string;
   verified: boolean;
+  /** opt this dataset into the interpretation layer (default false =
+   * base mode, see RigProfile.interpretation) */
+  interpretation?: boolean;
   calibration: Omit<RigCalibration, "screenReference">;
   screenReferencePath?: string | null;
   /** taxel layouts keyed by taxel count (as JSON keys): `{ "52": { model,
@@ -335,6 +350,7 @@ export function profileFromFile(
     gripper: String(f.gripper ?? "unknown gripper"),
     datasets: [],
     verified: f.verified === true,
+    interpretation: f.interpretation === true,
     screenReferencePath: f.screenReferencePath ?? null,
     layouts: layouts ?? undefined,
     calibration: {
@@ -353,6 +369,7 @@ export const TEMPLATE_PROFILE: RigProfile = {
   label: "TEMPLATE — sotac numbers, NOT verified on this rig",
   datasets: [],
   verified: false,
+  interpretation: false,
   screenReferencePath: null,
   calibration: { ...SOTAC_PROFILE.calibration, screenReference: null },
 };
@@ -385,6 +402,7 @@ export function templateProfileFile(): AnnotatorProfileFile {
     sensor: "EDIT ME (e.g. Paxini DP-S2015-Elite, 2 x 52 taxels)",
     gripper: "EDIT ME (e.g. SO-101 jaw, position units, opening = increasing)",
     verified: false,
+    interpretation: false,
     calibration,
     screenReferencePath: null,
     layouts: {},
@@ -410,6 +428,8 @@ export function templateProfileFile(): AnnotatorProfileFile {
       slideMinMm: verdict,
       hesitationP90S:
         "copied from sotac (task-family census) — re-derive from this dataset",
+      interpretation:
+        "false = BASE MODE: the base taxonomy, subtasks and capability flags only; set true to opt this dataset into the interpretation layer (marker renames, attempt and weak-contact spans, phantom and residual logic, hesitation; the signal screen too where screenReferencePath names a corpus) — its output then enters the annotation set on every run",
       layouts:
         'empty = the built-in taxel tables (Paxini models, by taxel count); add your sensor here when no table matches: { "<taxel count>": { model, points: [[x, y, z], ...] } } in mm, finger long axis = +Y',
       shortTransportMinS: measured,

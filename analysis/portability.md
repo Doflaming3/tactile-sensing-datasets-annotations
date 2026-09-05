@@ -106,7 +106,15 @@ and the corrected display REQUIRE a profile — there is no default anywhere
 sotac corpus; the reference now reaches the screen only as an argument).
 Since B2 a profile can also carry taxel `layouts` (keyed by taxel count),
 consulted before the built-in tables by the detector, the runner and the
-tiles — geometry is calibration too.
+tiles — geometry is calibration too. Since B3 the profile's `interpretation`
+flag is the per-dataset opt-in for the interpretation layer; without it the
+detector runs in base mode (Table VIII labels, subtasks, capability flags,
+`base_mode` flag) with the residual gate off as well, so a run on a
+non-opted dataset adds nothing from that layer to the annotation set. Known
+property of base mode: on residual-class episodes the ungated post-release
+residual can carry a base-taxonomy contact chain and pull the subtask
+anchors (sotac ep25 grasp anchor 13.8 s instead of 8.4 s) — the opt-in is
+what fixes it, by her own split.
 Cycle 7a moved the instrument layer into `tactileSeries.ts`, which takes
 its one rig number (the idle margin) as a plain option and never imports the
 profile; `DISPLAY_QUIET_MARGIN_N` (1.0 N) there is the corrected display's

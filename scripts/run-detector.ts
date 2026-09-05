@@ -13,6 +13,7 @@
 //   bun scripts/run-detector.ts --all --compare              # batch consistency audit
 //   bun scripts/run-detector.ts --episode 6 --th hfEnter=10 --th contactEnterN=0.2
 //   bun scripts/run-detector.ts --episode 6 --json out.json
+//   bun scripts/run-detector.ts --episode 6 --base          # interpretation layer off
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -48,6 +49,8 @@ interface Args {
   report: string | null;
   dedup: boolean;
   deviceGrid: boolean;
+  /** force BASE MODE (interpretation layer off) for A/B dumps */
+  base: boolean;
   thresholds: Partial<DetectionThresholds>;
   /** explicit registry profile id (--profile) */
   profileId: string | null;
@@ -67,6 +70,7 @@ function parseArgs(argv: string[]): Args {
     report: null,
     dedup: false,
     deviceGrid: false,
+    base: false,
     thresholds: {},
     profileId: null,
     profileRef: "Jingyi-Z/sotac",
@@ -82,6 +86,7 @@ function parseArgs(argv: string[]): Args {
     else if (k === "--report") a.report = argv[++i];
     else if (k === "--dedup") a.dedup = true;
     else if (k === "--device-grid") a.deviceGrid = true;
+    else if (k === "--base") a.base = true;
     else if (k === "--profile") a.profileId = argv[++i];
     else if (k === "--dataset-ref") a.profileRef = argv[++i];
     else if (k === "--th") {
@@ -302,7 +307,11 @@ async function runEpisode(
     fileProfile,
   );
   // the corpus lives outside the profile object: attach it from disk
-  const profile = loadScreenReference(resolvedProfile, root);
+  const loadedProfile = loadScreenReference(resolvedProfile, root);
+  // --base: run as a dataset that did not opt into the interpretation layer
+  const profile = args.base
+    ? { ...loadedProfile, interpretation: false }
+    : loadedProfile;
   // geometry: the profile's own layouts first, then the built-in tables
   const layout = layoutFor(profile, inputs.nTaxels)?.points ?? null;
   if (profileSource === "template" && !args.all) {

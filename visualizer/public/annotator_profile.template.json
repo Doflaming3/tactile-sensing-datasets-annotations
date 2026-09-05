@@ -5,6 +5,7 @@
   "sensor": "EDIT ME (e.g. Paxini DP-S2015-Elite, 2 x 52 taxels)",
   "gripper": "EDIT ME (e.g. SO-101 jaw, position units, opening = increasing)",
   "verified": false,
+  "interpretation": false,
   "calibration": {
     "thresholds": {
       "contactEnterN": 0.15,
@@ -72,6 +73,7 @@
     "armMoveEpsUps": "copied from sotac (measured) — re-measure on this rig",
     "slideMinMm": "copied from sotac (video-verdict calibration) — verify on this rig",
     "hesitationP90S": "copied from sotac (task-family census) — re-derive from this dataset",
+    "interpretation": "false = BASE MODE: the base taxonomy, subtasks and capability flags only; set true to opt this dataset into the interpretation layer (marker renames, attempt and weak-contact spans, phantom and residual logic, hesitation; the signal screen too where screenReferencePath names a corpus) — its output then enters the annotation set on every run",
     "layouts": "empty = the built-in taxel tables (Paxini models, by taxel count); add your sensor here when no table matches: { \"<taxel count>\": { model, points: [[x, y, z], ...] } } in mm, finger long axis = +Y",
     "shortTransportMinS": "copied from sotac (measured) — re-measure on this rig"
   },

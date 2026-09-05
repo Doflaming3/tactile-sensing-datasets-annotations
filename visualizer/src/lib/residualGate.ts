@@ -25,7 +25,7 @@ import { measureQuantumN, type GripperSeries } from "./tactileSeries";
  * graze is many taxels (ep54: 12 taxels × 1 quantum for 4 frames). */
 export const SINGLE_TAXEL_QUANTA = 1.5;
 /** Post-release residual gate (Zheng's rule 1, 2026-09-03; applied by
- * applyResidualGate so the detector AND the corrected display see it;
+ * applyResidualGate so the detector AND the corrected display see it — for datasets that opted into the interpretation layer (RigProfile.interpretation; base mode runs the re-zero alone);
  * the raw display stays the audit view). Mechanism (sotac ep37 f1 and
  * 14 more finger-windows, all finger 1): after the object leaves, the pad
  * keeps 1-3 taxels stuck at one quantum plus sub-0.3 s bursts of 6-12

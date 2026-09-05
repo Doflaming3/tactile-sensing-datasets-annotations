@@ -27,6 +27,11 @@ import {
 } from "@/lib/eventDetection";
 import { layoutFor, templateReminder } from "@/lib/rigProfile";
 import { useRigProfile } from "@/lib/useRigProfile";
+import {
+  activeProfileFor,
+  setSessionInterpretation,
+  useSessionInterpretation,
+} from "@/lib/interpretationOptIn";
 import { useSearchParams } from "next/navigation";
 import type { SensorFramesMap } from "@/app/[org]/[dataset]/[episode]/fetch-data";
 import type { LanguageAtom } from "@/types/language.types";
@@ -160,6 +165,16 @@ export default function AutoLabelPanel({
     profileOverride,
   );
   const [reminderDismissed, setReminderDismissed] = useState(false);
+  // Per-session opt-in for the interpretation layer on a dataset whose
+  // profile does not opt in (Jingyi's PR B: behind a per-dataset opt-in
+  // and out of the default save path). A page-wide store shared with the
+  // corrected display (lib/interpretationOptIn.ts); a reload returns to
+  // base mode.
+  const sessionInterp = useSessionInterpretation();
+  const activeProfile = useMemo(
+    () => activeProfileFor(profile, sessionInterp),
+    [profile, sessionInterp],
+  );
   const [open, setOpen] = useState(false);
   // Human-review queue (Zheng's verify-and-add flow): failed_attempt span
   // flags render as adjustable spans; a human watches the clip, nudges the
@@ -177,6 +192,11 @@ export default function AutoLabelPanel({
     "none" | "loading" | "ready" | "missing"
   >("none");
   const rawSeriesRef = useRef<TactileSeries | null>(null);
+  // the raw series is built WITH the profile (drift correction, residual
+  // gate): a cached one from before an opt-in change is the wrong input
+  useEffect(() => {
+    rawSeriesRef.current = null;
+  }, [activeProfile]);
   const [lastResult, setLastResult] = useState<AutoLabelResult | null>(null);
   const [status, setStatus] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -189,16 +209,16 @@ export default function AutoLabelPanel({
     );
     if (!entry) return null;
     const nTaxels = entry.shape.length >= 3 ? entry.shape[1] : entry.shape[0];
-    const layout = layoutFor(profile, nTaxels)?.points ?? null;
-    if (!profile) return null;
+    const layout = layoutFor(activeProfile, nTaxels)?.points ?? null;
+    if (!activeProfile) return null;
     return buildSeriesFromSensorFrames(
       entry.frames,
       entry.timestamps,
       layout,
       gripper,
-      profile,
+      activeProfile,
     );
-  }, [sensorFrames, gripper, profile]);
+  }, [sensorFrames, gripper, activeProfile]);
 
   const loadRaw = useCallback(async () => {
     if (rawSeriesRef.current) return rawSeriesRef.current;
@@ -233,9 +253,11 @@ export default function AutoLabelPanel({
         sensorFrames && Object.values(sensorFrames)[0]?.shape.length >= 3
           ? Object.values(sensorFrames)[0].shape[1]
           : 52;
-      const layout = layoutFor(profile, nTaxels)?.points ?? null;
-      if (!profile) return null;
-      const s = buildSeriesFromRawCsvs(texts, layout, gripper, { profile });
+      const layout = layoutFor(activeProfile, nTaxels)?.points ?? null;
+      if (!activeProfile) return null;
+      const s = buildSeriesFromRawCsvs(texts, layout, gripper, {
+        profile: activeProfile,
+      });
       rawSeriesRef.current = s;
       setRawState(s ? "ready" : "missing");
       return s;
@@ -243,11 +265,11 @@ export default function AutoLabelPanel({
       setRawState("missing");
       return null;
     }
-  }, [repoId, episodeId, root, sensorFrames, gripper, profile]);
+  }, [repoId, episodeId, root, sensorFrames, gripper, activeProfile]);
 
   const run = useCallback(
     async (th: Partial<DetectionThresholds>) => {
-      if (!profile) {
+      if (!activeProfile) {
         setStatus("calibration profile still loading — try again");
         return;
       }
@@ -279,7 +301,7 @@ export default function AutoLabelPanel({
         // episodeIndex keeps the signal screen from letting a corpus
         // episode's own reference windows vote for it on replays
         const result = detectEvents(series, gripper, th, arm, {
-          profile,
+          profile: activeProfile,
           episodeIndex: episodeId,
         });
         // Diagnostics: everything needed to compare a browser run against the
@@ -349,8 +371,8 @@ export default function AutoLabelPanel({
       addAtoms,
       episodeId,
       setDetectorSpans,
-      profile,
       repoId,
+      activeProfile,
     ],
   );
 
@@ -408,8 +430,10 @@ export default function AutoLabelPanel({
           type="button"
           disabled={running || !profile}
           title={
-            profile
-              ? `rig profile: ${profile.id} (${profileSource})`
+            activeProfile
+              ? `rig profile: ${activeProfile.id} (${profileSource}${
+                  activeProfile.interpretation ? "" : ", base mode"
+                })`
               : "calibration profile loading"
           }
           onClick={() => void run(thresholds)}
@@ -477,6 +501,25 @@ export default function AutoLabelPanel({
             >
               got it
             </button>
+          </div>
+        )}
+        {activeProfile && !activeProfile.interpretation && (
+          <div className="rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1.5 text-[11px] text-sky-200">
+            <span className="font-semibold">Base mode.</span> The interpretation
+            layer (attempts, phantom and residual logic, hesitation, signal
+            screen) is off because the dataset profile does not opt in: a run
+            adds only the base taxonomy to the annotation set (what a Save
+            commits); atoms saved earlier are left as they are. Opt the dataset
+            in with <code>interpretation: true</code> in{" "}
+            <code>meta/annotator_profile.json</code>, or
+            <button
+              type="button"
+              onClick={() => setSessionInterpretation(true)}
+              className="ml-1 text-sky-300 underline"
+            >
+              enable it for this session
+            </button>
+            .
           </div>
         )}
         {status && <span className="text-xs text-slate-500">{status}</span>}

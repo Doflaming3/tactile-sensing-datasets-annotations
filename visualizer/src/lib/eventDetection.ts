@@ -403,9 +403,11 @@ export const DEFAULT_THRESHOLDS: DetectionThresholds = {
 // enters the pipeline exactly here and nowhere else.
 
 /** Drift correction as the DETECTOR and the corrected DISPLAY see it: the
- * per-taxel re-zero (tactileSeries.applyAdaptiveBaseline) followed by the
- * residual gate (rule 1 + pre-grasp form). `residualGate: false` runs the
- * re-zero alone — for A/B probes of the gate itself. */
+ * per-taxel re-zero (tactileSeries.applyAdaptiveBaseline) followed, for
+ * profiles that opted into the interpretation layer
+ * (RigProfile.interpretation), by the residual gate (rule 1 + pre-grasp
+ * form). An explicit `residualGate` wins either way — for A/B probes of
+ * the gate itself. */
 export function applyAdaptiveBaseline(
   frames: unknown[],
   timestamps: number[],
@@ -413,8 +415,9 @@ export function applyAdaptiveBaseline(
   opts: {
     /** rig calibration: idle margin and jaw re-close vocabulary */
     profile: RigProfile;
-    /** Rule 1 (post-release residual gate) on by default; off for A/B
-     * probes of the gate itself. */
+    /** Rule 1 (post-release residual gate): defaults to the profile's
+     * `interpretation` opt-in; set explicitly for A/B probes of the gate
+     * itself. */
     residualGate?: boolean;
   },
 ): number[][][][] | null {
@@ -422,7 +425,10 @@ export function applyAdaptiveBaseline(
   const corrected = applyBaselineCore(frames, timestamps, gripper, {
     quietMarginN: P.quietMarginN,
   });
-  if (!corrected || opts.residualGate === false) return corrected;
+  // the gate is interpretation (PR B): on only for datasets that opted
+  // in, unless a probe says otherwise explicitly
+  const gate = opts.residualGate ?? opts.profile.interpretation === true;
+  if (!corrected || !gate) return corrected;
   return applyResidualGate(corrected, frames, timestamps, gripper, {
     quietMarginN: P.quietMarginN,
     jawRecloseU: P.jawRecloseU,
@@ -585,10 +591,15 @@ export function detectEvents(
   // the numbers behind this run were not verified on this rig (template,
   // or a dataset file that says so): say it in every result
   if (!context.profile.verified) flags.push("profile_unverified");
+  // Jingyi's PR B condition: the interpretation layer runs only for
+  // datasets that opted in (RigProfile.interpretation). Otherwise BASE
+  // MODE — see the `interp` guards below and the strip at the end.
+  const interp = context.profile.interpretation === true;
+  if (!interp) flags.push("base_mode");
   // the profile names a reference corpus but none was attached: the screen
   // is silently off unless we say so (the resolvers attach it; a missing or
   // unreachable file lands here)
-  if (!P.screenReference && context.profile.screenReferencePath) {
+  if (interp && !P.screenReference && context.profile.screenReferencePath) {
     flags.push("no_screen_reference");
   }
   const events: RawEvent[] = [];
@@ -1134,7 +1145,7 @@ export function detectEvents(
   // Gate-classified events are renamed to "phantom" by the rename pass
   // at the END (renaming here would corrupt bout building).
   const phantomEvents = new Set<DetectedEvent>();
-  {
+  if (interp) {
     const taskDoneByFinger = new Map<number, number>();
     // The finger's FINAL place must be computed over the full list before
     // pairing it with a terminal. Using the running "last place so far"
@@ -1790,7 +1801,7 @@ export function detectEvents(
   // release-less (ep40: the carry is invisible at 0.1 N) is protected:
   // its residual drop is not flagged as an attempt.
   const anyRelease = cleaned.some((e) => e.label === "release");
-  if (!anyRelease && subtasks.length > 1) {
+  if (interp && !anyRelease && subtasks.length > 1) {
     const lastTerminal = [...cleaned].reverse().find((e) => e.label === "drop");
     const lossFlagged =
       lastTerminal !== undefined &&
@@ -1933,86 +1944,90 @@ export function detectEvents(
   //    predates it is a SENSOR_RESIDUAL — the non-re-zeroed sensor
   //    discharging (ep36 @9.61, ep41 @7.34, ep22 @10.76,
   //    video-verified).
-  for (const e of cleaned) {
-    if (phantomEvents.has(e)) {
-      e.info = `was ${e.label}`;
-      e.label = "phantom";
-    }
-  }
-  const placeRel = subtasks.find((s) => s.label === "place_release");
-  const handRelease = placeRel
-    ? cleaned.find(
-        (e) => e.label === "release" && e.startS >= placeRel.startS - 0.3,
-      )
-    : undefined;
-  if (handRelease) {
-    // pads-meet closes are their own context: "hand still holding" is
-    // false there (the pads held each other, ep0) — no renames inside
-    const airSpans: Array<[number, number]> = spans
-      .filter((s) => s.kind === "air_grasp")
-      .map((s) => [
-        Number(s.startS.toFixed(1)) - 0.1,
-        Number(s.endS.toFixed(1)) + 0.1,
-      ]);
-    const inAir = (tq: number): boolean =>
-      airSpans.some(([s, e]) => tq >= s && tq <= e);
-    // the partner holds at tq if its latest engagement-opening precedes
-    // tq with no terminal in between
-    const partnerHolding = (fi: number, tq: number): boolean => {
-      let lastOn = -1;
-      let lastEx = -1;
-      for (const c of cleaned) {
-        if (c.finger === fi || c.startS >= tq) continue;
-        if (c.label === "contact_onset") lastOn = Math.max(lastOn, c.startS);
-        if (c.label === "release" || c.label === "drop") {
-          lastEx = Math.max(lastEx, c.startS);
-        }
-      }
-      return lastOn >= 0 && lastOn > lastEx;
-    };
+  if (interp) {
     for (const e of cleaned) {
-      if (inAir(e.startS)) continue;
-      if (e.label === "release" && e.startS < handRelease.startS - 0.3) {
-        if (partnerHolding(e.finger, e.startS)) {
-          e.info = "hand still holding";
-          e.label = "finger_unload";
-        }
-      } else if (
-        (e.label === "release" || e.label === "drop") &&
-        e !== handRelease &&
-        e.startS > handRelease.startS + 0.5
-      ) {
-        let ownOnset = -1;
+      if (phantomEvents.has(e)) {
+        e.info = `was ${e.label}`;
+        e.label = "phantom";
+      }
+    }
+    const placeRel = subtasks.find((s) => s.label === "place_release");
+    const handRelease = placeRel
+      ? cleaned.find(
+          (e) => e.label === "release" && e.startS >= placeRel.startS - 0.3,
+        )
+      : undefined;
+    if (handRelease) {
+      // pads-meet closes are their own context: "hand still holding" is
+      // false there (the pads held each other, ep0) — no renames inside
+      const airSpans: Array<[number, number]> = spans
+        .filter((s) => s.kind === "air_grasp")
+        .map((s) => [
+          Number(s.startS.toFixed(1)) - 0.1,
+          Number(s.endS.toFixed(1)) + 0.1,
+        ]);
+      const inAir = (tq: number): boolean =>
+        airSpans.some(([s, e]) => tq >= s && tq <= e);
+      // the partner holds at tq if its latest engagement-opening precedes
+      // tq with no terminal in between
+      const partnerHolding = (fi: number, tq: number): boolean => {
+        let lastOn = -1;
+        let lastEx = -1;
         for (const c of cleaned) {
-          if (
-            c.finger === e.finger &&
-            c.label === "contact_onset" &&
-            c.startS < e.startS &&
-            c.startS > ownOnset
-          ) {
-            ownOnset = c.startS;
+          if (c.finger === fi || c.startS >= tq) continue;
+          if (c.label === "contact_onset") lastOn = Math.max(lastOn, c.startS);
+          if (c.label === "release" || c.label === "drop") {
+            lastEx = Math.max(lastEx, c.startS);
           }
         }
-        if (ownOnset >= 0 && ownOnset <= handRelease.startS) {
+        return lastOn >= 0 && lastOn > lastEx;
+      };
+      for (const e of cleaned) {
+        if (inAir(e.startS)) continue;
+        if (e.label === "release" && e.startS < handRelease.startS - 0.3) {
+          if (partnerHolding(e.finger, e.startS)) {
+            e.info = "hand still holding";
+            e.label = "finger_unload";
+          }
+        } else if (
+          (e.label === "release" || e.label === "drop") &&
+          e !== handRelease &&
+          e.startS > handRelease.startS + 0.5
+        ) {
+          let ownOnset = -1;
+          for (const c of cleaned) {
+            if (
+              c.finger === e.finger &&
+              c.label === "contact_onset" &&
+              c.startS < e.startS &&
+              c.startS > ownOnset
+            ) {
+              ownOnset = c.startS;
+            }
+          }
+          if (ownOnset >= 0 && ownOnset <= handRelease.startS) {
+            e.info = "sensor not re-zeroed";
+            e.label = "sensor_residual";
+          }
+        }
+      }
+      // a PLACE built from that same discharge (the slow decay reads as
+      // weight transfer): place at/after the hand's release on a finger
+      // that has a sensor_residual — ep36 @8.46, ep41 @6.66
+      const residualFingers = new Set(
+        cleaned
+          .filter((e) => e.label === "sensor_residual")
+          .map((e) => e.finger),
+      );
+      for (const e of cleaned) {
+        if (
+          e.label === "place" &&
+          residualFingers.has(e.finger) &&
+          e.startS >= handRelease.startS - 0.05
+        ) {
           e.info = "sensor not re-zeroed";
           e.label = "sensor_residual";
         }
-      }
-    }
-    // a PLACE built from that same discharge (the slow decay reads as
-    // weight transfer): place at/after the hand's release on a finger
-    // that has a sensor_residual — ep36 @8.46, ep41 @6.66
-    const residualFingers = new Set(
-      cleaned.filter((e) => e.label === "sensor_residual").map((e) => e.finger),
-    );
-    for (const e of cleaned) {
-      if (
-        e.label === "place" &&
-        residualFingers.has(e.finger) &&
-        e.startS >= handRelease.startS - 0.05
-      ) {
-        e.info = "sensor not re-zeroed";
-        e.label = "sensor_residual";
       }
     }
   }
@@ -2021,7 +2036,7 @@ export function detectEvents(
   // renamed events — the terminal veto must see honest place/release
   // labels. Flags-only plus data enrichment of coincident slips: no
   // event class is added (Table VIII is partner-owned).
-  {
+  if (interp) {
     const graspAnchorS = subtasks.find((s2) => s2.label === "grasp")?.startS;
     const placeAnchorS =
       subtasks.find((s2) => s2.label === "place_release")?.startS ?? dur;
@@ -2146,7 +2161,7 @@ export function detectEvents(
   // place and passes any signal screen; renaming stays context-rule
   // territory). Raw path only: the featurizer's per-sample hf channel
   // distorts at table rate.
-  if (series.rateHz > 60) {
+  if (interp && series.rateHz > 60) {
     for (const e of cleaned) {
       if (deletedPlaces.has(e)) continue;
       if (
@@ -2177,7 +2192,7 @@ export function detectEvents(
 
   // Combine chained failed_attempt spans (see mergeAttemptSpans
   // provenance): no jaw reopen between two spans = still the same grab.
-  {
+  if (interp) {
     const failed = spans
       .filter((s) => s.kind === "failed_attempt")
       .sort((a, b) => a.startS - b.startS);
@@ -2228,7 +2243,7 @@ export function detectEvents(
 
   // Short transport → human-check card (see SHORT_TRANSPORT_MIN_S
   // provenance; ep39's wrong-location failure is otherwise invisible).
-  {
+  if (interp) {
     const tA = subtasks.find((s2) => s2.label === "transport")?.startS;
     const tB = subtasks.find((s2) => s2.label === "place_release")?.startS;
     if (
@@ -2252,7 +2267,7 @@ export function detectEvents(
   // retry/failure flag to excuse the time (an episode slow because it
   // retried is retrying, not hesitating — ep31/ep47/ep48 are excused).
   // Runs AFTER the result flag so the excuse check sees it.
-  {
+  if (interp) {
     const seq: SubtaskLabel[] = [
       "approach",
       "grasp",
@@ -2289,6 +2304,11 @@ export function detectEvents(
     const m = /@([\d.]+)/.exec(fl);
     return m ? Number(m[1]) : Infinity;
   };
+  // BASE MODE strip: every span kind is interpretation (attempts, weak
+  // contacts, air grasps, post-task chains, short transports). They were
+  // still computed above because place hygiene reads the air-grasp
+  // spans; nothing of them leaves the detector without the opt-in.
+  if (!interp) spans.length = 0;
   spans.sort((a, b) => a.startS - b.startS);
   const allFlags = [...flags, ...spans.map(spanFlag)];
   allFlags.sort((a, b) => flagTime(a) - flagTime(b));

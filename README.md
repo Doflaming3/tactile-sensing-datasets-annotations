@@ -71,7 +71,13 @@ To calibrate a new rig:
    keyed by taxel count: `{ "<count>": { "model": "...", "points": [[x, y, z], ...] } }`
    in mm with the finger's long axis along +Y — the detector's CoP rules
    and the 3-D tiles use it;
-3. set `verified: true` only after the numbers were checked on this rig —
+3. decide the **interpretation layer**: `interpretation: false` (the
+   default, *base mode*) runs only the base taxonomy, subtasks and
+   capability flags, so nothing from the attempts / phantom and residual
+   logic / hesitation / screen layer reaches the saved annotations;
+   `interpretation: true` opts the dataset in. The Auto-label panel shows
+   which mode it is in and offers a per-session opt-in;
+4. set `verified: true` only after the numbers were checked on this rig —
    the flag and the reminder go away, and the artifact screen runs if a
    `screenReferencePath` points at a reference built with
    `scripts/build-screen-reference.ts` on this dataset.
@@ -90,12 +96,13 @@ bun scripts/run-detector.ts --episode 23
 
 Useful flags: `--all --compare` (corpus audit vs published annotations),
 `--json out.json` (dump atoms + flags), `--th key=value` (threshold
-override), `--dedup` / `--device-grid` (duplicate-investigation axes — see
-below; both default off, the logger axis is canonical).
+override), `--base` (interpretation layer off — base-vs-full dumps),
+`--dedup` / `--device-grid` (duplicate-investigation axes — see below; both
+default off, the logger axis is canonical).
 
 **Validation workflow** for any detector change: `bun run format && bun run
-validate` in `visualizer/` (179 tests; lint carries one pre-existing
-upstream warning), then a full-corpus dump + diff against the previous
+validate` in `visualizer/` (the unit suite; lint carries pre-existing
+upstream hook-deps warnings only), then a full-corpus dump + diff against the previous
 output — every changed atom/flag must be explained or the change is wrong.
 Video verdicts (Zheng's) arbitrate anything the signal cannot.
 
