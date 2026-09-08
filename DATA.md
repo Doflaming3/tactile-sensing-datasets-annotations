@@ -10,9 +10,16 @@ below.
 
 | Path | Upstream | Base revision | Taken |
 |---|---|---|---|
-| `visualizer/` | HF Space `Jingyi-Z/lerobotac-dataset-visualizer` | `47d63aae3a0fec1a09b3763b13e941bbd23807ac` (2026-08-26 22:06, "Manual per-episode review marks...") | 2026-08-27 |
+| `visualizer/` | HF Space `Jingyi-Z/lerobotac-dataset-visualizer` | `e3714c1bbee576adf1f7e0929db74be4ac1c71d7` (2026-09-07 19:13, "Interpretation layer (PR B)..." — her main after she merged PR A as squash `0a3f2cf` and PR B as this commit; previous base `47d63aae` taken 2026-08-27) | 2026-09-07 |
 
 `visualizer/` is committed in this repo and is where our labeling changes go.
+Since the 2026-09-07 sync it equals her main byte for byte except for nine
+files that prettier reformats (`README.md`, `package.json`, `fetch-data.ts`,
+`hf-auth-button.tsx`, `raw-stream-panel.tsx`, `rgbd-panel.tsx`,
+`simple-videos-player.tsx`, `taxel-layouts.ts`, `parquetUtils.ts`): her main
+was never formatted there and our `bun run validate` requires it. Those nine
+are formatting-only, are excluded from every PR, and go away the day she
+runs prettier on main (a one-commit PR we can offer).
 To merge back later: clone her Space fresh, check out the base revision, apply
 our diff (`git diff` of base snapshot vs our tree), review, and hand it over —
 or open the diff with her directly. Do not add her Space as a git remote here.
