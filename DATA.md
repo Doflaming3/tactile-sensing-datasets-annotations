@@ -44,6 +44,13 @@ Contents per dataset: `data/` (30 Hz parquet main tables), `sensors/` (raw
 CSV sidecars + alignment.json per episode), `annotations/` (per-episode
 JSON), `videos/` (chunked mp4), `meta/`, and in sotac a `curation_map.json`.
 
+Successor format: `analysis/raw-sidecar-spec.md` (`paxini-raw/1`, one row per
+sensor refresh, raw counts, the 0x7C Hall block and temperatures as paired
+columns, identity in `meta.json`; validator `scripts/validate_raw_sidecar.py`).
+Her clock scheme, reverse-engineered 2026-09-09: `calibrated_timestamp_ns` ==
+`timestamp_ns` on every row (offset and frame_status always 0), epoch
+`time.time_ns()`, `alignment.json` holds the instant of main-table frame 0.
+
 Rate caveat (2026-08-31, measured): the sidecar rows tick at **90.88 Hz —
 the logger's fixed 11 ms loop**, not the device rate. ~84% of rows are
 byte-identical duplicates; the device emits change-gated (~6 Hz unloaded to

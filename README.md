@@ -18,7 +18,7 @@ upstream happens once, at the end, as a reviewed diff (see
 | `visualizer/` | Vendored snapshot of the HF Space `Jingyi-Z/lerobotac-dataset-visualizer` (base `e3714c1` = her main with PR A and PR B merged, 2026-09-07) carrying all of our detector and UI work. The instrument layer is `src/lib/tactileSeries.ts` (series builders, drift correction, raw-sidecar parser, clock map — Jingyi's PR A), the residual gate is `src/lib/residualGate.ts` and the detector is `src/lib/eventDetection.ts` (both PR B; the detector wraps the builders under their old names, so callers see one API); the artifact screen is `src/lib/signalScreen.ts`. |
 | `data/` | Gitignored local mirrors: `sotac` (63 episodes, pinned `e0fcfeb3`), `sotac_raw` (pinned `18e0dfed`), plus `annotation-history/` (tracked — irreplaceable saved-revision evidence). |
 | `scripts/` | The offline runner (`run-detector.ts`), the reference-corpus builder (`build-screen-reference.ts`), the Python studies and censuses, and `calibration/` — the per-rig threshold re-derivation toolkit. |
-| `analysis/` | Findings documents and audit outputs (see the docs index below). |
+| `analysis/` | Findings documents and audit outputs (see the docs index below); `raw-sidecar-spec.md` is the proposed arrival-driven tactile sidecar format (`paxini-raw/1`, validator `scripts/validate_raw_sidecar.py`). |
 | `SOTAC-_1.MD` | The original teardown + ranked work plan (historical, with addenda). |
 | `DATA.md` | Data/upstream management: pinned revisions, re-sync policy, merge-back procedure. |
 
