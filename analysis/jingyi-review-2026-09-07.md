@@ -35,8 +35,8 @@ the PR itself shows "closed" because she rebased rather than pressed merge.
 | her item | state |
 |---|---|
 | Save skips interpretation-layer atoms when `profile_unverified` | hers, on main, "no action needed" — pick it up when we re-base on her main |
-| batch auto-annotation | built 2026-09-09 (workspace): a dataset-level batch page (`/{org}/{dataset}/batch`) runs every episode, merges with the Hub files, stages the proposals into the browser for click-through review, triage list, one-commit save with a batch report; PR D from her main after Zheng's test |
+| batch auto-annotation | built and committed 2026-09-09 (workspace 65c08aa): a dataset-level batch page (`/{org}/{dataset}/batch`) runs every episode on worker threads, stages the proposals into the browser for click-through review, triage list, Stop → Resume / Rerun, one-commit save with a batch report; PR D assembled on the clone branch `pr-d-batch` from her main (unchanged since e3714c1): 12 modified + 18 new files, her formatting kept; awaiting Zheng's commit / open / push |
 | dataset trim | still wanted, after batch; no rush |
-| reference-corpus builder | ships with the batch tooling |
+| reference-corpus builder | NOT in PR D: `scripts/build-screen-reference.ts` reads the local mirror through the offline runner (`run-detector.ts`); needs a Hub-free loader with a data-path argument before it can live in the Space — its own small PR |
 | 0x7C live sensor block as an arrival-driven raw sidecar, readable in the raw stream panel | new; two halves: the recorder (her data-collection side) and the reader (the visualizer's raw stream panel + later the slip/hf calibration on that axis) |
 | start from main, not this branch | our vendored tree must be re-based on her main (`e3714c1` today) before any new work |
