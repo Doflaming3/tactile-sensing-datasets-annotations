@@ -60,6 +60,89 @@ function writableRepoId(repoId: string): string {
   return ref.repoId;
 }
 
+/** base64 of a JSON document, chunked (a spread over a large byte array
+ * overflows the argument list). */
+function base64Json(value: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(value, null, 1));
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
+export const BATCH_REPORT_PATH = "annotations/batch_report.json";
+
+/** The NDJSON body of one Hub commit carrying many files. */
+export function batchCommitBody(
+  entries: Array<{ path: string; json: unknown }>,
+  summary: string,
+): string {
+  const lines = [JSON.stringify({ key: "header", value: { summary } })];
+  for (const e of entries) {
+    lines.push(
+      JSON.stringify({
+        key: "file",
+        value: {
+          path: e.path,
+          content: base64Json(e.json),
+          encoding: "base64",
+        },
+      }),
+    );
+  }
+  return lines.join("\n");
+}
+
+/** Batch auto-annotation: every changed episode file plus the report in ONE
+ * commit, as the signed-in user. Same refusals as the single save: pinned
+ * views and missing sign-in. */
+export async function commitBatchToHub(
+  repoId: string,
+  episodes: Array<{ episodeId: number; atoms: LanguageAtom[] }>,
+  report: unknown,
+): Promise<{ paths: string[] }> {
+  const writeRepo = writableRepoId(repoId);
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("Not signed in — use the sign-in button first.");
+  }
+  const savedAt = new Date().toISOString();
+  const entries = episodes.map((e) => ({
+    path: annotationsPathFor(e.episodeId),
+    json: {
+      schema_version: 1,
+      episode_index: e.episodeId,
+      saved_at: savedAt,
+      atoms: e.atoms,
+    } as SavedAnnotations,
+  }));
+  entries.push({ path: BATCH_REPORT_PATH, json: report as SavedAnnotations });
+  const body = batchCommitBody(
+    entries,
+    `batch annotations: ${episodes.length} episode(s) + report`,
+  );
+  const res = await fetch(`${HUB}/api/datasets/${writeRepo}/commit/main`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/x-ndjson",
+    },
+    body,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(
+        "The Hub rejected the write (no write permission on this dataset, " +
+          "or the sign-in token lacks the write scope — sign out and back in).",
+      );
+    }
+    throw new Error(`Hub commit failed: ${res.status} ${text.slice(0, 200)}`);
+  }
+  return { paths: entries.map((e) => e.path) };
+}
+
 export async function commitAnnotationsToHub(
   repoId: string,
   episodeId: number,
@@ -77,11 +160,7 @@ export async function commitAnnotationsToHub(
     saved_at: new Date().toISOString(),
     atoms,
   };
-  const content = btoa(
-    String.fromCharCode(
-      ...new TextEncoder().encode(JSON.stringify(payload, null, 1)),
-    ),
-  );
+  const content = base64Json(payload);
   const ndjson =
     JSON.stringify({
       key: "header",

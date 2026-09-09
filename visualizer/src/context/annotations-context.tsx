@@ -1,5 +1,7 @@
 "use client";
 
+import { localAtomsKey } from "@/lib/localAtoms";
+
 /**
  * Per-episode annotation state for the v3.1 language schema.
  *
@@ -33,11 +35,8 @@ import {
   isAnnotateBackendEnabled,
 } from "../utils/annotationsClient";
 
-const STORAGE_PREFIX = "lerobot-annotations:v2:";
-
-function storageKey(repoOrPath: string, episodeId: number): string {
-  return `${STORAGE_PREFIX}${repoOrPath}::${episodeId}`;
-}
+// the local copy's key is owned by lib/localAtoms.ts: the batch page
+// stages its proposals into the same slot
 
 export interface PendingBboxDraw {
   kind: "bbox";
@@ -187,7 +186,7 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       let initial: LanguageAtom[] = [];
       try {
         const raw = localStorage.getItem(
-          storageKey(identKey(newIdent), newEpisodeId),
+          localAtomsKey(identKey(newIdent), newEpisodeId),
         );
         if (raw) initial = JSON.parse(raw) as LanguageAtom[];
       } catch {
@@ -251,7 +250,7 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
     if (episodeId == null) return;
     try {
       localStorage.setItem(
-        storageKey(identKey(ident), episodeId),
+        localAtomsKey(identKey(ident), episodeId),
         JSON.stringify(atoms),
       );
     } catch {
@@ -345,7 +344,7 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       setDirty(false);
       return {
         ok: true,
-        path: `localStorage://${storageKey(identKey(ident), episodeId)}`,
+        path: `localStorage://${localAtomsKey(identKey(ident), episodeId)}`,
       };
     }
     setSaving(true);

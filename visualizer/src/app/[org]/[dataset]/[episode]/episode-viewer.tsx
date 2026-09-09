@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { postParentMessageWithParams } from "@/utils/postParentMessage";
 import { hubRepoPageUrl } from "@/utils/repoRef";
+import { armSeriesFrom, gripperSeriesFrom } from "@/lib/annotateEpisode";
 import { useRigProfile } from "@/lib/useRigProfile";
 import { setDisplayProfile } from "@/components/tactile-panel";
 import { SimpleVideosPlayer } from "@/components/simple-videos-player";
@@ -507,50 +509,18 @@ function EpisodeViewerInner({
   // Gripper trajectory for the tactile auto-labeler (subtask anchors).
   // Chart rows carry real parquet timestamps (episode-relative) since the
   // fetch-data fix — no axis correction needed here.
-  const gripperSeries = useMemo(() => {
-    const rows = data.flatChartData;
-    if (!rows || rows.length === 0) return null;
-    const key = Object.keys(rows[0]).find(
-      (k) => /gripper/i.test(k) && !/^action/i.test(k),
-    );
-    if (!key) return null;
-    const t: number[] = [];
-    const pos: number[] = [];
-    for (const r of rows) {
-      const ts = r["timestamp"];
-      const v = r[key];
-      if (typeof ts === "number" && typeof v === "number") {
-        t.push(ts);
-        pos.push(v);
-      }
-    }
-    return t.length > 2 ? { t, pos } : null;
-  }, [data.flatChartData]);
+  const gripperSeries = useMemo(
+    () => gripperSeriesFrom(data.flatChartData),
+    [data.flatChartData],
+  );
 
   // Arm joint positions (gripper excluded) for the tactile auto-labeler —
   // the transport boundary anchors to the arm starting to CARRY, judged by
   // speed plus net directional rotation, which grip force cannot see.
-  const armSeries = useMemo(() => {
-    const rows = data.flatChartData;
-    if (!rows || rows.length === 0) return null;
-    const keys = Object.keys(rows[0]).filter(
-      (k) => /\.pos$/i.test(k) && !/^action/i.test(k) && !/gripper/i.test(k),
-    );
-    if (keys.length === 0) return null;
-    const t: number[] = [];
-    const joints: number[][] = [];
-    for (const r of rows) {
-      const ts = r["timestamp"];
-      if (typeof ts !== "number") continue;
-      const row = keys.map((k) =>
-        typeof r[k] === "number" ? (r[k] as number) : NaN,
-      );
-      if (row.some((v) => Number.isNaN(v))) continue;
-      t.push(ts);
-      joints.push(row);
-    }
-    return t.length > 2 ? { t, joints } : null;
-  }, [data.flatChartData]);
+  const armSeries = useMemo(
+    () => armSeriesFrom(data.flatChartData),
+    [data.flatChartData],
+  );
 
   const loadStartRef = useRef(performance.now());
 
@@ -1078,7 +1048,15 @@ function EpisodeViewerInner({
           "Doctor",
           "Dataset quality diagnostics (powered by lerobot-doctor)",
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center">
+          {/* whole-dataset job: its own page, not a tab state */}
+          <Link
+            href={`/${org}/${dataset}/batch${innerRootParam ? `?root=${encodeURIComponent(innerRootParam)}` : ""}`}
+            className="relative px-5 py-3 text-xs font-medium tracking-wide uppercase text-slate-400 hover:text-slate-100 transition-colors"
+            title="Run the auto-labeler over every episode of the dataset (batch page)"
+          >
+            Batch
+          </Link>
           <HfAuthButton variant="tab" />
         </div>
       </div>
@@ -1548,6 +1526,8 @@ function EpisodeViewerInner({
                   repoId={datasetInfo.repoId}
                   root={innerRootParam}
                   episodeId={effEpisodeId}
+                  org={org}
+                  dataset={dataset}
                 />
                 <AnnotationsTimeline duration={data.duration} />
                 <AnnotationsPanel

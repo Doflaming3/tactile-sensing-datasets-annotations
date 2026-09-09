@@ -35,7 +35,7 @@ the PR itself shows "closed" because she rebased rather than pressed merge.
 | her item | state |
 |---|---|
 | Save skips interpretation-layer atoms when `profile_unverified` | hers, on main, "no action needed" — pick it up when we re-base on her main |
-| batch auto-annotation | next on our side, when we get to it |
+| batch auto-annotation | built 2026-09-09 (workspace): a dataset-level batch page (`/{org}/{dataset}/batch`) runs every episode, merges with the Hub files, stages the proposals into the browser for click-through review, triage list, one-commit save with a batch report; PR D from her main after Zheng's test |
 | dataset trim | still wanted, after batch; no rush |
 | reference-corpus builder | ships with the batch tooling |
 | 0x7C live sensor block as an arrival-driven raw sidecar, readable in the raw stream panel | new; two halves: the recorder (her data-collection side) and the reader (the visualizer's raw stream panel + later the slip/hf calibration on that axis) |

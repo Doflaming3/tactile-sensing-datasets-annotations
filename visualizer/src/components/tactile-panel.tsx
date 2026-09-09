@@ -158,6 +158,12 @@ function useDriftCorrectedView(): boolean {
   );
 }
 
+/** The profile the corrected display currently follows (the save path
+ * reads it to apply the unverified-profile rule). */
+export function getDisplayProfile(): RigProfile | null {
+  return displayProfile;
+}
+
 export function setDisplayProfile(p: RigProfile | null): void {
   if (displayProfile === p) return;
   displayProfile = p;

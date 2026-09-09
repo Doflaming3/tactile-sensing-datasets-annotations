@@ -13,13 +13,9 @@ export default function Home() {
   );
 }
 
-// `org/name@rev` pins every read to a Hub revision (see utils/repoRef.ts);
-// 47d46cfb = the 63-episode state before the 2026-09-03 renumbering.
-const EXAMPLE_DATASETS = [
-  "Jingyi-Z/sotac",
-  "Jingyi-Z/sotac@47d46cfb",
-  "Jingyi-Z/sotac_raw",
-];
+// `org/name@rev` still pins a view to a Hub revision when typed into the
+// URL (utils/repoRef.ts); the home page lists only the live datasets.
+const EXAMPLE_DATASETS = ["Jingyi-Z/sotac", "Jingyi-Z/sotac_raw"];
 
 const FEATURES = [
   "Per-taxel force arrows",
@@ -297,7 +293,11 @@ function HomeInner() {
           <div className="flex flex-row flex-wrap gap-2 justify-center max-w-xl">
             {[
               ...EXAMPLE_DATASETS,
-              ...recent.filter((ds) => !EXAMPLE_DATASETS.includes(ds)),
+              // recently visited, without pinned views: a pin is typed into
+              // the URL when it is wanted, it is not a dataset of its own
+              ...recent.filter(
+                (ds) => !EXAMPLE_DATASETS.includes(ds) && !ds.includes("@"),
+              ),
             ].map((ds) => (
               <button
                 key={ds}

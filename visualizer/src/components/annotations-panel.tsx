@@ -21,6 +21,12 @@ import React, { useMemo, useState } from "react";
 import { useTime } from "../context/time-context";
 import { useAnnotations } from "../context/annotations-context";
 import { commitAnnotationsToHub } from "../utils/hubCommit";
+import { atomsForSave } from "../lib/atomPolicy";
+import {
+  activeProfileFor,
+  getSessionInterpretation,
+} from "../lib/interpretationOptIn";
+import { getDisplayProfile } from "./tactile-panel";
 import {
   buildSpeechAtom,
   classifyVqa,
@@ -579,8 +585,25 @@ export const AnnotationsPanel: React.FC<Props> = ({ cameraKeys }) => {
     }
     setExportStatus("Committing annotations to the dataset repo…");
     try {
-      const path = await commitAnnotationsToHub(ident.repoId, episodeId, atoms);
-      setExportStatus(`Committed ${path} to ${ident.repoId} on the Hub.`);
+      // the save rule (lib/atomPolicy.ts): an unverified profile never
+      // commits the interpretation layer's atoms
+      const profileNow = activeProfileFor(
+        getDisplayProfile(),
+        getSessionInterpretation(),
+      );
+      const toSave = atomsForSave(atoms, profileNow);
+      const skipped = atoms.length - toSave.length;
+      const path = await commitAnnotationsToHub(
+        ident.repoId,
+        episodeId,
+        toSave,
+      );
+      setExportStatus(
+        `Committed ${path} to ${ident.repoId} on the Hub.` +
+          (skipped
+            ? ` ${skipped} interpretation-layer atom(s) skipped: the profile is unverified.`
+            : ""),
+      );
     } catch (e) {
       setExportStatus(
         `Save to Hub failed: ${e instanceof Error ? e.message : String(e)}`,

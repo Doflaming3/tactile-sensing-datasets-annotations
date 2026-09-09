@@ -1,6 +1,7 @@
 import {
   DatasetMetadata,
   fetchParquetFile,
+  readRowRange,
   formatStringWithVars,
   readParquetAsObjects,
   parquetColumnNames,
@@ -926,10 +927,13 @@ async function loadEpisodeDataV3(
             : Number(startIndexValue);
         const localFromIndex = Math.max(0, fromIndex - fileStartIndex);
         const localToIndex = Math.max(localFromIndex, toIndex - fileStartIndex);
-        episodeRows = await readParquetAsObjects(parquetFile, v3DataColumns, {
-          rowStart: localFromIndex,
-          rowEnd: localToIndex,
-        });
+        // one decode per file, sliced per episode (see readRowRange)
+        episodeRows = await readRowRange(
+          parquetFile,
+          v3DataColumns,
+          localFromIndex,
+          localToIndex,
+        );
         usedRowRange = true;
       }
     } catch {

@@ -116,6 +116,57 @@ the runner's loaders. The Space ships only the corpus itself, attached to the
 sotac profile by path, out of the bundle; the screen module holds no reference of its own. Shipping the
 builder with the Space is a PR-B item (Jingyi's review).
 
+## Batch auto-annotation
+
+**Batch** in the viewer's tab bar (or the "batch auto-label every episode"
+line under the Auto-label panel) opens `/{org}/{dataset}/batch`, a
+dataset-level page (`visualizer/src/app/[org]/[dataset]/batch/`). A run
+goes over every episode (or a `from`/`to` range) in the browser, one at a
+time: parquet rows and raw sidecars are fetched, the same pipeline as the
+single-episode button runs (`visualizer/src/lib/annotateEpisode.ts`), and
+the result is merged with the annotation file already on the Hub — human
+atoms kept, the detector's atoms replaced (`lib/atomPolicy.ts`). Nothing
+goes to the Hub during the run. Instead each changed episode is **staged**
+into the browser's local copy of its annotations — the slot the viewer edits
+(`lib/localAtoms.ts`) — unless that copy holds unsaved edits, which are
+never overwritten (`localEdits` in the row). The page shows the run live:
+progress with an estimate, counters, a per-flag histogram, and the triage
+table (failed first, then the heaviest flags — `lib/batchAnnotate.ts`,
+`FLAG_WEIGHTS`; sort by episode, filter to flagged / failed / changed).
+Each row links to its episode on the Annotations tab, where the staged
+atoms are what you see and adjust; the last run is kept in the browser
+(`lib/batchStore.ts`) so the table is there when you come back.
+**Commit N staged episode(s)** then writes every staged
+`annotations/episode_XXXXXX.json` — the local copy, adjustments included —
+plus `annotations/batch_report.json` (profile, thresholds, detector version,
+the triage list) in ONE Hub commit as the signed-in user; pinned views and
+unsigned sessions are refused, like the single Save. The save rule applies
+to both: with an unverified profile the interpretation layer's atoms never
+reach the file (`atomsForSave`). When the Hub already holds a
+`batch_report.json`, the page shows that last committed batch and can list
+its triage rows.
+
+Speed: **workers** (default half the machine's cores, at most 4) is the
+number of episodes handled at once, each on its own Web Worker thread
+(`lib/workerPool.ts`, `lib/batch.worker.ts`, `lib/batchWorkers.ts`): the
+thread reads the episode's table, sidecars and Hub file together and runs
+the detector, so the page only merges, stages and draws. Every episode of
+`Jingyi-Z/sotac` sits in one parquet file with a single row group, so a
+per-episode read used to decode all 55k rows each time; the loader now
+decodes such a file once per thread and slices it (`readRowRange` in
+`utils/parquetUtils.ts` — the viewer's episode switching gains the same).
+A thread's first episode is a cold start (about 10 s: metadata fetches and
+that one decode); cold starts run one at a time, since four at once were a
+memory peak that killed the browser tab. After that an episode costs about
+0.6 s per thread; 20 episodes took 23 s on four threads. The table's `ms`
+column carries the per-stage breakdown on hover, and an average line sits
+above it. **Stop** ends a run after the episodes in flight; the page then
+offers **Resume (N left)**, which continues with only the episodes still
+owed (the rows so far kept, also after a trip into an episode), and
+**Rerun**, which starts the set range over. A staging marker
+(`lib/localAtoms.ts`) records what the batch wrote into each slot, so a
+rerun overwrites its own earlier proposals and keeps only real edits.
+
 ## What the annotator produces
 
 - **Four stage anchors** — approach / grasp / transport / place_release

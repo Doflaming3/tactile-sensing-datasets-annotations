@@ -19,6 +19,11 @@ export function setSessionInterpretation(v: boolean): void {
   subs.forEach((cb) => cb());
 }
 
+/** Non-hook read for code outside React (the save path). */
+export function getSessionInterpretation(): boolean {
+  return sessionOptIn;
+}
+
 export function useSessionInterpretation(): boolean {
   return useSyncExternalStore(
     (cb) => {

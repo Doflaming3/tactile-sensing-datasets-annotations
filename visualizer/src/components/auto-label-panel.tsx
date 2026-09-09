@@ -14,18 +14,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotations } from "@/context/annotations-context";
 import { useTime } from "@/context/time-context";
 import {
-  buildSeriesFromSensorFrames,
-  buildSeriesFromRawCsvs,
-  clipSeries,
-  detectEvents,
-  resultToRecordedAtoms,
   DEFAULT_THRESHOLDS,
   type DetectionThresholds,
-  type TactileSeries,
   type AutoLabelResult,
   spanFlag,
 } from "@/lib/eventDetection";
-import { layoutFor, templateReminder } from "@/lib/rigProfile";
+import { templateReminder } from "@/lib/rigProfile";
+import {
+  annotateEpisode,
+  fetchRepoText,
+  pickRawFiles,
+  tactileEntry,
+} from "@/lib/annotateEpisode";
+import { isAutoAtom, isAutoEventAtom } from "@/lib/atomPolicy";
+import Link from "next/link";
 import { useRigProfile } from "@/lib/useRigProfile";
 import {
   activeProfileFor,
@@ -34,35 +36,10 @@ import {
 } from "@/lib/interpretationOptIn";
 import { useSearchParams } from "next/navigation";
 import type { SensorFramesMap } from "@/app/[org]/[dataset]/[episode]/fetch-data";
-import type { LanguageAtom } from "@/types/language.types";
 import { findRawSensorCsvs } from "@/utils/episodeDiscovery";
-import { buildVersionedUrl } from "@/utils/versionUtils";
-import { authHeaders } from "@/utils/auth";
 
-const AUTO_SUBTASK_LABELS = new Set([
-  "approach",
-  "grasp",
-  "transport",
-  "place_release",
-]);
-
-/** Auto-generated tactile EVENT atoms only (slip, contact, place, ...). */
-function isAutoEventAtom(a: LanguageAtom): boolean {
-  return a.style === "interjection" && !!a.content?.startsWith("[auto:");
-}
-
-function isAutoAtom(a: LanguageAtom): boolean {
-  if (a.style === "interjection" && a.content?.startsWith("[auto:"))
-    return true;
-  if (
-    a.style === "subtask" &&
-    a.role === "assistant" &&
-    a.content != null &&
-    AUTO_SUBTASK_LABELS.has(a.content)
-  )
-    return true;
-  return false;
-}
+// auto-atom predicates live in lib/atomPolicy.ts (shared with the batch
+// runner and the save path)
 
 /** Threshold controls surfaced in the UI: [key, label, min, max, step, description]. */
 const TUNABLE: Array<
@@ -141,6 +118,8 @@ export default function AutoLabelPanel({
   repoId,
   root,
   episodeId,
+  org,
+  dataset,
 }: {
   sensorFrames: SensorFramesMap | undefined;
   /** Episode-relative gripper trajectory (from the flat chart data). */
@@ -150,6 +129,10 @@ export default function AutoLabelPanel({
   repoId: string;
   root?: string | null;
   episodeId: number;
+  /** route segments for the link to the batch page (fall back to the
+   * repo id when the viewer has none) */
+  org?: string;
+  dataset?: string;
 }) {
   const { atoms, addAtom, addAtoms, deleteAtom, resetAtoms, setDetectorSpans } =
     useAnnotations();
@@ -191,81 +174,35 @@ export default function AutoLabelPanel({
   const [rawState, setRawState] = useState<
     "none" | "loading" | "ready" | "missing"
   >("none");
-  const rawSeriesRef = useRef<TactileSeries | null>(null);
-  // the raw series is built WITH the profile (drift correction, residual
-  // gate): a cached one from before an opt-in change is the wrong input
-  useEffect(() => {
-    rawSeriesRef.current = null;
-  }, [activeProfile]);
   const [lastResult, setLastResult] = useState<AutoLabelResult | null>(null);
   const [status, setStatus] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // raw sidecar texts of this episode, fetched once; the series is rebuilt
+  // per run from them with the active profile (drift correction, residual
+  // gate), so no stale series can outlive an opt-in change
+  const rawTextsRef = useRef<string[] | null>(null);
 
-  // 30 Hz series from the already-loaded sensor frames (memoized).
-  const series30 = useMemo(() => {
-    if (!sensorFrames) return null;
-    const entry = Object.values(sensorFrames).find(
-      (s) => s.shape.length >= 2 && s.frames.length > 0,
-    );
-    if (!entry) return null;
-    const nTaxels = entry.shape.length >= 3 ? entry.shape[1] : entry.shape[0];
-    const layout = layoutFor(activeProfile, nTaxels)?.points ?? null;
-    if (!activeProfile) return null;
-    return buildSeriesFromSensorFrames(
-      entry.frames,
-      entry.timestamps,
-      layout,
-      gripper,
-      activeProfile,
-    );
-  }, [sensorFrames, gripper, activeProfile]);
-
-  const loadRaw = useCallback(async () => {
-    if (rawSeriesRef.current) return rawSeriesRef.current;
+  const loadRawTexts = useCallback(async (): Promise<string[] | null> => {
+    if (rawTextsRef.current) return rawTextsRef.current;
     setRawState("loading");
     try {
       const all = await findRawSensorCsvs(repoId, root);
-      const epTag = `episode_${String(episodeId).padStart(6, "0")}/`;
-      // Multi-episode datasets carry one folder per episode; per-episode-folder
-      // datasets carry the CSVs at the root. Prefer the episode's folder, fall
-      // back to unscoped paths.
-      let files = all.filter((p) => p.includes(epTag)).sort();
-      if (files.length === 0 && !all.some((p) => /episode_\d{6}\//.test(p))) {
-        files = all.slice().sort();
-      }
+      const files = pickRawFiles(all, episodeId);
       if (files.length === 0) {
         setRawState("missing");
         return null;
       }
       const texts = await Promise.all(
-        files.map(async (f) => {
-          const rel = root
-            ? f.slice(root.replace(/^\/+|\/+$/g, "").length + 1)
-            : f;
-          const res = await fetch(buildVersionedUrl(repoId, "v3.0", rel), {
-            headers: authHeaders(),
-          });
-          if (!res.ok) throw new Error(`${res.status} on ${f}`);
-          return res.text();
-        }),
+        files.map((f) => fetchRepoText(repoId, root, f)),
       );
-      const nTaxels =
-        sensorFrames && Object.values(sensorFrames)[0]?.shape.length >= 3
-          ? Object.values(sensorFrames)[0].shape[1]
-          : 52;
-      const layout = layoutFor(activeProfile, nTaxels)?.points ?? null;
-      if (!activeProfile) return null;
-      const s = buildSeriesFromRawCsvs(texts, layout, gripper, {
-        profile: activeProfile,
-      });
-      rawSeriesRef.current = s;
-      setRawState(s ? "ready" : "missing");
-      return s;
+      rawTextsRef.current = texts;
+      setRawState("ready");
+      return texts;
     } catch {
       setRawState("missing");
       return null;
     }
-  }, [repoId, episodeId, root, sensorFrames, gripper, activeProfile]);
+  }, [repoId, episodeId, root]);
 
   const run = useCallback(
     async (th: Partial<DetectionThresholds>) => {
@@ -275,42 +212,30 @@ export default function AutoLabelPanel({
       }
       setRunning(true);
       try {
-        let series: TactileSeries | null = series30;
-        let usedFallback = false;
-        if (useRaw) {
-          const raw = await loadRaw();
-          // Sidecar CSVs record through the inter-episode reset period, so the
-          // raw stream can far outlast the episode, clip to the main table's
-          // time window before detecting.
-          if (raw) {
-            const tEnd = series30
-              ? series30.t[series30.t.length - 1] + 0.1
-              : raw.t[raw.t.length - 1];
-            series = clipSeries(raw, tEnd);
-          } else {
-            // Silent fallback previously made 30 Hz artifacts (zero-frame
-            // dropouts) look like raw-stream detections. Be explicit.
-            usedFallback = true;
-          }
-        }
-        if (!series) {
+        const rawTexts = useRaw ? await loadRawTexts() : null;
+        const t0 = performance.now();
+        // one pipeline for the panel and the batch runner (lib/annotateEpisode)
+        const outcome = annotateEpisode(
+          { sensorFrames, gripper, arm, rawCsvTexts: rawTexts },
+          {
+            profile: activeProfile,
+            thresholds: th,
+            episodeIndex: episodeId,
+            useRaw,
+          },
+        );
+        if (outcome.status !== "ok" || !outcome.result) {
           setStatus("no tactile data in this episode");
           return;
         }
-        const t0 = performance.now();
-        // episodeIndex keeps the signal screen from letting a corpus
-        // episode's own reference windows vote for it on replays
-        const result = detectEvents(series, gripper, th, arm, {
-          profile: activeProfile,
-          episodeIndex: episodeId,
-        });
+        const result = outcome.result;
         // Diagnostics: everything needed to compare a browser run against the
         // offline reference. Read via DevTools: window.__autolabelDebug
         if (typeof window !== "undefined") {
           (window as unknown as Record<string, unknown>).__autolabelDebug = {
-            rateHz: series.rateHz,
-            nSamples: series.t.length,
-            tRange: [series.t[0], series.t[series.t.length - 1]],
+            rateHz: outcome.rateHz,
+            nSamples: outcome.samples,
+            source: outcome.source,
             gripper: gripper
               ? {
                   n: gripper.t.length,
@@ -329,17 +254,17 @@ export default function AutoLabelPanel({
         }
         // replace previous auto atoms, keep human ones. In events-only mode,
         // only auto EVENT atoms are replaced; subtask segments stay untouched.
-        const replaceFilter = eventsOnlyRef.current
-          ? isAutoEventAtom
-          : isAutoAtom;
-        for (const a of atoms.filter(replaceFilter)) deleteAtom(a);
+        const eventsOnlyNow = eventsOnlyRef.current;
+        for (const a of atoms.filter(
+          eventsOnlyNow ? isAutoEventAtom : isAutoAtom,
+        ))
+          deleteAtom(a);
         // recording policy: panels show everything, the annotation set
         // (what gets saved) keeps only the real events
-        const newAtoms = resultToRecordedAtoms(result);
         addAtoms(
-          eventsOnlyRef.current
-            ? newAtoms.filter((a) => a.style === "interjection")
-            : newAtoms,
+          eventsOnlyNow
+            ? outcome.recordedAtoms.filter((a) => a.style === "interjection")
+            : outcome.recordedAtoms,
         );
         setLastResult(result);
         setReview({});
@@ -351,9 +276,9 @@ export default function AutoLabelPanel({
           )
           .join(" | ");
         setStatus(
-          `${usedFallback ? "RAW UNAVAILABLE, used 30 Hz table! " : ""}` +
+          `${outcome.rawFallback ? "RAW UNAVAILABLE, used 30 Hz table! " : ""}` +
             `${result.events.length} events (${(performance.now() - t0).toFixed(0)} ms ` +
-            `@ ${series.rateHz.toFixed(0)} Hz) ${subStr}` +
+            `@ ${outcome.rateHz.toFixed(0)} Hz) ${subStr}` +
             `${result.flags.length ? ` flags: ${result.flags.join(", ")}` : ""}`,
         );
       } finally {
@@ -361,9 +286,9 @@ export default function AutoLabelPanel({
       }
     },
     [
-      series30,
       useRaw,
-      loadRaw,
+      loadRawTexts,
+      sensorFrames,
       gripper,
       arm,
       atoms,
@@ -371,7 +296,6 @@ export default function AutoLabelPanel({
       addAtoms,
       episodeId,
       setDetectorSpans,
-      repoId,
       activeProfile,
     ],
   );
@@ -401,7 +325,7 @@ export default function AutoLabelPanel({
 
   // reset per-episode caches
   useEffect(() => {
-    rawSeriesRef.current = null;
+    rawTextsRef.current = null;
     setRawState("none");
     setLastResult(null);
     setReview({});
@@ -409,7 +333,7 @@ export default function AutoLabelPanel({
     setStatus("");
   }, [repoId, episodeId, setDetectorSpans]);
 
-  if (!series30) return null;
+  if (!tactileEntry(sensorFrames)) return null;
 
   return (
     <div className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-3 space-y-2">
@@ -523,6 +447,17 @@ export default function AutoLabelPanel({
           </div>
         )}
         {status && <span className="text-xs text-slate-500">{status}</span>}
+      </div>
+
+      <div className="text-[11px] text-slate-500">
+        Whole dataset:{" "}
+        <Link
+          href={`/${org ?? repoId.split("/")[0]}/${dataset ?? repoId.split("/").slice(1).join("/")}/batch${root ? `?root=${encodeURIComponent(root)}` : ""}`}
+          className="text-cyan-300 underline"
+          title="Run the detector over every episode, review the triage list, commit in one go"
+        >
+          batch auto-label every episode →
+        </Link>
       </div>
 
       {open && (

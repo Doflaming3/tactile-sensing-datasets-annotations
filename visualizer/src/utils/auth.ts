@@ -5,8 +5,15 @@
 
 const STORAGE_KEY = "lerobot-viz-oauth";
 
+/** A token handed to a realm without a window (a Web Worker running the
+ * batch pipeline); the main thread's token is read from localStorage. */
+let tokenOverride: string | null = null;
+export function setAuthTokenOverride(token: string | null): void {
+  tokenOverride = token;
+}
+
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined") return tokenOverride;
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
