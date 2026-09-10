@@ -27,6 +27,7 @@ import {
   tactileEntry,
 } from "@/lib/annotateEpisode";
 import { isAutoAtom, isAutoEventAtom } from "@/lib/atomPolicy";
+import { loadStoredBatch } from "@/lib/batchStore";
 import Link from "next/link";
 import { useRigProfile } from "@/lib/useRigProfile";
 import {
@@ -205,7 +206,12 @@ export default function AutoLabelPanel({
   }, [repoId, episodeId, root]);
 
   const run = useCallback(
-    async (th: Partial<DetectionThresholds>) => {
+    async (
+      th: Partial<DetectionThresholds>,
+      // applyAtoms false: show the result (spans lane, review cards,
+      // status) and leave the atoms alone — the batch already staged them
+      mode: { applyAtoms?: boolean; origin?: string } = {},
+    ) => {
       if (!activeProfile) {
         setStatus("calibration profile still loading — try again");
         return;
@@ -255,17 +261,19 @@ export default function AutoLabelPanel({
         // replace previous auto atoms, keep human ones. In events-only mode,
         // only auto EVENT atoms are replaced; subtask segments stay untouched.
         const eventsOnlyNow = eventsOnlyRef.current;
-        for (const a of atoms.filter(
-          eventsOnlyNow ? isAutoEventAtom : isAutoAtom,
-        ))
-          deleteAtom(a);
-        // recording policy: panels show everything, the annotation set
-        // (what gets saved) keeps only the real events
-        addAtoms(
-          eventsOnlyNow
-            ? outcome.recordedAtoms.filter((a) => a.style === "interjection")
-            : outcome.recordedAtoms,
-        );
+        if (mode.applyAtoms !== false) {
+          for (const a of atoms.filter(
+            eventsOnlyNow ? isAutoEventAtom : isAutoAtom,
+          ))
+            deleteAtom(a);
+          // recording policy: panels show everything, the annotation set
+          // (what gets saved) keeps only the real events
+          addAtoms(
+            eventsOnlyNow
+              ? outcome.recordedAtoms.filter((a) => a.style === "interjection")
+              : outcome.recordedAtoms,
+          );
+        }
         setLastResult(result);
         setReview({});
         setDetectorSpans(result.spans);
@@ -276,7 +284,8 @@ export default function AutoLabelPanel({
           )
           .join(" | ");
         setStatus(
-          `${outcome.rawFallback ? "RAW UNAVAILABLE, used 30 Hz table! " : ""}` +
+          `${mode.origin ? `${mode.origin}: ` : ""}` +
+            `${outcome.rawFallback ? "RAW UNAVAILABLE, used 30 Hz table! " : ""}` +
             `${result.events.length} events (${(performance.now() - t0).toFixed(0)} ms ` +
             `@ ${outcome.rateHz.toFixed(0)} Hz) ${subStr}` +
             `${result.flags.length ? ` flags: ${result.flags.join(", ")}` : ""}`,
@@ -332,6 +341,22 @@ export default function AutoLabelPanel({
     setDetectorSpans([]);
     setStatus("");
   }, [repoId, episodeId, setDetectorSpans]);
+
+  // an episode the batch ran (Zheng): show its result on arrival the way a
+  // click on Auto-label shows it — spans lane, review cards, status — with
+  // the batch's own thresholds, and without touching the staged atoms
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    if (!activeProfile) return;
+    const stored = loadStoredBatch(repoId);
+    const row = stored?.report.episodes.find((r) => r.episode === episodeId);
+    if (!row || row.status !== "ok") return;
+    void runRef.current(stored!.report.thresholds, {
+      applyAtoms: false,
+      origin: "batch result",
+    });
+  }, [repoId, episodeId, activeProfile]);
 
   if (!tactileEntry(sensorFrames)) return null;
 

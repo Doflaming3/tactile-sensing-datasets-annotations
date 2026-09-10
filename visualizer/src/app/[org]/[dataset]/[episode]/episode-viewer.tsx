@@ -19,6 +19,7 @@ import {
 import { AnnotationsPanel } from "@/components/annotations-panel";
 import { AnnotationsTimeline } from "@/components/annotations-timeline";
 import AutoLabelPanel from "@/components/auto-label-panel";
+import TrimPanel from "@/components/trim-panel";
 import Sidebar from "@/components/side-nav";
 import StatsPanel from "@/components/stats-panel";
 import OverviewPanel from "@/components/overview-panel";
@@ -1057,6 +1058,13 @@ function EpisodeViewerInner({
           >
             Batch
           </Link>
+          <Link
+            href={`/${org}/${dataset}/trim${innerRootParam ? `?root=${encodeURIComponent(innerRootParam)}` : ""}`}
+            className="relative px-5 py-3 text-xs font-medium tracking-wide uppercase text-slate-400 hover:text-slate-100 transition-colors"
+            title="Cut the dead time before and after each episode: proposed cuts for every episode, review, one-click trim to a new repo"
+          >
+            Trim
+          </Link>
           <HfAuthButton variant="tab" />
         </div>
       </div>
@@ -1528,6 +1536,13 @@ function EpisodeViewerInner({
                   episodeId={effEpisodeId}
                   org={org}
                   dataset={dataset}
+                />
+                <TrimPanel
+                  repoId={datasetInfo.repoId}
+                  episodeId={effEpisodeId}
+                  fps={datasetInfo.fps}
+                  rows={data.flatChartData}
+                  totalFrames={data.frameTimestamps?.length}
                 />
                 <AnnotationsTimeline duration={data.duration} />
                 <AnnotationsPanel

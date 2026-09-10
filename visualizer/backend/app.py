@@ -48,6 +48,8 @@ from fastapi.responses import JSONResponse
 from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 from pydantic import BaseModel
 
+import trim as trim_mod
+
 logger = logging.getLogger("lerobot-annotate")
 logging.basicConfig(level=logging.INFO)
 
@@ -131,6 +133,22 @@ class PushToHubRequest(DatasetRef):
     new_repo_id: str | None = None
     private: bool = False
     commit_message: str = "Add language annotations"
+
+
+class TrimRequest(DatasetRef):
+    """The visualizer's trim page: episode -> [first kept frame, last kept
+    frame]; the result goes to a new folder and, with push, a new repo. The
+    source dataset is never written to."""
+
+    cuts: dict[str, list[int]] = {}
+    drop: list[int] = []
+    renumber: bool = False
+    output_dir: str | None = None
+    push: bool = False
+    new_repo_id: str | None = None
+    hf_token: str | None = None
+    private: bool = False
+    commit_message: str = "Trim episodes to the arm's motion envelope"
 
 
 @dataclass
@@ -869,3 +887,48 @@ def push_to_hub(req: PushToHubRequest) -> JSONResponse:
             "message": f"Pushed annotated dataset to {target_repo}",
         }
     )
+
+
+@app.post("/api/trim")
+def trim_episodes(req: TrimRequest) -> JSONResponse:
+    state = _ensure_state(req)
+    # the source in full: tables, videos, sidecars, annotations
+    if state.repo_id:
+        snapshot_download(
+            state.repo_id,
+            repo_type="dataset",
+            revision=state.revision,
+            local_dir=state.root,
+            allow_patterns=trim_mod.SNAPSHOT_PATTERNS,
+        )
+    try:
+        cuts = trim_mod.load_cuts(req.cuts)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=f"bad cuts: {e}")
+    if req.output_dir:
+        out_root = Path(req.output_dir).expanduser().resolve()
+    else:
+        EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
+        name = (state.repo_id or Path(state.root).name or "dataset").replace("/", "__")
+        out_root = EXPORT_ROOT / f"{name}_trimmed"
+    if req.push and not req.new_repo_id:
+        raise HTTPException(status_code=400, detail="new_repo_id required to push")
+    if req.push and req.new_repo_id == state.repo_id:
+        raise HTTPException(status_code=400, detail="the trim never writes back to the source dataset")
+    try:
+        summary = trim_mod.trim_dataset(
+            state.root, out_root, cuts, drop=req.drop, renumber=req.renumber, copy_videos=True
+        )
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    result: dict[str, Any] = {"ok": True, "output_dir": summary["output_dir"], "summary": summary}
+    if req.push:
+        result["repo_id"] = req.new_repo_id
+        result["url"] = trim_mod.push_folder(
+            Path(summary["output_dir"]),
+            req.new_repo_id,
+            req.hf_token,
+            private=req.private,
+            commit_message=req.commit_message,
+        )
+    return JSONResponse(result)

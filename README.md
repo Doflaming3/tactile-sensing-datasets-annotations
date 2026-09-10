@@ -167,6 +167,53 @@ owed (the rows so far kept, also after a trip into an episode), and
 (`lib/localAtoms.ts`) records what the batch wrote into each slot, so a
 rerun overwrites its own earlier proposals and keeps only real edits.
 
+## Dataset trim
+
+Jingyi's trim ask (PR #1 review): find the dead time before and after each
+recording from the trajectory signals, show the cut points on the timeline
+for the reviewer, trim every modality in one click, never modify the
+source, write the result to a separate repo. Her own cuts, read off
+sotac_raw (`analysis/trim-census.md`, `scripts/trim_census.py`), are the
+arm's motion envelope with fixed margins; the tool reproduces them.
+
+- **Detector** (`visualizer/src/lib/trimDetect.ts`): start = 0.43 s before
+  the commanded joints (`action`) first move faster than 0.5 deg/frame for
+  8 frames; end = 0.53 s after the measured joints (`observation.state`)
+  last move faster than 0.5 deg/frame for 2 frames. Jaw and tactile play
+  no part. Scored against her 100 script-cut episodes
+  (`bun scripts/trim-score.ts`, our mirror): starts within 3 frames of
+  hers in 83 % and within 6 in 97 %, ends within 3 in 92 %. Flags:
+  `arm_moving_at_start`, `no_motion`, `motion_to_recording_end`,
+  `no_command_signal`, `sampled_rows`.
+- **Trim panel** (Annotations tab, under the auto-label panel): the kept
+  window on a bar with two draggable handles, the rule's onset and end as
+  ticks, click to seek, start/end inputs, seek buttons, reset to the rule,
+  a reviewed mark. Decisions live per episode in the browser
+  (`lib/trimStore.ts`, `lerobot-trim:v1:<repo>::<ep>`).
+- **Trim page** (`/{org}/{dataset}/trim`, the **Trim** tab): propose cuts
+  for a range (adjusted and reviewed episodes are never replaced), the
+  table of every decision (row click opens the episode), counters, a
+  `cuts.json` download (`trim-cuts/1`), and the hand-off to the executor.
+- **Executor** (`visualizer/backend/trim.py`, and `POST /api/trim` in the
+  annotations backend): rows sliced and re-based (timestamp from 0,
+  frame_index from 0, index contiguous), episode metadata rewritten
+  (length, index range, video windows moved by the cut; the video files are
+  carried over untouched, as in her curated dataset), per-episode and
+  dataset-level stats recomputed for numeric features (image stats carried
+  over), raw sidecar CSVs cut to the kept window on their epoch clock with
+  `alignment.json` moved, per-episode annotation files shifted by the start
+  cut, the curation file re-keyed; episodes can be dropped and the rest
+  renumbered. Output to a new folder and, with `--push` / `push: true`, a
+  new dataset repo; the source is never written to. Tested on a synthetic
+  v3 dataset (`python -m unittest test_trim` in `visualizer/backend`) and
+  on the real sotac_raw mirror: her own cuts for four episodes come back
+  exactly (rows, video windows, sidecars at both ends), the other 73
+  episodes untouched.
+
+Develop and test against the mirrors as always; what ships reads through
+her loaders (the page and panel already do; the executor reads a local
+snapshot the backend downloads, like her export does).
+
 ## What the annotator produces
 
 - **Four stage anchors** — approach / grasp / transport / place_release
