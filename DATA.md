@@ -70,6 +70,15 @@ any rate- or derivative-based work on these files.
   zeroed-taxel firmware artifact in raw form; later ones are repaired at the
   recorder. Track per-episode recording dates when scoring.
 
+### `data/sotac_main_7d1afea9/`, `data/sotac_raw_326fe149/` — tables only (trim census)
+
+Downloaded 2026-09-09 for the trim reverse-engineering (`scripts/trim_census.py`):
+`meta/*`, `data/**` and `annotations/episode_annotations.json` only — no
+videos, no sidecars. `Jingyi-Z/sotac` at `7d1afea9` (main that day: 163
+episodes, 55,457 frames, renumbered by task) and `Jingyi-Z/sotac_raw` at
+`326fe149` (177 episodes, 89,122 frames). The old pinned mirrors above stay
+the reference for the detector work.
+
 ### `data/annotation-history/` — preserved annotation revisions
 
 Every save in the visualizer is one Hub commit ("annotations: episode N (X
