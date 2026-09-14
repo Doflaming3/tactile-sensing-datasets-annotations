@@ -20,6 +20,7 @@ import { AnnotationsPanel } from "@/components/annotations-panel";
 import { AnnotationsTimeline } from "@/components/annotations-timeline";
 import AutoLabelPanel from "@/components/auto-label-panel";
 import TrimPanel from "@/components/trim-panel";
+import RolloutReviewPanel from "@/components/rollout-review-panel";
 import Sidebar from "@/components/side-nav";
 import StatsPanel from "@/components/stats-panel";
 import OverviewPanel from "@/components/overview-panel";
@@ -1441,6 +1442,18 @@ function EpisodeViewerInner({
                   </Suspense>
                 )}
 
+              {/* Rollout review (rollout/eval datasets only) */}
+              <div className="mb-3">
+                <RolloutReviewPanel
+                  repoId={datasetInfo.repoId}
+                  episodeId={effEpisodeId}
+                  totalEpisodes={datasetInfo.total_episodes}
+                  defaultOpen={false}
+                  videosInfo={videosInfo}
+                  gripper={gripperSeries}
+                />
+              </div>
+
               {/* Graph */}
               <div className="mb-4">
                 <Suspense fallback={null}>
@@ -1527,6 +1540,13 @@ function EpisodeViewerInner({
 
               {/* RIGHT: annotation workflow — internal scroll */}
               <div className="flex flex-col gap-3 min-w-0 min-h-0 flex-[4] overflow-y-auto pr-1">
+                <RolloutReviewPanel
+                  repoId={datasetInfo.repoId}
+                  episodeId={effEpisodeId}
+                  totalEpisodes={datasetInfo.total_episodes}
+                  videosInfo={videosInfo}
+                  gripper={gripperSeries}
+                />
                 <AutoLabelPanel
                   sensorFrames={data.sensorFrames}
                   gripper={gripperSeries}

@@ -194,6 +194,51 @@ export async function commitAnnotationsToHub(
   return path;
 }
 
+/** Commit a single JSON file to the dataset repo as the signed-in user.
+ * Shared by the annotation, review-status and rollout-review writers. */
+export async function commitJsonFileToHub(
+  repoId: string,
+  path: string,
+  payload: unknown,
+  summary: string,
+): Promise<void> {
+  const writeRepo = writableRepoId(repoId);
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error("Not signed in — use the sign-in button first.");
+  }
+  const content = btoa(
+    String.fromCharCode(
+      ...new TextEncoder().encode(JSON.stringify(payload, null, 1)),
+    ),
+  );
+  const ndjson =
+    JSON.stringify({ key: "header", value: { summary } }) +
+    "\n" +
+    JSON.stringify({
+      key: "file",
+      value: { path, content, encoding: "base64" },
+    });
+  const res = await fetch(`${HUB}/api/datasets/${writeRepo}/commit/main`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/x-ndjson",
+    },
+    body: ndjson,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(
+        "The Hub rejected the write (no write permission on this dataset, " +
+          "or the sign-in token lacks the write scope — sign out and back in).",
+      );
+    }
+    throw new Error(`Hub commit failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+}
+
 // ---- manual per-episode review status ---------------------------------------
 // One aggregated file so the sidebar needs a single fetch. Distinct from the
 // curation file (episode_annotations.json), which marks curation review and

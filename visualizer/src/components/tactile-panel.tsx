@@ -36,6 +36,7 @@ import { useRigProfile } from "@/lib/useRigProfile";
 import { useSessionInterpretation } from "@/lib/interpretationOptIn";
 import { useSearchParams } from "next/navigation";
 import RawStreamPanel from "@/components/raw-stream-panel";
+import RawSidecarPanel from "@/components/raw-sidecar-panel";
 import {
   computeFolderTactileAggregate,
   type FolderTactileRow,
@@ -849,6 +850,7 @@ export default function TactilePanel({
       </div>
       {!compact && <ContactTimeline channels={channels} />}
       {!compact && repoId && <RawStreamPanel repoId={repoId} root={root} />}
+      {!compact && repoId && <RawSidecarPanel repoId={repoId} root={root} />}
     </div>
   );
 }

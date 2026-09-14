@@ -51,6 +51,8 @@ This tool is designed to help robotics researchers and practitioners quickly ins
 - **Filtering Panel:** Identify and flag problematic episodes (low movement, jerky motion, outlier length) for removal. Exports flagged episode IDs as a ready-to-run LeRobot CLI command.
 - **3D URDF Viewer:** Visualize robot joint poses frame-by-frame in an interactive 3D scene, with end-effector trail rendering. Supports SO-100, SO-101, and OpenArm bimanual robots.
 - **Annotations Panel:** Hand-edit the v3.1 language schema (`language_persistent` + `language_events`) — subtask, plan, memory, interjection + paired speech, and VQA atoms with bounding-box / keypoint / count / attribute / spatial answers. VQA bboxes and keypoints render as overlays on the video player; drag or click on a camera to draw new ones. Backed by an optional FastAPI service (in `backend/`) for parquet rewrites and HF Hub push.
+- **Batch auto-label:** From the viewer's **Batch** tab, run the tactile auto-labeler over every episode (or a range) on worker threads, review a triage table of flagged episodes, open any of them with the proposal already staged in the browser, then commit every staged annotation file plus a batch report to the Hub in one commit.
+- **Dataset trim:** From the viewer's **Trim** tab, propose the dead time to cut before and after every episode from the arm's motion envelope, adjust the cut points on the episode's timeline, then trim every modality in one click — rows re-based, video windows moved, raw sidecars and annotations cut along — into a separate dataset repo through the annotations backend. The source dataset is never modified.
 - **Efficient Data Loading:** Uses parquet and JSON loading for large dataset support, with pagination, chunking, and lazy-loaded panels for fast initial load.
 - **Responsive UI:** Built with React, Next.js, and Tailwind CSS for a fast, modern user experience.
 
@@ -151,6 +153,49 @@ The backend exposes:
 - `POST /api/export` — rewrite parquet with the new language columns plus
   the dataset-level `tools` column (drops legacy `subtask_index`)
 - `POST /api/push_to_hub` — export and push to a target repo
+- `POST /api/trim` — trim the dataset to the visualizer's cut points into a
+  new folder and, with `push`, a new repo (never the source); the same as
+  `python backend/trim.py --src <repo or folder> --out <dir> --cuts cuts.json`
+
+## Batch auto-label
+
+**Batch** at the right end of the viewer's tab bar opens `/{org}/{dataset}/batch`. A run goes over every episode (or a `from`/`to` range): each episode is read and annotated on its own Web Worker thread (default half the machine's cores, at most 4) with the same pipeline as the single-episode button, and merged with the annotation file already on the Hub — human atoms kept, the detector's atoms replaced. Nothing goes to the Hub during the run. Each changed episode is **staged** into the browser's local copy of its annotations, the slot the Annotations panel edits, unless that copy holds unsaved edits (never overwritten; the table says so). The page shows the run live: progress with an estimate, counters, a per-flag histogram and the triage table (failed first, then the heaviest flags; sort by episode; filter to flagged / failed / changed). Every row opens its episode on the Annotations tab with the proposal in place; the last run is kept per dataset, so the table is there when you come back. **Stop** ends a run after the episodes in flight and offers **Resume** (only the episodes still owed) and **Rerun**.
+
+**Commit N staged episode(s)** writes every staged `annotations/episode_XXXXXX.json` — the local copy, adjustments included — plus `annotations/batch_report.json` (profile, thresholds, detector version, the per-episode rows, the summary) in one Hub commit as the signed-in user. Pinned views and unsigned sessions are refused, like the single Save. With an unverified profile the interpretation layer's atoms never reach a file, for the batch and the single Save alike.
+
+Episode reads: a parquet file with a single row group is decoded once per thread and sliced per episode (`readRowRange` in `src/utils/parquetUtils.ts`, kept as typed arrays), instead of decoded on every episode read; the viewer's episode switching gains the same.
+
+## Dataset trim
+
+Recordings carry dead time before the arm starts and after it stops. **Trim**
+at the right end of the viewer's tab bar opens `/{org}/{dataset}/trim`.
+**Propose cuts** runs a rule over a range of episodes: keep from 0.43 s
+before the commanded joints (`action`) first move to 0.53 s after the
+measured joints (`observation.state`) last move — the rule read off the
+curated sotac's own cuts against sotac_raw, which it reproduces to within
+a few frames (`src/lib/trimDetect.ts`). Stop leaves a resumable run. Every
+episode's proposal is a row (click opens the episode); flags name the
+cases worth a look (`arm_moving_at_start`, `motion_to_recording_end`,
+`no_motion`, …).
+
+In the episode, the **Trim** panel under the auto-label panel shows the
+recording as a bar with the kept window and two draggable handles, the
+rule's onset and end as ticks, seek buttons for the frames at each cut,
+start/end inputs, and a reviewed mark. Decisions are kept per episode in
+the browser (`src/lib/trimStore.ts`); a proposal never replaces an
+adjusted or reviewed one.
+
+**Apply the trim** hands the cuts to the annotations backend's
+`POST /api/trim` (`backend/trim.py`, also a CLI): rows sliced and re-based
+(timestamp from 0, frame_index from 0, index contiguous), episode metadata
+rewritten with the video windows moved by the cut (the video files are
+carried over untouched, the way the curated sotac was made), per-episode
+and dataset-level stats recomputed for the numeric features, raw sidecar
+CSVs cut to the kept window on their epoch clock with `alignment.json`
+moved, per-episode annotation files shifted by the start cut; episodes
+can be dropped and the rest renumbered. The result goes to a new folder
+and, with `push`, a new dataset repo. The source is never written to.
+Without the backend, **Download cuts.json** and run the CLI.
 
 ## Docker Deployment
 

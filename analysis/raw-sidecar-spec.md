@@ -1,3 +1,17 @@
+> **Superseded on the visualizer side (2026-09-14).** Jingyi's main of
+> 2026-09-12 ships her own high-rate raw sidecar reader, for her recorder's
+> format: one session-long CSV per robot session, header
+> `t_epoch_ns,e0_x,e0_y,e0_z,…,e11_x,e11_y,e11_z` (37 columns, the 12 hall
+> elements × 3 axes in relative counts, one row per poll at 0.3–1.2 kHz), a
+> `baseline.csv` (12 rows `element,x,y,z`, session-start means) and a
+> `session.json` with `started_epoch_ns`, under
+> `board_raw/<sensor>/session_<stamp>/slotNN_raw.csv` (or
+> `live_raw/<name>/session_<stamp>/raw.csv`); the viewer picks an episode's
+> rows by the time window of its per-episode 91 Hz CSV. A recorder meant to
+> show in her panel writes that layout. The format below stays as our record
+> of what a fuller capture (resultant, array, temperatures, change bitmask)
+> would carry; the validator still checks it.
+
 # Raw tactile sidecar — format `paxini-raw/1`
 
 Status: proposal, 2026-09-09. Written for Jingyi's request on PR #2 ("the

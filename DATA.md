@@ -10,7 +10,7 @@ below.
 
 | Path | Upstream | Base revision | Taken |
 |---|---|---|---|
-| `visualizer/` | HF Space `Jingyi-Z/lerobotac-dataset-visualizer` | `e3714c1bbee576adf1f7e0929db74be4ac1c71d7` (2026-09-07 19:13, "Interpretation layer (PR B)..." — her main after she merged PR A as squash `0a3f2cf` and PR B as this commit; previous base `47d63aae` taken 2026-08-27) | 2026-09-07 |
+| `visualizer/` | HF Space `Jingyi-Z/lerobotac-dataset-visualizer` | `6e8d04cbbee576adf1f7e0929db74be4ac1c71d7` (2026-09-07 19:13, "Interpretation layer (PR B)..." — her main after she merged PR A as squash `0a3f2cf` and PR B as this commit; previous base `47d63aae` taken 2026-08-27) | 2026-09-07 |
 
 `visualizer/` is committed in this repo and is where our labeling changes go.
 Since the 2026-09-07 sync it equals her main byte for byte except for nine
@@ -29,6 +29,15 @@ type-check writes a ~320 KB `tsconfig.tsbuildinfo` cache; it rode into PR #1
 through `git add -A` (Jingyi's review, 2026-09-02). `visualizer/.gitignore`
 now lists `*.tsbuildinfo` (create-next-app's own line), so a clone that
 carries our tree cannot stage it again.
+
+Sync 2026-09-14: her main gained three commits on 2026-09-12 (`1f26b39`
+prettier reformat of the files that did not match her locked style — the
+eight-file formatting divergence recorded below is gone; `5e31def` rollout
+review + high-rate raw sidecar reader; `6e8d04c` automatic rollout review).
+Brought in through the merged PR #3 tree (batch + trim + her main, one
+import conflict in episode-viewer resolved by keeping both lines). Our
+`visualizer/` now equals that tree file for file. Base for new work:
+`6e8d04c`.
 
 ## Local data mirrors (`data/`, gitignored)
 

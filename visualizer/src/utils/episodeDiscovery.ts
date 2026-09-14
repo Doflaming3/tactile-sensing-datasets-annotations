@@ -55,6 +55,67 @@ export async function discoverEpisodeFolders(
   return folders;
 }
 
+// ---- session-long high-rate raw sidecar --------------------------------------
+// Layout (written by the recorder, one session per robot connect):
+//   <...>/board_raw/<sensor>/session_<stamp>/slotNN_raw.csv  (+ slotNN_baseline.csv, session.json)
+//   <...>/live_raw/<sensor>/session_<stamp>/raw.csv          (+ baseline.csv)
+// Rows are t_epoch_ns + 36 per-element raw counts, ~0.3-1.2 kHz, spanning the
+// whole session (not per episode) — the viewer windows them by timestamp.
+
+export interface RawSidecarSession {
+  /** sensor name path segment */
+  sensor: string;
+  /** repo-relative session directory, no trailing slash */
+  dir: string;
+  /** raw CSV paths inside the session dir (one per raw-capable module) */
+  rawFiles: string[];
+  /** matching baseline CSV for a raw file, when present */
+  baselines: Record<string, string>;
+  /** repo-relative session.json path, when present */
+  sessionJson: string | null;
+}
+
+const SIDECAR_RE =
+  /(?:^|\/)(?:board_raw|live_raw)\/([^/]+)\/(session_[^/]+)\/([^/]+)$/;
+
+/** High-rate raw sidecar sessions under one episode root ("" = repo root),
+ *  grouped by session directory, sorted by directory name (chronological —
+ *  the stamp is part of the name). */
+export async function findRawSidecarSessions(
+  repoId: string,
+  root: string | null | undefined,
+): Promise<RawSidecarSession[]> {
+  const files = await listRepoFiles(repoId);
+  const prefix = root ? root.replace(/^\/+|\/+$/g, "") + "/" : "";
+  const byDir = new Map<string, RawSidecarSession>();
+  for (const f of files) {
+    if (prefix && !f.startsWith(prefix)) continue;
+    const m = SIDECAR_RE.exec(f);
+    if (!m) continue;
+    const [, sensor, , base] = m;
+    const dir = f.slice(0, f.length - base.length - 1);
+    let s = byDir.get(dir);
+    if (!s) {
+      s = { sensor, dir, rawFiles: [], baselines: {}, sessionJson: null };
+      byDir.set(dir, s);
+    }
+    if (/^(slot\d+_)?raw\.csv$/i.test(base)) {
+      s.rawFiles.push(f);
+    } else if (base === "session.json") {
+      s.sessionJson = f;
+    }
+  }
+  // second pass: pair baselines with their raw files
+  for (const s of byDir.values()) {
+    s.rawFiles.sort();
+    for (const raw of s.rawFiles) {
+      const cand = raw.replace(/raw\.csv$/i, "baseline.csv");
+      if (files.includes(cand)) s.baselines[raw] = cand;
+    }
+  }
+  return [...byDir.values()].sort((a, b) => a.dir.localeCompare(b.dir));
+}
+
 /** Raw high-frequency sensor CSV paths for one episode root ("" = repo
  *  root), repo-relative. */
 export async function findRawSensorCsvs(
