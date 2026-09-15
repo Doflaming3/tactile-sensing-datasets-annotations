@@ -21,6 +21,7 @@ export interface WorkerLike {
     type: "error",
     listener: (ev: { message?: string }) => void,
   ): void;
+  addEventListener(type: "messageerror", listener: (ev: unknown) => void): void;
 }
 
 export interface PoolJob {
@@ -44,6 +45,8 @@ interface Slot {
   busy: number;
   profile: RigProfile | null;
   pending: Set<number>;
+  /** crashed: never dispatched to again (postMessage would be a no-op) */
+  dead: boolean;
 }
 
 interface Waiting<J, R> {
@@ -51,6 +54,7 @@ interface Waiting<J, R> {
   reject: (error: Error) => void;
   slot: Slot;
   job: J;
+  timer?: ReturnType<typeof setTimeout>;
 }
 
 export interface WorkerPoolOptions<J, R> {
@@ -58,6 +62,9 @@ export interface WorkerPoolOptions<J, R> {
   fallback?: (job: J) => Promise<R>;
   /** told about a worker crash (once per crash) */
   onWorkerError?: (message: string, jobs: number) => void;
+  /** a job unanswered this long marks its worker dead (hung, not crashed)
+   * and goes to the fallback; 0 = wait forever */
+  jobTimeoutMs?: number;
 }
 
 export class WorkerPool<J extends PoolJob, R> {
@@ -73,12 +80,24 @@ export class WorkerPool<J extends PoolJob, R> {
   ) {
     for (let i = 0; i < Math.max(1, Math.floor(size)); i++) {
       const worker = factory();
-      const slot: Slot = { worker, busy: 0, profile: null, pending: new Set() };
+      const slot: Slot = {
+        worker,
+        busy: 0,
+        profile: null,
+        pending: new Set(),
+        dead: false,
+      };
       worker.addEventListener("message", (ev) =>
         this.onMessage(ev.data as PoolResponse<R>),
       );
       worker.addEventListener("error", (ev) =>
         this.onError(slot, ev.message ?? "worker error"),
+      );
+      worker.addEventListener("messageerror", () =>
+        this.onError(
+          slot,
+          "a message to or from the worker could not be decoded",
+        ),
       );
       this.slots.push(slot);
     }
@@ -88,9 +107,23 @@ export class WorkerPool<J extends PoolJob, R> {
     return this.slots.length;
   }
 
+  /** workers still alive */
+  get liveSize(): number {
+    return this.slots.filter((s) => !s.dead).length;
+  }
+
   run(job: J): Promise<R> {
     if (this.closed) return Promise.reject(new Error("pool terminated"));
-    const slot = this.slots.reduce((a, b) => (b.busy < a.busy ? b : a));
+    // a dead slot is never chosen; with none alive the job runs through
+    // the fallback (the main thread) rather than waiting on a corpse
+    const live = this.slots.filter((s) => !s.dead);
+    if (live.length === 0) {
+      const fallback = this.options.fallback;
+      return fallback
+        ? fallback(job)
+        : Promise.reject(new Error("every worker of the pool has died"));
+    }
+    const slot = live.reduce((a, b) => (b.busy < a.busy ? b : a));
     const id = ++this.seq;
     const { profile, ...rest } = job;
     const req: PoolRequest<J> = {
@@ -102,7 +135,18 @@ export class WorkerPool<J extends PoolJob, R> {
     slot.busy++;
     slot.pending.add(id);
     return new Promise<R>((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject, slot, job });
+      const w: Waiting<J, R> = { resolve, reject, slot, job };
+      const limit = this.options.jobTimeoutMs ?? 0;
+      if (limit > 0)
+        w.timer = setTimeout(
+          () =>
+            this.onError(
+              slot,
+              `no answer from the worker in ${Math.round(limit / 1000)} s`,
+            ),
+          limit,
+        );
+      this.waiting.set(id, w);
       try {
         slot.worker.postMessage(req);
       } catch (e) {
@@ -125,6 +169,7 @@ export class WorkerPool<J extends PoolJob, R> {
   private take(id: number): Waiting<J, R> | undefined {
     const w = this.waiting.get(id);
     if (!w) return undefined;
+    if (w.timer) clearTimeout(w.timer);
     this.waiting.delete(id);
     w.slot.busy--;
     w.slot.pending.delete(id);
@@ -147,6 +192,8 @@ export class WorkerPool<J extends PoolJob, R> {
   /** A worker died (its script failed to load, or it threw outside a
    * message): its pending jobs go to the fallback or fail. */
   private onError(slot: Slot, message: string): void {
+    if (slot.dead) return;
+    slot.dead = true;
     const ids = [...slot.pending];
     slot.profile = null;
     this.options.onWorkerError?.(message, ids.length);

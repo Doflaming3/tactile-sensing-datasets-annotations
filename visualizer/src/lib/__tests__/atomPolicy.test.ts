@@ -31,8 +31,13 @@ const autoRename = atom(
   "[auto:high] finger_unload f0 2.1N (hand still holding)",
   8.1,
 );
-const autoSubtask = atom("subtask", "grasp", 6.1);
-const humanSubtask = atom("subtask", "grasp", 6.0, "user");
+// the detector's subtask carries its mark; the panel's manual add and a
+// dragged detector atom have the assistant role and no mark
+const autoSubtask: LanguageAtom = {
+  ...atom("subtask", "grasp", 6.1),
+  origin: "auto",
+};
+const humanSubtask = atom("subtask", "grasp", 6.0);
 
 describe("auto-atom predicates", () => {
   test("detector atoms vs human atoms", () => {
@@ -77,7 +82,10 @@ describe("atomsForSave (Jingyi's unverified-profile rule)", () => {
   const atoms = [humanNote, autoEvent, autoRename, autoSubtask];
   test("a verified profile saves everything", () => {
     expect(atomsForSave(atoms, SOTAC_PROFILE)).toEqual(atoms);
-    expect(atomsForSave(atoms, null)).toEqual(atoms);
+  });
+  test("no profile yet counts as unverified", () => {
+    expect(atomsForSave(atoms, null)).not.toContain(autoRename);
+    expect(atomsForSave(atoms, undefined)).toContain(humanNote);
   });
   test("an unverified profile keeps the base taxonomy and human atoms, drops the interpretation layer's", () => {
     const kept = atomsForSave(atoms, TEMPLATE_PROFILE);

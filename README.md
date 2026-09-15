@@ -140,9 +140,18 @@ atoms are what you see and adjust; the last run is kept in the browser
 `annotations/episode_XXXXXX.json` — the local copy, adjustments included —
 plus `annotations/batch_report.json` (profile, thresholds, detector version,
 the triage list) in ONE Hub commit as the signed-in user; pinned views and
-unsigned sessions are refused, like the single Save. The save rule applies
-to both: with an unverified profile the interpretation layer's atoms never
-reach the file (`atomsForSave`). When the Hub already holds a
+unsigned sessions are refused, like the single Save. The save rule applies to both: with an unverified profile, or none known yet,
+the interpretation layer's atoms never reach the file (`atomsForSave`), and
+the commit applies it to every staged copy. After Jingyi's review of PR #3
+(`analysis/jingyi-review-2026-09-15.md`): the detector marks its subtask
+atoms (`origin: "auto"`) and only marked atoms are replaced, so hand-placed
+or hand-moved subtasks survive and legacy files get no second set; a Hub
+error other than 404 fails the episode instead of reading as an empty
+file; the commit carries the dataset version the run started from and is
+refused with "rerun" if anything landed in between; a dead worker leaves
+the pool; the report path follows the dataset root; an emptied local copy
+counts as an edit; a staged proposal reads as unsaved until Commit; rows
+read "committed" afterwards. When the Hub already holds a
 `batch_report.json`, the page shows that last committed batch and can list
 its triage rows.
 

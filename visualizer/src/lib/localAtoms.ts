@@ -86,6 +86,19 @@ export function readStagedMarker(
   }
 }
 
+/** After a commit the marker has done its job. */
+export function clearStagedMarker(
+  repoId: string,
+  episodeId: number,
+  storage: StorageLike | null = browserStorage(),
+): void {
+  try {
+    storage?.removeItem(stagedMarkerKey(repoId, episodeId));
+  } catch {
+    /* nothing to clear */
+  }
+}
+
 /** Stage: the local copy AND the marker; false when either write failed. */
 export function stageLocalAtoms(
   repoId: string,

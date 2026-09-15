@@ -80,6 +80,8 @@ export interface BatchRow {
   localEdits: boolean;
   /** the merged file was written into this browser's local copy for review */
   staged: boolean;
+  /** this row's file went to the Hub in a batch commit */
+  committed?: boolean;
   error?: string;
   ms: number;
   timing?: BatchTiming;
@@ -103,6 +105,9 @@ export interface BatchReport {
   concurrency: number;
   /** the episodes the run was asked for (a stopped run has fewer rows) */
   requested: number[];
+  /** the dataset's commit on main when the run started; Commit sends it
+   * as the parent so nothing committed in between is overwritten */
+  baseSha?: string | null;
   startedAt: string;
   finishedAt: string;
   aborted: boolean;
@@ -304,13 +309,44 @@ export interface BatchRunOptions {
   /** the whole read-and-annotate step (the batch page's worker pool);
    * default: episodeReader over `loaders` and `annotate` */
   readEpisode?: EpisodeReader;
+  /** the dataset's commit on main at the start of a fresh run */
+  baseSha?: string | null;
   /** continue a stopped run: the rows already done (their episodes are
-   * skipped), the files they staged, and the original start time */
+   * skipped), the files they staged, the original start time and the
+   * original base version */
   resume?: {
     rows: BatchRow[];
     files?: Map<number, LanguageAtom[]>;
     startedAt?: string;
+    baseSha?: string | null;
   };
+}
+
+/** What a Commit sends: every staged, not yet committed row's local copy
+ * (the reviewer's adjustments included; the run's own file when the copy
+ * is gone), each through the save rule for the active profile. */
+export function entriesForCommit(
+  report: BatchReport,
+  readLocal: (episode: number) => LanguageAtom[] | null,
+  files: Map<number, LanguageAtom[]> | undefined,
+  profile: RigProfile | null,
+): {
+  entries: Array<{ episodeId: number; atoms: LanguageAtom[] }>;
+  missing: number[];
+} {
+  const entries: Array<{ episodeId: number; atoms: LanguageAtom[] }> = [];
+  const missing: number[] = [];
+  for (const r of report.episodes) {
+    if (!r.staged || r.committed) continue;
+    const atoms = readLocal(r.episode) ?? files?.get(r.episode) ?? null;
+    if (atoms)
+      entries.push({
+        episodeId: r.episode,
+        atoms: atomsForSave(atoms, profile),
+      });
+    else missing.push(r.episode);
+  }
+  return { entries, missing };
 }
 
 export interface BatchOutput {
@@ -365,15 +401,14 @@ export async function runBatch(opts: BatchRunOptions): Promise<BatchOutput> {
         !(existing.length === 0 && merged.length === 0) &&
         !sameAtomSet(existing, merged);
       if (changed) files.set(episode, merged);
-      // unsaved edits in this browser: a local copy that is neither empty,
-      // nor what the Hub holds, nor what the batch itself staged last
-      // time, nor already this very proposal. The batch never overwrites
-      // them.
+      // unsaved edits in this browser: a local copy that is neither what
+      // the Hub holds, nor what the batch itself staged last time, nor
+      // already this very proposal — an emptied copy included (someone
+      // cleared the episode on purpose). The batch never overwrites them.
       const local = opts.loaders.readLocal?.(episode) ?? null;
       const stagedBefore = opts.loaders.readStaged?.(episode) ?? null;
       const localEdits =
-        !!local &&
-        local.length > 0 &&
+        local !== null &&
         !sameAtomSet(local, existing) &&
         !sameAtomSet(local, merged) &&
         !(stagedBefore !== null && sameAtomSet(local, stagedBefore));
@@ -465,6 +500,9 @@ export async function runBatch(opts: BatchRunOptions): Promise<BatchOutput> {
     detectorVersion: DETECTOR_VERSION,
     concurrency,
     requested: [...opts.episodes],
+    baseSha: opts.resume
+      ? (opts.resume.baseSha ?? null)
+      : (opts.baseSha ?? null),
     startedAt,
     finishedAt: now().toISOString(),
     aborted,

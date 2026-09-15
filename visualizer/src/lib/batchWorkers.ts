@@ -55,7 +55,9 @@ export function createBrowserPool(
         new Worker(
           new URL("./batch.worker.ts", import.meta.url),
         ) as unknown as WorkerLike,
-      { fallback: readEpisodeHere, onWorkerError },
+      // a thread that stops answering (not a crash) is given up after
+      // three minutes — a cold episode read takes ~10 s
+      { fallback: readEpisodeHere, onWorkerError, jobTimeoutMs: 180_000 },
     );
   } catch {
     return null;

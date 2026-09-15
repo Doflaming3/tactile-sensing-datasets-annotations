@@ -2413,5 +2413,9 @@ export function resultToRecordedAtoms(result: AutoLabelResult): LanguageAtom[] {
     }
     return true;
   });
-  return resultToAtoms({ ...result, events: kept });
+  // the detector's own subtask atoms carry its mark; the events carry
+  // the [auto:…] prefix. Only marked atoms are replaced by a re-run.
+  return resultToAtoms({ ...result, events: kept }).map((a) =>
+    a.style === "subtask" ? { ...a, origin: "auto" as const } : a,
+  );
 }

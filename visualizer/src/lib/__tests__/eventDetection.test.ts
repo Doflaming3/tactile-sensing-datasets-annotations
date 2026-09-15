@@ -126,7 +126,12 @@ describe("resultToRecordedAtoms", () => {
       flags: [],
       spans: [],
     };
-    expect(resultToRecordedAtoms(noSpan)).toEqual(resultToAtoms(noSpan));
+    // identity up to the detector's mark on its subtask atoms
+    expect(resultToRecordedAtoms(noSpan)).toEqual(
+      resultToAtoms(noSpan).map((a) =>
+        a.style === "subtask" ? { ...a, origin: "auto" } : a,
+      ),
+    );
   });
 });
 

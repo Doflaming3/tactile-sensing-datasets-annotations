@@ -26,7 +26,7 @@ import {
   pickRawFiles,
   tactileEntry,
 } from "@/lib/annotateEpisode";
-import { isAutoAtom, isAutoEventAtom } from "@/lib/atomPolicy";
+import { autoAtomsToAdd, isAutoAtom, isAutoEventAtom } from "@/lib/atomPolicy";
 import { loadStoredBatch } from "@/lib/batchStore";
 import Link from "next/link";
 import { useRigProfile } from "@/lib/useRigProfile";
@@ -262,17 +262,15 @@ export default function AutoLabelPanel({
         // only auto EVENT atoms are replaced; subtask segments stay untouched.
         const eventsOnlyNow = eventsOnlyRef.current;
         if (mode.applyAtoms !== false) {
-          for (const a of atoms.filter(
-            eventsOnlyNow ? isAutoEventAtom : isAutoAtom,
-          ))
-            deleteAtom(a);
-          // recording policy: panels show everything, the annotation set
-          // (what gets saved) keeps only the real events
-          addAtoms(
-            eventsOnlyNow
-              ? outcome.recordedAtoms.filter((a) => a.style === "interjection")
-              : outcome.recordedAtoms,
-          );
+          // the merge rule shared with the batch (lib/atomPolicy): drop the
+          // detector's own atoms, keep every other one, add what it
+          // recorded except a subtask whose label a kept atom carries.
+          // Recording policy: panels show everything, the annotation set
+          // keeps only the real events.
+          const drop = eventsOnlyNow ? isAutoEventAtom : isAutoAtom;
+          const kept = atoms.filter((a) => !drop(a));
+          for (const a of atoms) if (drop(a)) deleteAtom(a);
+          addAtoms(autoAtomsToAdd(kept, outcome.recordedAtoms, eventsOnlyNow));
         }
         setLastResult(result);
         setReview({});

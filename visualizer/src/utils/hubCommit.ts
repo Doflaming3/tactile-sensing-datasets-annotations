@@ -29,12 +29,48 @@ export async function fetchAnnotationsFromHub(
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: "no-store",
   });
-  if (!res.ok) return null;
+  // only "no such file" means an empty episode; a refused or failed
+  // request says nothing about the file and must not read as empty
+  // (review of PR #3, item 1)
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${res.status} on ${path}`);
+  // a body that is not an annotations file (a proxy page, a truncated
+  // download) says nothing about the file either
+  let parsed: unknown;
   try {
-    return (await res.json()) as SavedAnnotations;
+    parsed = await res.json();
   } catch {
-    return null;
+    throw new Error(`unreadable body on ${path}`);
   }
+  const saved = parsed as Partial<SavedAnnotations> | null;
+  if (!saved || typeof saved !== "object" || !Array.isArray(saved.atoms))
+    throw new Error(`not an annotations file: ${path}`);
+  // a file for another episode served under this path is wrong data too
+  if (
+    typeof saved.episode_index === "number" &&
+    saved.episode_index !== episodeId
+  )
+    throw new Error(
+      `${path} carries episode ${saved.episode_index}, not ${episodeId}`,
+    );
+  return saved as SavedAnnotations;
+}
+
+/** The dataset's current commit on main, recorded at a batch run's start
+ * and sent back as the commit's parent, so a Commit made later refuses to
+ * overwrite what landed in between. */
+export async function fetchBranchSha(repoId: string): Promise<string> {
+  const ref = parseRepoRef(repoId);
+  const token = getAuthToken();
+  const res = await fetch(`${HUB}/api/datasets/${ref.repoId}/revision/main`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`${res.status} reading the dataset version`);
+  const j = (await res.json()) as { sha?: unknown };
+  if (typeof j.sha !== "string" || !j.sha)
+    throw new Error("the dataset version is missing from the Hub's answer");
+  return j.sha;
 }
 
 export interface SavedAnnotations {
@@ -71,14 +107,26 @@ function base64Json(value: unknown): string {
   return btoa(bin);
 }
 
+/** repo-relative under the dataset's root; the URL builders add the
+ * `?root=` prefix for reads, batchReportPath() adds it for the write */
 export const BATCH_REPORT_PATH = "annotations/batch_report.json";
+
+export function batchReportPath(): string {
+  return `${getDatasetPathPrefix()}${BATCH_REPORT_PATH}`;
+}
 
 /** The NDJSON body of one Hub commit carrying many files. */
 export function batchCommitBody(
   entries: Array<{ path: string; json: unknown }>,
   summary: string,
+  parentCommit?: string,
 ): string {
-  const lines = [JSON.stringify({ key: "header", value: { summary } })];
+  const lines = [
+    JSON.stringify({
+      key: "header",
+      value: { summary, ...(parentCommit ? { parentCommit } : {}) },
+    }),
+  ];
   for (const e of entries) {
     lines.push(
       JSON.stringify({
@@ -101,6 +149,7 @@ export async function commitBatchToHub(
   repoId: string,
   episodes: Array<{ episodeId: number; atoms: LanguageAtom[] }>,
   report: unknown,
+  opts: { parentCommit?: string } = {},
 ): Promise<{ paths: string[] }> {
   const writeRepo = writableRepoId(repoId);
   const token = getAuthToken();
@@ -117,10 +166,11 @@ export async function commitBatchToHub(
       atoms: e.atoms,
     } as SavedAnnotations,
   }));
-  entries.push({ path: BATCH_REPORT_PATH, json: report as SavedAnnotations });
+  entries.push({ path: batchReportPath(), json: report as SavedAnnotations });
   const body = batchCommitBody(
     entries,
     `batch annotations: ${episodes.length} episode(s) + report`,
+    opts.parentCommit,
   );
   const res = await fetch(`${HUB}/api/datasets/${writeRepo}/commit/main`, {
     method: "POST",
@@ -132,6 +182,12 @@ export async function commitBatchToHub(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    if (res.status === 412) {
+      throw new Error(
+        "the dataset moved since this run started (something was committed " +
+          "in between) — rerun the batch and commit again",
+      );
+    }
     if (res.status === 401 || res.status === 403) {
       throw new Error(
         "The Hub rejected the write (no write permission on this dataset, " +

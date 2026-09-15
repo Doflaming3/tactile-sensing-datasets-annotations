@@ -55,7 +55,7 @@ function fakeWorker(mode: "ok" | "fail" | "crash" | "silent" = "ok"): Fake {
       w.terminated = true;
     },
     addEventListener(type: string, listener: (ev: never) => void) {
-      listeners[type].push(listener);
+      (listeners[type] ??= []).push(listener);
     },
   };
   return w;

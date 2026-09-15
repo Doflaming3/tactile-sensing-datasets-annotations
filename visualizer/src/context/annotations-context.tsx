@@ -1,5 +1,6 @@
 "use client";
 
+import { editedAtom } from "@/lib/atomPolicy";
 import { localAtomsKey } from "@/lib/localAtoms";
 
 /**
@@ -202,22 +203,27 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       // backend will optionally overwrite this below.
       setFrameTimestamps(initialFrameTimestamps ?? []);
 
-      // No local backend (deployed Space): pull previously committed
-      // annotations from the dataset repo on the Hub, so saves made in one
-      // browser are visible from any other. Local unsaved edits win.
+      // No local backend (deployed Space): the dataset repo's annotation
+      // file is what "saved" means. It fills an empty episode, and it is
+      // the snapshot the unsaved pill measures against — so a batch's
+      // staged proposal, or any local edit, reads as unsaved until it is
+      // committed (review of PR #3). Local edits themselves win.
       const hubRepoId = newIdent.repoId;
-      if (!isAnnotateBackendEnabled() && initial.length === 0 && hubRepoId) {
+      if (!isAnnotateBackendEnabled() && hubRepoId) {
         import("../utils/hubCommit")
           .then((m) => m.fetchAnnotationsFromHub(hubRepoId, newEpisodeId))
           .then((saved) => {
-            if (saved?.atoms && saved.atoms.length > 0) {
-              setAtoms(saved.atoms);
-              savedSnapshotRef.current = JSON.stringify(saved.atoms);
+            const hubAtoms = saved?.atoms ?? [];
+            savedSnapshotRef.current = JSON.stringify(hubAtoms);
+            if (initial.length === 0 && hubAtoms.length > 0) {
+              setAtoms(hubAtoms);
               setDirty(false);
+            } else {
+              setDirty(JSON.stringify(initial) !== savedSnapshotRef.current);
             }
           })
           .catch(() => {
-            /* no saved annotations on the Hub */
+            /* the Hub did not answer: the local copy stays the reference */
           });
       }
 
@@ -245,18 +251,25 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
-  // Persist to sessionStorage on every change once we have an episode.
+  // Persist to localStorage on every change once we have an episode. An
+  // untouched empty state is not written: a plain visit must not leave an
+  // empty copy behind that a later batch run would read as "someone
+  // cleared this episode" (a person emptying it is a change: dirty).
   useEffect(() => {
     if (episodeId == null) return;
-    try {
-      localStorage.setItem(
-        localAtomsKey(identKey(ident), episodeId),
-        JSON.stringify(atoms),
-      );
-    } catch {
-      /* ignore */
+    const serialized = JSON.stringify(atoms);
+    const dirtyNow = serialized !== savedSnapshotRef.current;
+    if (atoms.length > 0 || dirtyNow) {
+      try {
+        localStorage.setItem(
+          localAtomsKey(identKey(ident), episodeId),
+          serialized,
+        );
+      } catch {
+        /* ignore */
+      }
     }
-    setDirty(JSON.stringify(atoms) !== savedSnapshotRef.current);
+    setDirty(dirtyNow);
   }, [atoms, episodeId, ident]);
 
   const snap = useCallback(
@@ -278,7 +291,9 @@ export const AnnotationsProvider: React.FC<{ children: React.ReactNode }> = ({
       setAtoms((prev) => {
         if (index < 0 || index >= prev.length) return prev;
         const next = prev.slice();
-        next[index] = { ...next[index], ...updates };
+        // a person's change: the detector's mark goes with it, so a dragged
+        // or edited detector atom survives later runs
+        next[index] = editedAtom(next[index], updates);
         return next;
       });
     },

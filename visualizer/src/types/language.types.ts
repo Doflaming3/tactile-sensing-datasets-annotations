@@ -49,6 +49,14 @@ export interface LanguageAtom {
    */
   camera: string | null;
   tool_calls: ToolCall[] | null;
+  /**
+   * `"auto"` on atoms the tactile detector wrote itself (its subtask
+   * segments; its events carry an `[auto:…]` content prefix). Only marked
+   * atoms are replaced by a re-run; a hand-added or hand-moved atom has no
+   * mark and survives. The annotation JSON files keep the field; the
+   * parquet exporter drops it, which errs on the safe side.
+   */
+  origin?: "auto" | null;
 }
 
 export const PERSISTENT_STYLES: ReadonlySet<LanguageStyle> = new Set([

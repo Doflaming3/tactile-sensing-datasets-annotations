@@ -18,6 +18,7 @@ import HfAuthButton from "@/components/hf-auth-button";
 import { useAuth } from "@/context/auth-context";
 import { fetchRepoText } from "@/lib/annotateEpisode";
 import {
+  entriesForCommit,
   flagHistogram,
   isFlaggedRow,
   remainingEpisodes,
@@ -46,18 +47,19 @@ import {
   useSessionInterpretation,
 } from "@/lib/interpretationOptIn";
 import {
+  clearStagedMarker,
   readLocalAtoms,
   readStagedMarker,
   stageLocalAtoms,
 } from "@/lib/localAtoms";
 import { useRigProfile } from "@/lib/useRigProfile";
-import type { LanguageAtom } from "@/types/language.types";
 import { authHeaders, getAuthToken } from "@/utils/auth";
 import { findRawSensorCsvs } from "@/utils/episodeDiscovery";
 import {
   BATCH_REPORT_PATH,
   commitBatchToHub,
   fetchAnnotationsFromHub,
+  fetchBranchSha,
 } from "@/utils/hubCommit";
 import { parseRepoRef } from "@/utils/repoRef";
 import {
@@ -322,6 +324,16 @@ export default function BatchPage({
         if (created) poolRef.current = { size: workers, pool: created };
       }
       const pool = poolRef.current?.pool ?? null;
+      // the dataset's version at the start of a fresh run: Commit sends it
+      // as the parent, so anything committed in between is never
+      // overwritten (review of PR #3, item 3); a resume keeps the original
+      const baseSha = prior
+        ? (prior.baseSha ?? null)
+        : await fetchBranchSha(repoId).catch(() => null);
+      if (!prior && !baseSha)
+        setNote(
+          "could not read the dataset's version: the run goes on for review, but a commit of it will be refused — rerun when the Hub answers",
+        );
       const readEpisode = pool
         ? poolReader(pool, {
             profile: activeProfile,
@@ -351,8 +363,14 @@ export default function BatchPage({
           stage: (ep, atoms) => stageLocalAtoms(repoId, ep, atoms),
           concurrency: workers,
           readEpisode,
+          baseSha,
           resume: prior
-            ? { rows: priorRows, files: priorFiles, startedAt: prior.startedAt }
+            ? {
+                rows: priorRows,
+                files: priorFiles,
+                startedAt: prior.startedAt,
+                baseSha: prior.baseSha ?? null,
+              }
             : undefined,
           onStart: (ep) => setInFlight((prev) => [...prev, ep]),
           onProgress: (row, done, total) => {
@@ -408,19 +426,21 @@ export default function BatchPage({
   const commit = useCallback(async () => {
     const rep = stored?.report ?? output?.report;
     if (!rep) return;
-    const entries: Array<{ episodeId: number; atoms: LanguageAtom[] }> = [];
-    const missing: number[] = [];
-    for (const r of rep.episodes) {
-      if (!r.staged) continue;
-      // the local copy carries the reviewer's adjustments; the run's own
-      // file is the fallback when the copy is gone
-      const atoms =
-        readLocalAtoms(repoId, r.episode) ??
-        output?.files.get(r.episode) ??
-        null;
-      if (atoms) entries.push({ episodeId: r.episode, atoms });
-      else missing.push(r.episode);
+    if (!rep.baseSha) {
+      setNote(
+        "this run has no base version (the Hub did not answer at its start) — rerun it, then commit",
+      );
+      return;
     }
+    // the local copies carry the reviewer's adjustments (the run's own file
+    // when a copy is gone), each through the save rule for the active
+    // profile (review of PR #3, item 4)
+    const { entries, missing } = entriesForCommit(
+      rep,
+      (ep) => readLocalAtoms(repoId, ep),
+      output?.files,
+      activeProfile,
+    );
     if (entries.length === 0) {
       setNote("nothing staged to commit");
       return;
@@ -433,13 +453,26 @@ export default function BatchPage({
       return;
     setNote("committing to the Hub…");
     try {
-      const { paths } = await commitBatchToHub(repoId, entries, rep);
+      const { paths } = await commitBatchToHub(repoId, entries, rep, {
+        parentCommit: rep.baseSha,
+      });
+      // the committed rows are no longer staged: their markers go, a second
+      // Commit has nothing to send, the table reads "committed"
+      const sent = new Set(entries.map((e) => e.episodeId));
+      for (const ep of sent) clearStagedMarker(repoId, ep);
+      const report: BatchReport = {
+        ...rep,
+        episodes: rep.episodes.map((r) =>
+          sent.has(r.episode) ? { ...r, staged: false, committed: true } : r,
+        ),
+      };
       const st: StoredBatch = {
-        report: rep,
+        report,
         committedAt: new Date().toISOString(),
       };
       saveStoredBatch(repoId, st);
       setStored(st);
+      setRows(report.episodes);
       setNote(
         `committed ${paths.length} file(s) in one commit` +
           (missing.length
@@ -496,10 +529,12 @@ export default function BatchPage({
         ? "pinned view: read-only"
         : !signedIn
           ? "sign in to commit"
-          : stored?.committedAt
-            ? `already committed ${fmtTime(stored.committedAt)}`
-            : stagedRows.length === 0
-              ? "nothing staged"
+          : stagedRows.length === 0
+            ? stored?.committedAt
+              ? `committed ${fmtTime(stored.committedAt)}; nothing left to send`
+              : "nothing staged"
+            : !(stored?.report.baseSha ?? output?.report.baseSha)
+              ? "no base version for this run: rerun, then commit"
               : null;
 
   const openEpisode = () => {
@@ -863,7 +898,9 @@ export default function BatchPage({
                       <td className="pr-3 text-right tabular">{r.atoms}</td>
                       <td className="pr-3">{r.changed ? "yes" : "same"}</td>
                       <td className="pr-3">
-                        {r.staged ? (
+                        {r.committed ? (
+                          <span className="text-emerald-300">committed</span>
+                        ) : r.staged ? (
                           <span className="text-cyan-300">staged</span>
                         ) : r.localEdits ? (
                           <span className="text-amber-200">
