@@ -20,6 +20,8 @@ interface Job {
 type Fake = WorkerLike & {
   received: PoolRequest<Job>[];
   terminated: boolean;
+  /** fire an event on the page side, as the browser would */
+  emit: (type: string, ev: unknown) => void;
 };
 
 /** A worker stand-in: answers on the next tick with n × 10, or fails per
@@ -35,6 +37,7 @@ function fakeWorker(mode: "ok" | "fail" | "crash" | "silent" = "ok"): Fake {
   const w: Fake = {
     received: [],
     terminated: false,
+    emit,
     postMessage(msg) {
       const req = msg as PoolRequest<Job>;
       w.received.push(req);
@@ -123,5 +126,142 @@ describe("WorkerPool", () => {
     await expect(p).rejects.toThrow("pool terminated");
     expect(silent.terminated).toBe(true);
     await expect(pool.run(job(3))).rejects.toThrow("pool terminated");
+  });
+});
+
+describe("a dead worker is terminated and, when allowed, replaced", () => {
+  const fallback = async (j: Job) => 1000 + j.n;
+
+  test("a crashed worker is terminated, not only skipped", async () => {
+    const w = fakeWorker("crash");
+    const pool = new WorkerPool<Job, number>(1, () => w, { fallback });
+    expect(await pool.run(job(1))).toBe(1001);
+    expect(w.terminated).toBe(true);
+    pool.terminate();
+  });
+
+  test("a hung worker is terminated when given up on", async () => {
+    const w = fakeWorker("silent");
+    const pool = new WorkerPool<Job, number>(1, () => w, {
+      fallback,
+      jobTimeoutMs: 20,
+    });
+    expect(await pool.run(job(1))).toBe(1001);
+    expect(w.terminated).toBe(true);
+    pool.terminate();
+  });
+
+  test("without restarts (the default) a dead slot stays dead", async () => {
+    const made: Fake[] = [];
+    const pool = new WorkerPool<Job, number>(
+      1,
+      () => {
+        const w = fakeWorker("crash");
+        made.push(w);
+        return w;
+      },
+      { fallback },
+    );
+    await pool.run(job(1));
+    expect(await pool.run(job(2))).toBe(1002);
+    expect(made.length).toBe(1);
+    expect(pool.liveSize).toBe(0);
+    pool.terminate();
+  });
+
+  test("with restarts allowed a fresh worker takes the dead one's place and is sent the profile again", async () => {
+    const made: Fake[] = [];
+    const restartable: boolean[] = [];
+    const pool = new WorkerPool<Job, number>(
+      1,
+      () => {
+        const w = fakeWorker(made.length === 0 ? "crash" : "ok");
+        made.push(w);
+        return w;
+      },
+      {
+        fallback,
+        onWorkerError: (_m, _n, r) => restartable.push(r),
+        maxRespawns: 1,
+      },
+    );
+    expect(await pool.run(job(1))).toBe(1001); // the crash: fallback
+    expect(restartable).toEqual([true]);
+    expect(made[0].terminated).toBe(true);
+    expect(pool.liveSize).toBe(0);
+    expect(await pool.run(job(2))).toBe(20); // a fresh worker answered
+    expect(made.length).toBe(2);
+    expect(pool.liveSize).toBe(1);
+    expect(made[1].received[0].profile).toBeDefined();
+    pool.terminate();
+    expect(made[1].terminated).toBe(true);
+  });
+
+  test("the cap holds: a worker that keeps dying is not replaced again", async () => {
+    const made: Fake[] = [];
+    const restartable: boolean[] = [];
+    const pool = new WorkerPool<Job, number>(
+      1,
+      () => {
+        const w = fakeWorker("crash");
+        made.push(w);
+        return w;
+      },
+      {
+        fallback,
+        onWorkerError: (_m, _n, r) => restartable.push(r),
+        maxRespawns: 1,
+      },
+    );
+    expect(await pool.run(job(1))).toBe(1001);
+    expect(await pool.run(job(2))).toBe(1002); // the replacement died too
+    expect(await pool.run(job(3))).toBe(1003); // no third worker
+    expect(made.length).toBe(2);
+    expect(restartable).toEqual([true, false]);
+    expect(pool.liveSize).toBe(0);
+    pool.terminate();
+  });
+
+  test("a late event from a replaced worker does not kill its successor", async () => {
+    const made: Fake[] = [];
+    const pool = new WorkerPool<Job, number>(
+      1,
+      () => {
+        const w = fakeWorker(made.length === 0 ? "crash" : "ok");
+        made.push(w);
+        return w;
+      },
+      { fallback, maxRespawns: 1 },
+    );
+    await pool.run(job(1));
+    expect(await pool.run(job(2))).toBe(20);
+    made[0].emit("error", { message: "late" });
+    made[0].emit("message", { data: { id: 1, ok: true, result: -1 } });
+    expect(pool.liveSize).toBe(1);
+    expect(await pool.run(job(3))).toBe(30);
+    expect(made[1].received.length).toBe(2);
+    pool.terminate();
+  });
+
+  test("an idle live worker is preferred; a dead one is restarted only when every live one is busy", async () => {
+    const made: Fake[] = [];
+    const pool = new WorkerPool<Job, number>(
+      2,
+      () => {
+        const w = fakeWorker(made.length === 0 ? "crash" : "ok");
+        made.push(w);
+        return w;
+      },
+      { fallback, maxRespawns: 1 },
+    );
+    expect(await pool.run(job(1))).toBe(1001); // slot 0 dies
+    expect(await pool.run(job(2))).toBe(20); // slot 1 was idle: no restart
+    expect(made.length).toBe(2);
+    const [c, d] = await Promise.all([pool.run(job(3)), pool.run(job(4))]);
+    expect([c, d]).toEqual([30, 40]); // slot 1 busy: slot 0 restarted
+    expect(made.length).toBe(3);
+    expect(made[2].received.length).toBe(1);
+    expect(pool.liveSize).toBe(2);
+    pool.terminate();
   });
 });

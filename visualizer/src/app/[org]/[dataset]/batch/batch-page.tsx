@@ -309,17 +309,23 @@ export default function BatchPage({
       });
       // one thread per worker, each reading and annotating whole episodes;
       // a dead worker's episodes fall back to this thread, so the run
-      // still completes (without workers everything runs here). The pool
-      // is kept between runs unless the worker count changed.
+      // still completes (without workers everything runs here), and a
+      // fresh worker takes its place while restarts remain. The pool is
+      // kept between runs unless the worker count changed.
       if (poolRef.current && poolRef.current.size !== workers) {
         poolRef.current.pool.terminate();
         poolRef.current = null;
       }
       if (!poolRef.current) {
-        const created = createBrowserPool(workers, (message, jobs) =>
-          setNote(
-            `a worker died (${message}); ${jobs} episode(s) ran on the main thread instead`,
-          ),
+        const created = createBrowserPool(
+          workers,
+          (message, jobs, restartable) =>
+            setNote(
+              `a worker died (${message}); ${jobs} episode(s) ran on the main thread instead; ` +
+                (restartable
+                  ? "a fresh worker takes its place"
+                  : "the run goes on with one worker fewer"),
+            ),
         );
         if (created) poolRef.current = { size: workers, pool: created };
       }

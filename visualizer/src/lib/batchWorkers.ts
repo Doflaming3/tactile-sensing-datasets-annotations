@@ -45,7 +45,7 @@ export type EpisodePool = WorkerPool<EpisodeJob, EpisodeRead>;
 
 export function createBrowserPool(
   size: number,
-  onWorkerError?: (message: string, jobs: number) => void,
+  onWorkerError?: (message: string, jobs: number, restartable: boolean) => void,
 ): EpisodePool | null {
   if (typeof Worker === "undefined") return null;
   try {
@@ -56,8 +56,16 @@ export function createBrowserPool(
           new URL("./batch.worker.ts", import.meta.url),
         ) as unknown as WorkerLike,
       // a thread that stops answering (not a crash) is given up after
-      // three minutes — a cold episode read takes ~10 s
-      { fallback: readEpisodeHere, onWorkerError, jobTimeoutMs: 180_000 },
+      // three minutes — a cold episode read takes ~10 s; a dead worker is
+      // terminated and replaced up to twice, so a passing failure (a
+      // stalled fetch) does not cost a thread for the rest of the page's
+      // life, while one that keeps dying stays dead
+      {
+        fallback: readEpisodeHere,
+        onWorkerError,
+        jobTimeoutMs: 180_000,
+        maxRespawns: 2,
+      },
     );
   } catch {
     return null;

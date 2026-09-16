@@ -45,8 +45,11 @@ interface Slot {
   busy: number;
   profile: RigProfile | null;
   pending: Set<number>;
-  /** crashed: never dispatched to again (postMessage would be a no-op) */
+  /** crashed or hung: its worker is terminated and it is never dispatched
+   * to (postMessage would be a no-op) until a fresh worker takes its place */
   dead: boolean;
+  /** fresh workers this slot has been given */
+  respawns: number;
 }
 
 interface Waiting<J, R> {
@@ -60,11 +63,16 @@ interface Waiting<J, R> {
 export interface WorkerPoolOptions<J, R> {
   /** where a crashed worker's jobs go (the main thread, typically) */
   fallback?: (job: J) => Promise<R>;
-  /** told about a worker crash (once per crash) */
-  onWorkerError?: (message: string, jobs: number) => void;
+  /** told about a worker crash (once per crash): the message, how many of
+   * its jobs moved to the fallback, whether a fresh worker may replace it */
+  onWorkerError?: (message: string, jobs: number, restartable: boolean) => void;
   /** a job unanswered this long marks its worker dead (hung, not crashed)
    * and goes to the fallback; 0 = wait forever */
   jobTimeoutMs?: number;
+  /** how many times a dead slot may be given a fresh worker (0 = never):
+   * a transient failure then costs one job's delay, not a thread for the
+   * rest of the page's life; a worker that keeps dying stays dead */
+  maxRespawns?: number;
 }
 
 export class WorkerPool<J extends PoolJob, R> {
@@ -75,32 +83,49 @@ export class WorkerPool<J extends PoolJob, R> {
 
   constructor(
     size: number,
-    factory: () => WorkerLike,
+    private readonly factory: () => WorkerLike,
     private readonly options: WorkerPoolOptions<J, R> = {},
   ) {
-    for (let i = 0; i < Math.max(1, Math.floor(size)); i++) {
-      const worker = factory();
-      const slot: Slot = {
-        worker,
-        busy: 0,
-        profile: null,
-        pending: new Set(),
-        dead: false,
-      };
-      worker.addEventListener("message", (ev) =>
-        this.onMessage(ev.data as PoolResponse<R>),
-      );
-      worker.addEventListener("error", (ev) =>
-        this.onError(slot, ev.message ?? "worker error"),
-      );
-      worker.addEventListener("messageerror", () =>
+    for (let i = 0; i < Math.max(1, Math.floor(size)); i++)
+      this.slots.push(this.spawn());
+  }
+
+  /** A slot with a fresh worker: a new one, or a dead slot revived. Events
+   * from a worker the slot has since replaced are ignored — a terminated
+   * worker may still have events queued on this side. */
+  private spawn(prior?: Slot): Slot {
+    const worker = this.factory();
+    const slot: Slot = prior ?? {
+      worker,
+      busy: 0,
+      profile: null,
+      pending: new Set(),
+      dead: false,
+      respawns: 0,
+    };
+    if (prior) {
+      slot.worker = worker;
+      slot.busy = 0;
+      slot.profile = null;
+      slot.pending = new Set();
+      slot.dead = false;
+      slot.respawns++;
+    }
+    const mine = () => slot.worker === worker;
+    worker.addEventListener("message", (ev) => {
+      if (mine()) this.onMessage(ev.data as PoolResponse<R>);
+    });
+    worker.addEventListener("error", (ev) => {
+      if (mine()) this.onError(slot, ev.message ?? "worker error");
+    });
+    worker.addEventListener("messageerror", () => {
+      if (mine())
         this.onError(
           slot,
           "a message to or from the worker could not be decoded",
-        ),
-      );
-      this.slots.push(slot);
-    }
+        );
+    });
+    return slot;
   }
 
   get size(): number {
@@ -114,16 +139,15 @@ export class WorkerPool<J extends PoolJob, R> {
 
   run(job: J): Promise<R> {
     if (this.closed) return Promise.reject(new Error("pool terminated"));
-    // a dead slot is never chosen; with none alive the job runs through
-    // the fallback (the main thread) rather than waiting on a corpse
-    const live = this.slots.filter((s) => !s.dead);
-    if (live.length === 0) {
+    const slot = this.pick();
+    if (!slot) {
+      // every worker is dead for good: the job runs through the fallback
+      // (the main thread) rather than waiting on a corpse
       const fallback = this.options.fallback;
       return fallback
         ? fallback(job)
         : Promise.reject(new Error("every worker of the pool has died"));
     }
-    const slot = live.reduce((a, b) => (b.busy < a.busy ? b : a));
     const id = ++this.seq;
     const { profile, ...rest } = job;
     const req: PoolRequest<J> = {
@@ -138,14 +162,13 @@ export class WorkerPool<J extends PoolJob, R> {
       const w: Waiting<J, R> = { resolve, reject, slot, job };
       const limit = this.options.jobTimeoutMs ?? 0;
       if (limit > 0)
-        w.timer = setTimeout(
-          () =>
-            this.onError(
-              slot,
-              `no answer from the worker in ${Math.round(limit / 1000)} s`,
-            ),
-          limit,
-        );
+        w.timer = setTimeout(() => {
+          if (!slot.pending.has(id)) return; // moved already: its worker died
+          this.onError(
+            slot,
+            `no answer from the worker in ${Math.round(limit / 1000)} s`,
+          );
+        }, limit);
       this.waiting.set(id, w);
       try {
         slot.worker.postMessage(req);
@@ -157,6 +180,27 @@ export class WorkerPool<J extends PoolJob, R> {
         );
       }
     });
+  }
+
+  /** The least-busy live worker; when none is idle, a dead slot with
+   * restarts left is given a fresh worker instead (a dead slot is never
+   * chosen as it is: postMessage to it would be a silent no-op). */
+  private pick(): Slot | null {
+    const live = this.slots.filter((s) => !s.dead);
+    const best = live.length
+      ? live.reduce((a, b) => (b.busy < a.busy ? b : a))
+      : null;
+    if (best && best.busy === 0) return best;
+    const max = this.options.maxRespawns ?? 0;
+    for (const s of this.slots) {
+      if (!s.dead || s.respawns >= max) continue;
+      try {
+        return this.spawn(s);
+      } catch {
+        s.respawns = max; // no worker could be made: this slot stays dead
+      }
+    }
+    return best;
   }
 
   terminate(): void {
@@ -189,14 +233,26 @@ export class WorkerPool<J extends PoolJob, R> {
     else this.settle(msg.id, undefined, new Error(msg.error));
   }
 
-  /** A worker died (its script failed to load, or it threw outside a
-   * message): its pending jobs go to the fallback or fail. */
+  /** A worker died (its script failed to load, it threw outside a message,
+   * a message could not be decoded, or a job went unanswered too long).
+   * Its thread is terminated — a crashed worker's realm lives on with its
+   * memory, and a hung one keeps its core too, until the page is left —
+   * and its pending jobs go to the fallback or fail. */
   private onError(slot: Slot, message: string): void {
     if (slot.dead) return;
     slot.dead = true;
+    try {
+      slot.worker.terminate();
+    } catch {
+      /* already gone */
+    }
     const ids = [...slot.pending];
     slot.profile = null;
-    this.options.onWorkerError?.(message, ids.length);
+    this.options.onWorkerError?.(
+      message,
+      ids.length,
+      slot.respawns < (this.options.maxRespawns ?? 0),
+    );
     for (const id of ids) {
       const w = this.take(id);
       if (!w) continue;
