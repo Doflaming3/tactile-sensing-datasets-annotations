@@ -18,6 +18,7 @@ import HfAuthButton from "@/components/hf-auth-button";
 import { useAuth } from "@/context/auth-context";
 import { fetchRepoText } from "@/lib/annotateEpisode";
 import {
+  EPISODE_READ_TIMEOUT_MS,
   entriesForCommit,
   flagHistogram,
   isFlaggedRow,
@@ -369,6 +370,7 @@ export default function BatchPage({
           stage: (ep, atoms) => stageLocalAtoms(repoId, ep, atoms),
           concurrency: workers,
           readEpisode,
+          readTimeoutMs: EPISODE_READ_TIMEOUT_MS,
           baseSha,
           resume: prior
             ? {

@@ -34,6 +34,7 @@ import {
 import { atomsForSave, mergeAutoAtoms, sameAtomSet } from "./atomPolicy";
 import type { DetectionThresholds } from "./eventDetection";
 import type { ProfileSource, RigProfile } from "./rigProfile";
+import { withTimeout } from "./timeLimit";
 
 /** Bumped by hand when the detector's output changes; lands in the report
  * so a batch can be told apart from a later one. */
@@ -235,6 +236,12 @@ export type EpisodeReader = (
  * sidecar texts and the Hub file fetched together, then the detector. Runs
  * wherever it is called — on the main thread, or inside a worker with that
  * worker's own loaders. */
+/** How long one episode's read — its fetches and the detector together —
+ * may take before its row fails: on this thread, inside a worker, and on
+ * the worker's fallback alike, so a stalled fetch costs one row, never
+ * the run. A cold episode read takes ~10 s. */
+export const EPISODE_READ_TIMEOUT_MS = 180_000;
+
 export function episodeReader(
   loaders: Pick<BatchLoaders, "loadEpisode" | "fetchText" | "fetchExisting">,
   annotate: AnnotateFn,
@@ -242,9 +249,15 @@ export function episodeReader(
     profile: RigProfile;
     thresholds: Partial<DetectionThresholds>;
     useRaw: boolean;
+    /** give up on an episode after this long (0 or unset: wait) */
+    timeoutMs?: number;
   },
 ): EpisodeReader {
-  return async (episode, rawPaths) => {
+  const limit = opts.timeoutMs ?? 0;
+  const readOne = async (
+    episode: number,
+    rawPaths: string[],
+  ): Promise<EpisodeRead> => {
     const timing: BatchTiming = { load: 0, raw: 0, hub: 0, annotate: 0 };
     // the work is started INSIDE the clock (a synchronous detector would
     // otherwise run before it)
@@ -280,6 +293,12 @@ export function episodeReader(
     );
     return { outcome, existing: existingFile?.atoms ?? null, timing };
   };
+  return (episode, rawPaths) =>
+    withTimeout(
+      readOne(episode, rawPaths),
+      limit,
+      `no answer in ${Math.round(limit / 1000)} s (a stalled fetch, most likely)`,
+    );
 }
 
 // ---------------------------------------------------------------- the run
@@ -309,6 +328,9 @@ export interface BatchRunOptions {
   /** the whole read-and-annotate step (the batch page's worker pool);
    * default: episodeReader over `loaders` and `annotate` */
   readEpisode?: EpisodeReader;
+  /** the default reader's deadline per episode (the batch page passes
+   * EPISODE_READ_TIMEOUT_MS); unset: wait */
+  readTimeoutMs?: number;
   /** the dataset's commit on main at the start of a fresh run */
   baseSha?: string | null;
   /** continue a stopped run: the rows already done (their episodes are
@@ -365,6 +387,7 @@ export async function runBatch(opts: BatchRunOptions): Promise<BatchOutput> {
       profile: opts.profile,
       thresholds: opts.thresholds,
       useRaw: opts.useRaw,
+      timeoutMs: opts.readTimeoutMs,
     });
   const concurrency = Math.max(1, Math.floor(opts.concurrency ?? 1));
   const priorRows = opts.resume?.rows ?? [];

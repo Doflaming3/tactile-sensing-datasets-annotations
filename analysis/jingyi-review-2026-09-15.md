@@ -88,3 +88,23 @@ as a person's and never refreshed by a run (accepted by her rule); a
 dragged detector EVENT keeps its `[auto:…]` label and is still replaced on
 a rerun; the single Save has no parent-version check of its own (hers,
 untouched here).
+
+## Follow-ups after the round (2026-09-15, same day)
+
+Zheng's questions once the fixes had shipped; two further commits on the
+PR #3 branch.
+
+- **A dead worker is terminated and, up to twice, replaced.** Marking a
+  crashed or hung worker dead had left its thread alive — the pool held the
+  reference, so it kept its memory and, hung, its core, until the page was
+  left — and the slot was never replaced, so every later run on the page
+  had one worker fewer. Now the worker is terminated on death; a dead slot
+  is given a fresh worker when every live one is busy, twice per slot at
+  most; a late event from the replaced worker is ignored.
+- **Every episode read has a deadline.** A fetch that stalled on the
+  worker's fallback, or on the main-thread run without workers, held the
+  run forever. One episode's read (fetches and detector together) now has
+  three minutes everywhere: inside a worker, which answers with an error
+  and lives on (the pool gives up on a thread that cannot even answer a
+  minute after that); on the fallback; on the default reader. The row
+  fails with "no answer in 180 s" and the run goes on.

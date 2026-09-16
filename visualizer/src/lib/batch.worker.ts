@@ -10,7 +10,11 @@ import { fetchAnnotationsFromHub } from "@/utils/hubCommit";
 import { setDatasetPathPrefix } from "@/utils/versionUtils";
 
 import { annotateEpisode, fetchRepoText } from "./annotateEpisode";
-import { episodeReader, type EpisodeRead } from "./batchAnnotate";
+import {
+  EPISODE_READ_TIMEOUT_MS,
+  episodeReader,
+  type EpisodeRead,
+} from "./batchAnnotate";
 import type { EpisodeJob } from "./batchJobs";
 import type { RigProfile } from "./rigProfile";
 import type { PoolRequest, PoolResponse } from "./workerPool";
@@ -37,7 +41,15 @@ self.addEventListener(
           fetchExisting: (ep) => fetchAnnotationsFromHub(repoId, ep),
         },
         async (inputs, opts) => annotateEpisode(inputs, opts),
-        { profile, thresholds: job.thresholds, useRaw: job.useRaw },
+        {
+          profile,
+          thresholds: job.thresholds,
+          useRaw: job.useRaw,
+          // a stalled fetch fails this job with a message and the worker
+          // lives on; the pool's own, longer limit is for a thread that
+          // cannot even answer
+          timeoutMs: EPISODE_READ_TIMEOUT_MS,
+        },
       );
       res = {
         id: req.id,

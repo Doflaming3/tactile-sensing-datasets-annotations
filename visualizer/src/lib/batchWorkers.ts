@@ -8,6 +8,7 @@ import { fetchAnnotationsFromHub } from "@/utils/hubCommit";
 
 import { annotateEpisode, fetchRepoText } from "./annotateEpisode";
 import {
+  EPISODE_READ_TIMEOUT_MS,
   episodeReader,
   type EpisodeRead,
   type EpisodeReader,
@@ -27,8 +28,13 @@ export function defaultWorkerCount(): number {
 }
 
 /** The per-episode pipeline on this thread, from a job: the pool's
- * fallback, and the whole story when there are no workers. */
-export function readEpisodeHere(job: EpisodeJob): Promise<EpisodeRead> {
+ * fallback, where a dead worker's jobs land. It has the same deadline as
+ * a worker's read, so a fetch that stalls here too fails the row rather
+ * than holding the run. */
+export function readEpisodeHere(
+  job: EpisodeJob,
+  timeoutMs = EPISODE_READ_TIMEOUT_MS,
+): Promise<EpisodeRead> {
   const repoId = `${job.org}/${job.dataset}`;
   return episodeReader(
     {
@@ -37,7 +43,12 @@ export function readEpisodeHere(job: EpisodeJob): Promise<EpisodeRead> {
       fetchExisting: (ep) => fetchAnnotationsFromHub(repoId, ep),
     },
     async (inputs, opts) => annotateEpisode(inputs, opts),
-    { profile: job.profile, thresholds: job.thresholds, useRaw: job.useRaw },
+    {
+      profile: job.profile,
+      thresholds: job.thresholds,
+      useRaw: job.useRaw,
+      timeoutMs,
+    },
   )(job.episode, job.rawPaths);
 }
 
@@ -55,15 +66,16 @@ export function createBrowserPool(
         new Worker(
           new URL("./batch.worker.ts", import.meta.url),
         ) as unknown as WorkerLike,
-      // a thread that stops answering (not a crash) is given up after
-      // three minutes — a cold episode read takes ~10 s; a dead worker is
-      // terminated and replaced up to twice, so a passing failure (a
-      // stalled fetch) does not cost a thread for the rest of the page's
-      // life, while one that keeps dying stays dead
+      // a worker's read has its own deadline (EPISODE_READ_TIMEOUT_MS) and
+      // answers with an error when a fetch stalls; a thread that cannot
+      // even answer by a minute after that is given up as hung. A dead
+      // worker is terminated and replaced up to twice, so a passing
+      // failure does not cost a thread for the rest of the page's life,
+      // while one that keeps dying stays dead
       {
         fallback: readEpisodeHere,
         onWorkerError,
-        jobTimeoutMs: 180_000,
+        jobTimeoutMs: EPISODE_READ_TIMEOUT_MS + 60_000,
         maxRespawns: 2,
       },
     );
